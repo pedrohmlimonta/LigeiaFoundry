@@ -1,0 +1,10 @@
+node_modules/
+package-lock.json
+.DS_Store
+build-*/
+ligeia-rpg.zip
+# Logs gerais (mas NÃO os .log dos packs LevelDB, que são necessários)
+/*.log
+# Locks transitórios do LevelDB (não devem ir ao git)
+packs/**/LOCK
+packs/**/LOG.old

@@ -1,0 +1,64 @@
+name: Release Ligeia RPG
+
+# Dispara quando você cria uma Release no GitHub (recomendado) OU empurra uma tag v*
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Garante que a versão do system.json bate com a tag da release (vX.Y.Z)
+      - name: Sincronizar versão e URLs com a tag
+        id: vars
+        run: |
+          TAG="${GITHUB_REF_NAME}"            # ex: v0.1.0
+          VERSION="${TAG#v}"                  # ex: 0.1.0
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          REPO="${GITHUB_REPOSITORY}"         # ex: pedrohmlimonta/ligeia-foundry
+          node -e "
+            const fs=require('fs');
+            const d=JSON.parse(fs.readFileSync('system.json','utf8'));
+            d.version='${VERSION}';
+            d.manifest='https://github.com/${REPO}/releases/latest/download/system.json';
+            d.download='https://github.com/${REPO}/releases/download/${TAG}/ligeia-rpg.zip';
+            fs.writeFileSync('system.json', JSON.stringify(d,null,2));
+            console.log('system.json -> versão', d.version);
+          "
+
+      # Os packs LevelDB já vêm versionados no repositório. Se você mantiver
+      # um build-packs.mjs + bibliotecas, descomente o bloco abaixo para
+      # regenerá-los no release.
+      # - name: Gerar compendia
+      #   run: |
+      #     npm install classic-level --no-save
+      #     node build-packs.mjs
+
+      # Empacota o sistema com o system.json na RAIZ do zip
+      - name: Empacotar ligeia-rpg.zip
+        run: |
+          find packs -name "LOCK" -delete 2>/dev/null || true
+          find packs -name "LOG.old" -delete 2>/dev/null || true
+          zip -r ligeia-rpg.zip \
+            system.json module templates styles lang assets packs README.md LICENSE \
+            -x "*.DS_Store" "node_modules/*" ".git/*" "build-*" "package*.json"
+
+      # Anexa system.json e ligeia-rpg.zip como assets da release
+      - name: Anexar assets à release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            system.json
+            ligeia-rpg.zip

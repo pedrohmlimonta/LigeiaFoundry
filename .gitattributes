@@ -1,0 +1,5 @@
+# Arquivos LevelDB das compendia são binários — não tratar como texto
+packs/**/*.ldb binary
+packs/**/*.log binary
+packs/**/MANIFEST-* binary
+packs/**/CURRENT binary

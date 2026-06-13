@@ -13,8 +13,12 @@
       "name": "Comunidade Ligeia"
     }
   ],
-  "esmodules": ["module/ligeia.mjs"],
-  "styles": ["styles/ligeia.css"],
+  "esmodules": [
+    "module/ligeia.mjs"
+  ],
+  "styles": [
+    "styles/ligeia.css"
+  ],
   "languages": [
     {
       "lang": "pt-BR",
@@ -49,7 +53,10 @@
       "path": "packs/habilidades",
       "type": "Item",
       "system": "ligeia-rpg",
-      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
     },
     {
       "name": "magias",
@@ -57,7 +64,10 @@
       "path": "packs/magias",
       "type": "Item",
       "system": "ligeia-rpg",
-      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
     },
     {
       "name": "tracos",
@@ -65,7 +75,10 @@
       "path": "packs/tracos",
       "type": "Item",
       "system": "ligeia-rpg",
-      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
     },
     {
       "name": "equipamentos",
@@ -73,19 +86,29 @@
       "path": "packs/equipamentos",
       "type": "Item",
       "system": "ligeia-rpg",
-      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
     }
   ],
   "packFolders": [
     {
       "name": "Ligeia — Livro de Regras",
       "sorting": "m",
-      "packs": ["habilidades", "magias", "tracos", "equipamentos"]
+      "packs": [
+        "habilidades",
+        "magias",
+        "tracos",
+        "equipamentos"
+      ]
     }
   ],
   "primaryTokenAttribute": "resources.hp",
   "secondaryTokenAttribute": "resources.mp",
   "url": "https://github.com/pedrohmlimonta/ligeia-foundry",
-  "manifest": "https://raw.githubusercontent.com/pedrohmlimonta/ligeia-foundry/main/system.json",
-  "download": "https://github.com/pedrohmlimonta/ligeia-foundry/archive/refs/heads/main.zip"
+  "manifest": "https://github.com/pedrohmlimonta/ligeia-foundry/releases/latest/download/system.json",
+  "download": "https://github.com/pedrohmlimonta/ligeia-foundry/releases/download/v0.1.0/ligeia-rpg.zip",
+  "bugs": "https://github.com/pedrohmlimonta/ligeia-foundry/issues",
+  "readme": "https://github.com/pedrohmlimonta/ligeia-foundry/blob/main/README.md"
 }
