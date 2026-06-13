@@ -27,6 +27,9 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       removeMeta: LigeiaItemSheetBase._onRemoveMeta,
       addListItem: LigeiaItemSheetBase._onAddListItem,
       removeListItem: LigeiaItemSheetBase._onRemoveListItem,
+      removeTrait: LigeiaItemSheetBase._onRemoveTrait,
+      addAction: LigeiaItemSheetBase._onAddAction,
+      removeAction: LigeiaItemSheetBase._onRemoveAction,
     },
   };
 
@@ -266,7 +269,6 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
   }
 
   #savedScroll = 0;
-  #delegationBound = false;
   // Quando true, o próximo _prepareSubmitData NÃO reconstrói os arrays a
   // partir do form (evita corrida que sobrescreve uma adição/remoção
   // programática feita por _appendToArray/_removeFromArray).
@@ -277,48 +279,12 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     const root = this.element;
     if (!root) return;
 
-    // ----- Fallback de ações por DELEGAÇÃO -----
-    // Liga UM ÚNICO listener no elemento raiz (não re-liga a cada render).
-    // Captura cliques em [data-action] e despacha para os handlers de array.
-    // Isto garante o funcionamento mesmo se o dispatcher de actions do
-    // ApplicationV2 não capturar os botões dos partials.
-    if (!this.#delegationBound) {
-      this.#delegationBound = true;
-      // Captura na fase de CAPTURE (true) para interceptar antes de
-      // qualquer handler do formulário/ApplicationV2.
-      root.addEventListener(
-        "click",
-        async (ev) => {
-          const btn = ev.target.closest("[data-action]");
-          if (!btn || !root.contains(btn)) return;
-          const action = btn.dataset.action;
-          const arrayActions = {
-            addEffect: () => this._appendToArray("system.effects", { type: "bonus", target: "all", value: 1, label: "", enabled: true }),
-            removeEffect: () => this._removeFromArray("system.effects", Number(btn.dataset.index)),
-            addCost: () => this._appendToArray("system.costs", { resource: "mp", value: 1, label: "" }),
-            removeCost: () => this._removeFromArray("system.costs", Number(btn.dataset.index)),
-            addMeta: () => this._appendToArray("system.metamagics", { name: "", wordId: "", description: "" }),
-            removeMeta: () => this._removeFromArray("system.metamagics", Number(btn.dataset.index)),
-            addListItem: () => this._appendToArray("system.skillList", ""),
-            removeListItem: () => this._removeFromArray("system.skillList", Number(btn.dataset.index)),
-            removeTrait: () => this._removeFromArray("system.grantedTraits", Number(btn.dataset.index)),
-            addAction: () => this._appendToArray("system.actions", {
-              label: "Ação", canRoll: true, rollAttr: "forca", rollBonus: 0, rollDice: 0,
-              targetMode: "target", includeSelf: false, defenseAttr: "esquiva", defenseAttr2: "",
-              damage: "", damageType: "", damageResource: "hp", scalingDamage: false,
-              appliesConditions: [], range: 0, area: 0, costMp: 0, costHp: 0, costHeroic: 0,
-            }),
-            removeAction: () => this._removeFromArray("system.actions", Number(btn.dataset.index)),
-          };
-          if (arrayActions[action]) {
-            ev.preventDefault();
-            ev.stopPropagation();
-            await arrayActions[action]();
-          }
-        },
-        true, // <-- fase de captura
-      );
-    }
+    // Os botões de adicionar/remover itens de lista (efeitos, custos, ações,
+    // etc.) são tratados pelo dispatcher nativo de `actions` do ApplicationV2
+    // (ver DEFAULT_OPTIONS.actions), que é re-vinculado a cada render. Não
+    // usamos mais delegação manual aqui — ela ficava órfã após um re-render
+    // que troca o elemento raiz, fazendo os botões de Ação pararem de
+    // funcionar até um F5.
 
     // ----- Preservação de scroll -----
     // O elemento que rola é .ligeia-item-body (o .window-content tem
@@ -404,6 +370,24 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
   }
   static async _onRemoveListItem(event, target) {
     await this._removeFromArray("system.skillList", Number(target.dataset.index));
+  }
+
+  /* ---- Traços concedidos (definições) ---- */
+  static async _onRemoveTrait(event, target) {
+    await this._removeFromArray("system.grantedTraits", Number(target.dataset.index));
+  }
+
+  /* ---- Ações (habilidade/magia/equipamento/traço) ---- */
+  static async _onAddAction() {
+    await this._appendToArray("system.actions", {
+      label: "Ação", canRoll: true, rollAttr: "forca", rollBonus: 0, rollDice: 0,
+      targetMode: "target", includeSelf: false, defenseAttr: "esquiva", defenseAttr2: "",
+      damage: "", damageType: "", damageResource: "hp", scalingDamage: false,
+      appliesConditions: [], range: 0, area: 0, costMp: 0, costHp: 0, costHeroic: 0,
+    });
+  }
+  static async _onRemoveAction(event, target) {
+    await this._removeFromArray("system.actions", Number(target.dataset.index));
   }
 }
 
