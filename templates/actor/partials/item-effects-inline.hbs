@@ -1,0 +1,31 @@
+{{!-- Efeitos de um item exibidos inline na ficha do personagem.
+      Espera: item (com _fxView), effectTypeLabels, effectTargetLabels.
+      _fxView[i]._active = se o efeito contribui agora (modo+enabled+nível).
+      Permite ligar/desligar cada efeito sem abrir a edição do item. --}}
+{{#if item._fxView.length}}
+<div class="lig-inline-effects">
+  {{#each item._fxView as |eff ei|}}
+  <div class="lig-inline-effect {{#unless eff.enabled}}is-off{{/unless}} {{#unless eff._active}}is-inactive{{/unless}}">
+    <button type="button"
+            class="lig-fx-toggle {{#if eff.enabled}}on{{/if}}"
+            data-action="effectToggle"
+            data-item-id="{{../item.id}}"
+            data-effect-index="{{ei}}"
+            title="{{#if eff.enabled}}Desativar este efeito{{else}}Ativar este efeito{{/if}}">
+      {{#if eff.enabled}}●{{else}}○{{/if}}
+    </button>
+    <span class="lig-fx-desc">
+      <span class="lig-fx-type">{{lookup ../effectTypeLabels eff.type}}</span>
+      {{#if (ne eff.type "info")}}
+        <span class="lig-fx-val">{{eff.value}}</span>
+        {{#unless (or (eq eff.type "damage") (eq eff.type "rd"))}}
+          <span class="lig-fx-target">{{lookup ../effectTargetLabels eff.target}}</span>
+        {{/unless}}
+      {{/if}}
+      {{#if (ne eff.level "all")}}<span class="lig-fx-lvl">{{eff.level}}</span>{{/if}}
+      {{#if eff.label}}<span class="lig-fx-label">{{eff.label}}</span>{{/if}}
+    </span>
+  </div>
+  {{/each}}
+</div>
+{{/if}}

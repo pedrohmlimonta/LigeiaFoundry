@@ -1,0 +1,5 @@
+{{!-- Partial: cabeçalho comum de item (imagem + nome). Espera {item, editable} --}}
+<header class="lig-item-header">
+  <img class="lig-item-img" src="{{item.img}}" data-edit="img" alt="{{item.name}}"/>
+  <input type="text" name="name" value="{{item.name}}" class="lig-item-name" placeholder="Nome"/>
+</header>

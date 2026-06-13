@@ -1,0 +1,47 @@
+{{!-- Partial: editor de efeitos. Cada efeito já vem com targetChoices e
+      targetApplies calculados em _prepareContext conforme seu tipo.
+      showEffectLevel = true apenas em habilidades (efeito por nível B/A/E). --}}
+<div class="lig-effects">
+  <div class="lig-section-title">
+    Efeitos
+    <button type="button" class="lig-mini-btn" data-action="addEffect">+ efeito</button>
+  </div>
+  {{#each effects as |eff i|}}
+  <div class="lig-effect-row {{#if ../showEffectLevel}}has-level{{/if}}">
+    <select name="system.effects.{{i}}.type">
+      {{selectOptions ../effectTypes selected=eff.type}}
+    </select>
+    {{#if eff.targetApplies}}
+    <select name="system.effects.{{i}}.target">
+      {{selectOptions eff.targetChoices selected=eff.target}}
+    </select>
+    {{else}}
+    <select name="system.effects.{{i}}.target" disabled>
+      <option value="all" selected>—</option>
+    </select>
+    {{/if}}
+    <input type="number" name="system.effects.{{i}}.value" value="{{eff.value}}" class="lig-narrow"/>
+    {{#if eff.isDamageType}}
+    <select name="system.effects.{{i}}.damageType" class="lig-fx-dmgtype" title="Tipo de dano (RD desse tipo / dano desse tipo)">
+      {{selectOptions ../damageTypesWithAny selected=eff.damageType}}
+    </select>
+    {{/if}}
+    {{#if ../showEffectLevel}}
+    <select name="system.effects.{{i}}.level" class="lig-fx-level" title="A partir de qual nível este efeito vale">
+      <option value="all" {{#if (eq eff.level "all")}}selected{{/if}}>Sempre</option>
+      <option value="B" {{#if (eq eff.level "B")}}selected{{/if}}>Básico+</option>
+      <option value="A" {{#if (eq eff.level "A")}}selected{{/if}}>Avançado+</option>
+      <option value="E" {{#if (eq eff.level "E")}}selected{{/if}}>Épico</option>
+    </select>
+    {{/if}}
+    <input type="text" name="system.effects.{{i}}.label" value="{{eff.label}}" placeholder="nota"/>
+    <label class="lig-inline-check" title="Ativo">
+      <input type="checkbox" name="system.effects.{{i}}.enabled" {{checked eff.enabled}}/>
+    </label>
+    <button type="button" class="lig-mini-btn danger" data-action="removeEffect" data-index="{{i}}">✕</button>
+  </div>
+  {{/each}}
+  {{#unless effects.length}}
+  <div class="lig-empty">Sem efeitos.</div>
+  {{/unless}}
+</div>

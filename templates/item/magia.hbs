@@ -1,0 +1,67 @@
+<div class="ligeia-item-body magia">
+  {{> systems/ligeia-rpg/templates/item/partials/header.hbs}}
+
+  <div class="lig-item-row">
+    <label>Palavra arcana
+      <select name="system.wordId">
+        <option value="">—</option>
+        {{selectOptions arcaneWords selected=system.wordId}}
+      </select>
+    </label>
+    <label>Círculo
+      <select name="system.tier">
+        {{selectOptions tierChoices selected=system.tier}}
+      </select>
+    </label>
+    <label>Conjuração
+      <input type="text" name="system.casting" value="{{system.casting}}" placeholder="Ação, 1 min..."/>
+    </label>
+  </div>
+
+  <div class="lig-slots">
+    <label>Alvo<input type="text" name="system.target" value="{{system.target}}"/></label>
+    <label>Área<input type="text" name="system.area" value="{{system.area}}"/></label>
+    <label>Alcance<input type="text" name="system.range" value="{{system.range}}"/></label>
+    <label>Duração<input type="text" name="system.duration" value="{{system.duration}}"/></label>
+  </div>
+
+  <div class="lig-desc-block">
+    <div class="lig-section-title">Descrição</div>
+    {{#if editable}}
+    <textarea name="system.description" rows="4">{{system.description}}</textarea>
+    {{else}}<div class="lig-rendered">{{{enrichedDescription}}}</div>{{/if}}
+  </div>
+
+  <div class="lig-desc-block">
+    <div class="lig-section-title">Peculiaridades (Criação de Magias)</div>
+    {{#if editable}}
+    <textarea name="system.peculiarities" rows="3">{{system.peculiarities}}</textarea>
+    {{else}}<div class="lig-rendered">{{{enrichedPeculiarities}}}</div>{{/if}}
+  </div>
+
+  {{!-- Metamagias --}}
+  <div class="lig-meta-block">
+    <div class="lig-section-title">
+      Metamagias
+      {{#if editable}}<button type="button" class="lig-mini-btn" data-action="addMeta">+ metamagia</button>{{/if}}
+    </div>
+    {{#each system.metamagics as |meta i|}}
+    <div class="lig-meta-row">
+      <input type="text" name="system.metamagics.{{i}}.name" value="{{meta.name}}" placeholder="Nome"/>
+      <select name="system.metamagics.{{i}}.wordId">
+        <option value="">—</option>
+        {{selectOptions ../arcaneWords selected=meta.wordId}}
+      </select>
+      <input type="text" name="system.metamagics.{{i}}.description" value="{{meta.description}}" placeholder="Efeito"/>
+      {{#if ../editable}}<button type="button" class="lig-mini-btn danger" data-action="removeMeta" data-index="{{i}}">✕</button>{{/if}}
+    </div>
+    {{else}}
+    <div class="lig-empty">Sem metamagias.</div>
+    {{/each}}
+  </div>
+
+  {{> systems/ligeia-rpg/templates/item/partials/action.hbs}}
+  {{> systems/ligeia-rpg/templates/item/partials/mode.hbs}}
+  {{> systems/ligeia-rpg/templates/item/partials/effects.hbs}}
+  {{> systems/ligeia-rpg/templates/item/partials/costs.hbs}}
+</div>

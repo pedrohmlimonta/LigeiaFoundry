@@ -1,0 +1,19 @@
+{{!-- Partial: editor de custos. Espera {costs, costResources, editable} --}}
+<div class="lig-costs">
+  <div class="lig-section-title">
+    Custos para usar
+    <button type="button" class="lig-mini-btn" data-action="addCost">+ custo</button>
+  </div>
+  {{#each costs as |cost i|}}
+  <div class="lig-cost-row">
+    <select name="system.costs.{{i}}.resource">
+      {{selectOptions ../costResources selected=cost.resource}}
+    </select>
+    <input type="number" name="system.costs.{{i}}.value" value="{{cost.value}}" class="lig-narrow"/>
+    <input type="text" name="system.costs.{{i}}.label" value="{{cost.label}}" placeholder="nota"/>
+    <button type="button" class="lig-mini-btn danger" data-action="removeCost" data-index="{{i}}">✕</button>
+  </div>
+  {{else}}
+  <div class="lig-empty">Sem custos.</div>
+  {{/each}}
+</div>

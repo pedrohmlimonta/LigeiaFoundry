@@ -1,0 +1,60 @@
+<div class="ligeia-item-body equipamento">
+  {{> systems/ligeia-rpg/templates/item/partials/header.hbs}}
+
+  <div class="lig-item-row">
+    <label>Categoria
+      <input type="text" name="system.category" value="{{system.category}}" placeholder="Arma, Armadura, Suprimento..."/>
+    </label>
+    <label>Qtd.
+      <input type="number" name="system.qty" value="{{system.qty}}" min="0"/>
+    </label>
+    <label>Peso
+      <input type="number" name="system.weight" value="{{system.weight}}" min="0" step="0.1"/>
+    </label>
+    <label>Preço
+      <input type="text" name="system.price" value="{{system.price}}" placeholder="ex: 50 Vo"/>
+    </label>
+  </div>
+
+  <label class="lig-full">Notas / propriedades
+    <input type="text" name="system.notes" value="{{system.notes}}" placeholder="Versátil, alcance, penalidade..."/>
+  </label>
+
+  <div class="lig-desc-block">
+    <div class="lig-section-title">Descrição</div>
+    {{#if editable}}
+    <textarea name="system.description" rows="3">{{system.description}}</textarea>
+    {{else}}<div class="lig-rendered">{{{enrichedDescription}}}</div>{{/if}}
+  </div>
+
+  {{!-- Ataque derivado --}}
+  <div class="lig-attack-block">
+    <label class="lig-inline-check">
+      <input type="checkbox" name="system.isWeapon" {{checked system.isWeapon}}/>
+      É uma arma (gera ataque na ficha)
+    </label>
+    {{#if system.isWeapon}}
+    <div class="lig-item-row">
+      <label>Atributo
+        <select name="system.attack.attribute">
+          {{selectOptions attrChoices selected=system.attack.attribute}}
+        </select>
+      </label>
+      <label>Bônus
+        <input type="number" name="system.attack.bonus" value="{{system.attack.bonus}}"/>
+      </label>
+      <label>Dados de melhoria
+        <input type="number" name="system.attack.dice" value="{{system.attack.dice}}" min="0"/>
+      </label>
+    </div>
+    <label class="lig-full">Propriedades do ataque
+      <input type="text" name="system.attack.properties" value="{{system.attack.properties}}" placeholder="dano, tipo, alcance..."/>
+    </label>
+    {{/if}}
+  </div>
+
+  {{> systems/ligeia-rpg/templates/item/partials/action.hbs}}
+  {{> systems/ligeia-rpg/templates/item/partials/mode.hbs}}
+  {{> systems/ligeia-rpg/templates/item/partials/effects.hbs}}
+  {{> systems/ligeia-rpg/templates/item/partials/costs.hbs}}
+</div>

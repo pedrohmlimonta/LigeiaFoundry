@@ -1,0 +1,91 @@
+{
+  "id": "ligeia-rpg",
+  "title": "Ligeia RPG",
+  "description": "Sistema não-oficial para o RPG de mesa Ligeia. Fichas de personagem, habilidades, magias, equipamentos, traços, sistema de listas de habilidades e descanso.",
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "13",
+    "verified": "13",
+    "maximum": "13"
+  },
+  "authors": [
+    {
+      "name": "Comunidade Ligeia"
+    }
+  ],
+  "esmodules": ["module/ligeia.mjs"],
+  "styles": ["styles/ligeia.css"],
+  "languages": [
+    {
+      "lang": "pt-BR",
+      "name": "Português (Brasil)",
+      "path": "lang/pt-BR.json"
+    }
+  ],
+  "documentTypes": {
+    "Actor": {
+      "personagem": {},
+      "npc": {}
+    },
+    "Item": {
+      "habilidade": {},
+      "magia": {},
+      "equipamento": {},
+      "traco": {},
+      "raca": {},
+      "heranca": {},
+      "vocacao": {},
+      "organizacao": {}
+    }
+  },
+  "grid": {
+    "distance": 1,
+    "units": "m"
+  },
+  "packs": [
+    {
+      "name": "habilidades",
+      "label": "Habilidades (Livro)",
+      "path": "packs/habilidades",
+      "type": "Item",
+      "system": "ligeia-rpg",
+      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+    },
+    {
+      "name": "magias",
+      "label": "Magias (Livro)",
+      "path": "packs/magias",
+      "type": "Item",
+      "system": "ligeia-rpg",
+      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+    },
+    {
+      "name": "tracos",
+      "label": "Traços (Livro)",
+      "path": "packs/tracos",
+      "type": "Item",
+      "system": "ligeia-rpg",
+      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+    },
+    {
+      "name": "equipamentos",
+      "label": "Equipamentos (Livro)",
+      "path": "packs/equipamentos",
+      "type": "Item",
+      "system": "ligeia-rpg",
+      "ownership": { "PLAYER": "OBSERVER", "ASSISTANT": "OWNER" }
+    }
+  ],
+  "packFolders": [
+    {
+      "name": "Ligeia — Livro de Regras",
+      "sorting": "m",
+      "packs": ["habilidades", "magias", "tracos", "equipamentos"]
+    }
+  ],
+  "primaryTokenAttribute": "resources.hp",
+  "secondaryTokenAttribute": "resources.mp",
+  "url": "https://github.com/pedrohmlimonta/ligeia-foundry",
+  "manifest": "https://raw.githubusercontent.com/pedrohmlimonta/ligeia-foundry/main/system.json",
+  "download": "https://github.com/pedrohmlimonta/ligeia-foundry/archive/refs/heads/main.zip"
+}

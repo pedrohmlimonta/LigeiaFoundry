@@ -1,0 +1,130 @@
+{{!-- Editor da LISTA de ações do item. Cada ação tem rolagem, modo de alvo,
+      área/alcance, dano e condições próprios.
+      Espera: actions (enriquecidas), attackAttrs, defenseAttrs, damageTypes. --}}
+<div class="lig-actions-editor">
+  <div class="lig-section-title">
+    Ações
+    <button type="button" class="lig-mini-btn" data-action="addAction">+ ação</button>
+  </div>
+  <p class="lig-hint">Cada ação é uma rolagem/efeito independente (ex.: um golpe corpo-a-corpo, uma onda em área, um toque que aplica condição). Mostra um botão 🎲 por ação na ficha.</p>
+
+  {{#each actions as |act i|}}
+  <div class="lig-action-block">
+    <div class="lig-action-head">
+      <input type="text" name="system.actions.{{i}}.label" value="{{act.label}}" placeholder="Nome da ação" class="lig-action-label"/>
+      <button type="button" class="lig-mini-btn danger" data-action="removeAction" data-index="{{i}}" title="Remover ação">✕</button>
+    </div>
+
+    <label class="lig-inline-check">
+      <input type="checkbox" name="system.actions.{{i}}.canRoll" {{checked act.canRoll}}/>
+      Faz rolagem de ataque
+    </label>
+
+    <div class="lig-item-row">
+      <label>Atributo de ataque
+        <select name="system.actions.{{i}}.rollAttr">{{selectOptions ../attackAttrs selected=act.rollAttr}}</select>
+      </label>
+      <label>Bônus
+        <input type="number" name="system.actions.{{i}}.rollBonus" value="{{act.rollBonus}}"/>
+      </label>
+      <label>Dados extra
+        <input type="number" name="system.actions.{{i}}.rollDice" value="{{act.rollDice}}" min="0"/>
+      </label>
+    </div>
+
+    <div class="lig-item-row">
+      <label>Alvo
+        <select name="system.actions.{{i}}.targetMode">
+          <option value="none" {{#if (eq act.targetMode "none")}}selected{{/if}}>Nenhum</option>
+          <option value="self" {{#if (eq act.targetMode "self")}}selected{{/if}}>O próprio personagem</option>
+          <option value="target" {{#if (eq act.targetMode "target")}}selected{{/if}}>Alvo(s) mirado(s)</option>
+          <option value="area" {{#if (eq act.targetMode "area")}}selected{{/if}}>Área (afeta quem está nela)</option>
+          <option value="aura" {{#if (eq act.targetMode "aura")}}selected{{/if}}>Aura (afeta os outros, não você)</option>
+        </select>
+      </label>
+      <label>Alcance (m)
+        <input type="number" name="system.actions.{{i}}.range" value="{{act.range}}" min="0" step="0.5"/>
+      </label>
+      {{#if (or (eq act.targetMode "area") (eq act.targetMode "aura"))}}
+      <label>Raio da área (m)
+        <input type="number" name="system.actions.{{i}}.area" value="{{act.area}}" min="0" step="0.5"/>
+      </label>
+      {{/if}}
+    </div>
+
+    {{#if (or (eq act.targetMode "area") (eq act.targetMode "aura"))}}
+    <label class="lig-inline-check">
+      <input type="checkbox" name="system.actions.{{i}}.includeSelf" {{checked act.includeSelf}}/>
+      {{#if (eq act.targetMode "aura")}}Exceção: incluir você também na aura{{else}}Exceção: incluir você mesmo se estiver fora da área{{/if}}
+    </label>
+    {{/if}}
+
+    {{#if (or (eq act.targetMode "target") (eq act.targetMode "area") (eq act.targetMode "aura"))}}
+    <div class="lig-item-row">
+      <label>Defesa do alvo
+        <select name="system.actions.{{i}}.defenseAttr">{{selectOptions ../defenseAttrs selected=act.defenseAttr}}</select>
+      </label>
+      <label>Defesa alternativa (usa a melhor)
+        <select name="system.actions.{{i}}.defenseAttr2">
+          <option value="" {{#unless act.defenseAttr2}}selected{{/unless}}>— nenhuma —</option>
+          {{selectOptions ../defenseAttrs selected=act.defenseAttr2}}
+        </select>
+      </label>
+    </div>
+    {{/if}}
+
+    <div class="lig-item-row">
+      <label>Dano (ex: 1d6+2)
+        <input type="text" name="system.actions.{{i}}.damage" value="{{act.damage}}" placeholder="vazio = sem dano"/>
+      </label>
+      <label>Recurso afetado
+        <select name="system.actions.{{i}}.damageResource">
+          <option value="hp" {{#if (eq act.damageResource "hp")}}selected{{/if}}>Vida (PV)</option>
+          <option value="mp" {{#if (eq act.damageResource "mp")}}selected{{/if}}>Mana (PM)</option>
+          <option value="heroic" {{#if (eq act.damageResource "heroic")}}selected{{/if}}>Pontos Heroicos</option>
+        </select>
+      </label>
+      {{#if (eq act.damageResource "hp")}}
+      <label>Tipo de dano
+        <select name="system.actions.{{i}}.damageType">
+          <option value="" {{#unless act.damageType}}selected{{/unless}}>—</option>
+          {{selectOptions ../damageTypes selected=act.damageType}}
+        </select>
+      </label>
+      {{/if}}
+    </div>
+
+    <label class="lig-inline-check">
+      <input type="checkbox" name="system.actions.{{i}}.scalingDamage" {{checked act.scalingDamage}}/>
+      Dano escalonado (+1 por 2 pontos acima da defesa)
+    </label>
+
+    <div class="lig-item-row lig-action-costs">
+      <label>Custo PM
+        <input type="number" name="system.actions.{{i}}.costMp" value="{{act.costMp}}" min="0"/>
+      </label>
+      <label>Custo PV
+        <input type="number" name="system.actions.{{i}}.costHp" value="{{act.costHp}}" min="0"/>
+      </label>
+      <label>Custo PH
+        <input type="number" name="system.actions.{{i}}.costHeroic" value="{{act.costHeroic}}" min="0"/>
+      </label>
+    </div>
+
+    <div class="lig-cond-apply">
+      <div class="lig-subtitle">Condições aplicadas ao acertar</div>
+      <div class="lig-cond-checks">
+        {{#each act.conditionChoices as |c|}}
+        <label class="lig-cond-check">
+          <input type="checkbox" name="system.actions.{{i}}.appliesConditions" value="{{c.id}}" {{#if c.checked}}checked{{/if}}/>
+          {{c.label}}
+        </label>
+        {{/each}}
+      </div>
+    </div>
+  </div>
+  {{/each}}
+  {{#unless actions.length}}
+  <div class="lig-empty">Nenhuma ação. Clique em "+ ação" para criar a primeira (ataque, área, etc.).</div>
+  {{/unless}}
+</div>

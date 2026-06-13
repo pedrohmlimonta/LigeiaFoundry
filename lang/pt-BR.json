@@ -1,0 +1,52 @@
+{
+  "LIGEIA": {
+    "Document": {
+      "Personagem": "Personagem",
+      "Npc": "NPC",
+      "Habilidade": "Habilidade",
+      "Magia": "Magia",
+      "Equipamento": "Equipamento",
+      "Traco": "Traço",
+      "Raca": "Raça",
+      "Heranca": "Herança",
+      "Vocacao": "Vocação",
+      "Organizacao": "Organização"
+    },
+    "Attr": {
+      "forca": "Força",
+      "agilidade": "Agilidade",
+      "vigor": "Vigor",
+      "mente": "Mente",
+      "percepcao": "Percepção"
+    },
+    "Secondary": {
+      "bloqueio": "Bloqueio",
+      "esquiva": "Esquiva",
+      "conjuracao": "Conjuração",
+      "iniciativa": "Iniciativa",
+      "deslocamento": "Deslocamento"
+    },
+    "Resource": {
+      "hp": "Pontos de Vida",
+      "mp": "Pontos de Magia",
+      "heroic": "Pontos Heroicos",
+      "temp": "PV Temporário"
+    }
+  },
+  "TYPES": {
+    "Actor": {
+      "personagem": "Personagem",
+      "npc": "NPC"
+    },
+    "Item": {
+      "habilidade": "Habilidade",
+      "magia": "Magia",
+      "equipamento": "Equipamento",
+      "traco": "Traço",
+      "raca": "Raça",
+      "heranca": "Herança",
+      "vocacao": "Vocação",
+      "organizacao": "Organização"
+    }
+  }
+}

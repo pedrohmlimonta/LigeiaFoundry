@@ -1,0 +1,67 @@
+<div class="ligeia-item-body habilidade">
+  {{> systems/ligeia-rpg/templates/item/partials/header.hbs}}
+
+  <div class="lig-item-row">
+    <label>Nível adquirido
+      <select name="system.level">
+        <option value="B" {{#if (eq system.level "B")}}selected{{/if}}>Básico</option>
+        <option value="A" {{#if (eq system.level "A")}}selected{{/if}}>Avançado</option>
+        <option value="E" {{#if (eq system.level "E")}}selected{{/if}}>Épico/Especial</option>
+      </select>
+    </label>
+    <label>Pré-requisito
+      <input type="text" name="system.prereq" value="{{system.prereq}}" placeholder="ex: Mente 4+"/>
+    </label>
+    <label>Ativação
+      <input type="text" name="system.activation" value="{{system.activation}}" placeholder="Ação, Reação..."/>
+    </label>
+  </div>
+
+  <div class="lig-item-row lig-xp-costs">
+    <label>Custo XP — Básico
+      <input type="number" name="system.costBasic" value="{{system.costBasic}}" min="0" placeholder="padrão"/>
+    </label>
+    <label>Custo XP — Avançado
+      <input type="number" name="system.costAdvanced" value="{{system.costAdvanced}}" min="0" placeholder="padrão"/>
+    </label>
+    <label>Custo XP — Épico
+      <input type="number" name="system.costSpecial" value="{{system.costSpecial}}" min="0" placeholder="padrão"/>
+    </label>
+  </div>
+  <p class="lig-hint">Deixe 0 para usar o custo padrão do sistema. O custo dobra se a habilidade não estiver nas listas de acesso do personagem.</p>
+
+  <label class="lig-full">Listas (separadas por vírgula)
+    <input type="text" name="system.lists" value="{{system.lists}}" placeholder="guerreiro, ladino, monge..."/>
+  </label>
+
+  <div class="lig-slots">
+    <label>Alvo<input type="text" name="system.target" value="{{system.target}}"/></label>
+    <label>Área<input type="text" name="system.area" value="{{system.area}}"/></label>
+    <label>Alcance<input type="text" name="system.range" value="{{system.range}}"/></label>
+    <label>Duração<input type="text" name="system.duration" value="{{system.duration}}"/></label>
+  </div>
+
+  <div class="lig-desc-block">
+    <div class="lig-section-title">Básico</div>
+    {{#if editable}}
+    <textarea name="system.descBasic" rows="3">{{system.descBasic}}</textarea>
+    {{else}}<div class="lig-rendered">{{{enrichedBasic}}}</div>{{/if}}
+  </div>
+  <div class="lig-desc-block">
+    <div class="lig-section-title">Avançado</div>
+    {{#if editable}}
+    <textarea name="system.descAdvanced" rows="3">{{system.descAdvanced}}</textarea>
+    {{else}}<div class="lig-rendered">{{{enrichedAdvanced}}}</div>{{/if}}
+  </div>
+  <div class="lig-desc-block">
+    <div class="lig-section-title">Especial / Épico</div>
+    {{#if editable}}
+    <textarea name="system.descSpecial" rows="2">{{system.descSpecial}}</textarea>
+    {{else}}<div class="lig-rendered">{{{enrichedSpecial}}}</div>{{/if}}
+  </div>
+
+  {{> systems/ligeia-rpg/templates/item/partials/action.hbs}}
+  {{> systems/ligeia-rpg/templates/item/partials/mode.hbs}}
+  {{> systems/ligeia-rpg/templates/item/partials/effects.hbs}}
+  {{> systems/ligeia-rpg/templates/item/partials/costs.hbs}}
+</div>

@@ -1,0 +1,18 @@
+{{!-- Partial: alternador de modo passivo/ativo. Espera {system, editable} --}}
+<div class="lig-mode-bar">
+  <span class="lig-section-title">Modo</span>
+  <label class="lig-radio">
+    <input type="radio" name="system.mode" value="passive" {{#if (eq system.mode "passive")}}checked{{/if}}/>
+    Passivo
+  </label>
+  <label class="lig-radio">
+    <input type="radio" name="system.mode" value="active" {{#if (eq system.mode "active")}}checked{{/if}}/>
+    Ativável
+  </label>
+  {{#if (eq system.mode "active")}}
+  <label class="lig-inline-check lig-active-toggle" title="Atualmente ativo">
+    <input type="checkbox" name="system.active" {{checked system.active}}/>
+    Ligado
+  </label>
+  {{/if}}
+</div>

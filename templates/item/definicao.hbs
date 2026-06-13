@@ -1,0 +1,61 @@
+<div class="ligeia-item-body definicao">
+  {{> systems/ligeia-rpg/templates/item/partials/header.hbs}}
+
+  <div class="lig-desc-block">
+    <div class="lig-section-title">Descrição</div>
+    {{#if editable}}
+    <textarea name="system.description" rows="4">{{system.description}}</textarea>
+    {{else}}<div class="lig-rendered">{{{enrichedDescription}}}</div>{{/if}}
+  </div>
+
+  {{!-- Campos específicos por tipo --}}
+  {{#if (eq itemType "raca")}}
+  <div class="lig-item-row">
+    <label>Bônus de Deslocamento
+      <input type="number" name="system.moveBonus" value="{{system.moveBonus}}"/>
+    </label>
+  </div>
+  {{/if}}
+  {{#if (eq itemType "vocacao")}}
+  <div class="lig-item-row">
+    <label>Bônus de PV
+      <input type="number" name="system.hpBonus" value="{{system.hpBonus}}"/>
+    </label>
+    <label>Bônus de PM
+      <input type="number" name="system.mpBonus" value="{{system.mpBonus}}"/>
+    </label>
+  </div>
+  {{/if}}
+
+  {{!-- Lista de habilidades concedidas --}}
+  <div class="lig-skilllist-block">
+    <div class="lig-section-title">
+      Lista de Habilidades concedidas
+      {{#if editable}}<button type="button" class="lig-mini-btn" data-action="addListItem">+ habilidade</button>{{/if}}
+    </div>
+    <p class="lig-hint">Arraste uma habilidade para cá, ou digite o nome. Habilidades nesta lista têm custo de XP normal; fora da lista, o custo dobra.</p>
+    {{#each system.skillList as |skill i|}}
+    <div class="lig-skilllist-row">
+      <input type="text" name="system.skillList.{{i}}" value="{{skill}}" placeholder="Nome da habilidade"/>
+      {{#if ../editable}}<button type="button" class="lig-mini-btn danger" data-action="removeListItem" data-index="{{i}}">✕</button>{{/if}}
+    </div>
+    {{else}}
+    <div class="lig-empty">Nenhuma habilidade na lista.</div>
+    {{/each}}
+  </div>
+
+  {{!-- Traços concedidos automaticamente --}}
+  <div class="lig-granttraits-block">
+    <div class="lig-section-title">Traços concedidos</div>
+    <p class="lig-hint">Arraste um traço para cá. Esses traços são adicionados automaticamente ao personagem quando esta definição é colocada na ficha.</p>
+    {{#each system.grantedTraits as |trait i|}}
+    <div class="lig-granttrait-row">
+      <img class="lig-item-icon" src="{{trait.img}}" alt=""/>
+      <span class="lig-item-title">{{trait.name}}</span>
+      {{#if ../editable}}<button type="button" class="lig-mini-btn danger" data-action="removeTrait" data-index="{{i}}">✕</button>{{/if}}
+    </div>
+    {{else}}
+    <div class="lig-empty">Nenhum traço concedido. Arraste um traço para cá.</div>
+    {{/each}}
+  </div>
+</div>
