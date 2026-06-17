@@ -120,23 +120,27 @@ export function actionEntryField() {
       choices: ["hp", "mp", "heroic"],
     }),
     scalingDamage: new fields.BooleanField({ initial: false }),
-    appliesConditions: new fields.ArrayField(new fields.StringField({ blank: false }), { initial: [] }),
-    // Efeitos (buffs/debuffs) aplicados ao ALVO quando a ação acerta.
-    // Cada um vira um "efeito ativo" na ficha do alvo, com duração e
-    // resistência por rodada (a CD pode ser a própria rolagem da conjuração).
+    // Efeitos aplicados ao ALVO quando a ação acerta. Cada um é como um
+    // efeito de habilidade (qualquer tipo, incluindo "condition") e vira um
+    // "efeito ativo" na ficha do alvo, com duração e resistência por rodada.
     appliesEffects: new fields.ArrayField(
       new fields.SchemaField({
         label: new fields.StringField({ blank: true, initial: "Efeito" }),
-        // Um modificador (use várias entradas para vários modificadores)
-        fxType: new fields.StringField({ initial: "bonus", choices: ["bonus", "dice", "stat"] }),
+        // Tipo do modificador (mesma lista dos efeitos de itens + condição)
+        fxType: new fields.StringField({
+          initial: "bonus",
+          choices: ["bonus", "dice", "stat", "set", "damage", "rd", "condition"],
+        }),
+        // Alvo do modificador — depende do tipo (atributo, recurso, tipo de
+        // dano ou id de condição). Sempre escolhido por select.
         fxTarget: new fields.StringField({ blank: true, initial: "all" }),
         fxValue: new fields.NumberField({ initial: 0, integer: true }),
-        // Duração em rodadas; 0 = até o fim da cena (combate)
-        durationRounds: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+        // Duração: "rounds" (em rodadas) ou "scene" (até o fim da cena)
+        durationMode: new fields.StringField({ initial: "scene", choices: ["rounds", "scene"] }),
+        durationRounds: new fields.NumberField({ initial: 1, integer: true, min: 0 }),
         // Resistência por rodada
         resist: new fields.BooleanField({ initial: false }),
         resistAttr: new fields.StringField({ blank: true, initial: "vigor" }),
-        // Se true, a CD da resistência é a rolagem da conjuração (uma vez)
         resistVsCast: new fields.BooleanField({ initial: true }),
         resistDc: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
         // Dano contínuo por rodada (0 = nenhum) — ex.: Corrosão
@@ -200,7 +204,7 @@ export function migrateFlatActionToArray(source) {
   if (Array.isArray(source.actions) && source.actions.length) return source;
   const hasLegacy =
     "canRoll" in source || "rollAttr" in source || "hasTarget" in source ||
-    "damage" in source || "appliesConditions" in source;
+    "damage" in source;
   if (!hasLegacy) return source;
 
   const legacyTargetMode = source.hasTarget ? "target" : "none";
@@ -218,7 +222,6 @@ export function migrateFlatActionToArray(source) {
     damageType: source.damageType ?? "",
     damageResource: source.damageResource ?? "hp",
     scalingDamage: source.scalingDamage ?? false,
-    appliesConditions: Array.isArray(source.appliesConditions) ? source.appliesConditions : [],
     range: 0,
     area: 0,
   }];

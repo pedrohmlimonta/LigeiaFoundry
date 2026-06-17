@@ -82,7 +82,17 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         }
         // Remove buracos ANTES de mexer (evita arr[i] undefined).
         arr = arr.filter((v) => v !== undefined && v !== null);
-
+        // Cada ação pode ter appliesEffects como objeto indexado {0:{...}}
+        // vindo do form → converte para array.
+        for (let i = 0; i < arr.length; i++) {
+          const fx = arr[i].appliesEffects;
+          if (fx && !Array.isArray(fx) && typeof fx === "object") {
+            arr[i].appliesEffects = Object.keys(fx)
+              .sort((a, b) => Number(a) - Number(b))
+              .map((k) => fx[k]);
+          }
+        }
+        sys.actions = arr;
       } else {
         // Form sem nenhum campo de ação → preserva o documento.
         delete sys.actions;
@@ -165,65 +175,54 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     // Tipos de dano + opção "qualquer" para o seletor de RD nos efeitos
     context.damageTypesWithAny = { "": "Qualquer", ...(CONFIG.LIGEIA?.damageTypes || {}) };
 
-    // Condições do livro, marcando as que este item já aplica ao alvo.
-    const applied = item.system?.appliesConditions || [];
-    context.conditionChoices = Object.entries(CONFIG.LIGEIA?.conditions || {}).map(
-      ([id, def]) => ({ id, label: def.label, checked: applied.includes(id) }),
-    );
-
-    // Ações do item (lista). Cada ação recebe as opções de selects e a lista
-    // de condições marcada conforme o que ela aplica, para o editor.
-    const condDefs = CONFIG.LIGEIA?.conditions || {};
-    context.actions = (item.system?.actions || []).map((a) => ({
-      ...a,
-      conditionChoices: Object.entries(condDefs).map(([id, def]) => ({
-        id, label: def.label, checked: (a.appliesConditions || []).includes(id),
-      })),
-    }));
-
     // ----- Opções de ALVO por tipo de efeito -----
-    // dice / bonus → rolagens (atributos, ataque, defesa, iniciativa,
-    //   conjuração e "todas")
-    // stat → valores derivados que recebem +N
-    // set → valores que podem ser FIXADOS (atributos + secundários)
-    // damage / rd / info → não usam alvo (mostram "—")
     const TARGETS = {
       roll: {
         all: "Todas as rolagens",
-        forca: "Força",
-        agilidade: "Agilidade",
-        vigor: "Vigor",
-        mente: "Mente",
-        percepcao: "Percepção",
-        conjuracao: "Conjuração",
-        esquiva: "Esquiva",
-        bloqueio: "Bloqueio",
-        iniciativa: "Iniciativa",
-        attack: "Ataque (qualquer)",
-        defense: "Defesa (qualquer)",
+        forca: "Força", agilidade: "Agilidade", vigor: "Vigor", mente: "Mente",
+        percepcao: "Percepção", conjuracao: "Conjuração",
+        esquiva: "Esquiva", bloqueio: "Bloqueio", iniciativa: "Iniciativa",
+        attack: "Ataque (qualquer)", defense: "Defesa (qualquer)",
       },
       stat: {
-        hp: "PV máximo",
-        mp: "PM máximo",
-        heroic: "Pontos Heroicos máx.",
-        deslocamento: "Deslocamento",
+        hp: "PV máximo", mp: "PM máximo", heroic: "Pontos Heroicos máx.", deslocamento: "Deslocamento",
       },
       set: {
-        forca: "Força",
-        agilidade: "Agilidade",
-        vigor: "Vigor",
-        mente: "Mente",
-        percepcao: "Percepção",
-        bloqueio: "Bloqueio",
-        esquiva: "Esquiva",
-        conjuracao: "Conjuração",
-        iniciativa: "Iniciativa",
-        deslocamento: "Deslocamento",
-        percepcao_passiva: "Percepção Passiva",
+        forca: "Força", agilidade: "Agilidade", vigor: "Vigor", mente: "Mente", percepcao: "Percepção",
+        bloqueio: "Bloqueio", esquiva: "Esquiva", conjuracao: "Conjuração", iniciativa: "Iniciativa",
+        deslocamento: "Deslocamento", percepcao_passiva: "Percepção Passiva",
       },
       none: { all: "—" },
     };
     context.targetOptions = TARGETS;
+
+    // Condições e suas escolhas (id → label)
+    const condDefs = CONFIG.LIGEIA?.conditions || {};
+    const condChoices = Object.fromEntries(Object.entries(condDefs).map(([id, d]) => [id, d.label]));
+    const dmgChoices = { all: "Qualquer", ...(CONFIG.LIGEIA?.damageTypes || {}) };
+    // Alvos por tipo de efeito (para o select contextual de appliesEffects)
+    const targetsForType = (type) => {
+      switch (type) {
+        case "bonus":
+        case "dice": return TARGETS.roll;
+        case "stat": return TARGETS.stat;
+        case "set": return TARGETS.set;
+        case "damage":
+        case "rd": return dmgChoices;
+        case "condition": return condChoices;
+        default: return TARGETS.roll;
+      }
+    };
+
+    // Ações do item (lista). Cada efeito aplicado recebe targetChoices conforme seu tipo.
+    context.actions = (item.system?.actions || []).map((a) => ({
+      ...a,
+      appliesEffects: (a.appliesEffects || []).map((fx) => ({
+        ...fx,
+        targetChoices: targetsForType(fx.fxType),
+      })),
+    }));
+
 
     // Mapa: tipo de efeito → qual conjunto de alvos usar
     const typeToTargetSet = {
@@ -376,7 +375,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       label: "Ação", canRoll: true, rollAttr: "forca", rollBonus: 0, rollDice: 0,
       targetMode: "target", includeSelf: false, defenseAttr: "esquiva", defenseAttr2: "",
       damage: "", damageType: "", damageResource: "hp", scalingDamage: false,
-      appliesConditions: [], range: 0, area: 0, costMp: 0, costHp: 0, costHeroic: 0,
+      appliesEffects: [], range: 0, area: 0, costMp: 0, costHp: 0, costHeroic: 0,
     });
   }
   static async _onRemoveAction(event, target) {
@@ -398,8 +397,9 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     actions[ai].appliesEffects = actions[ai].appliesEffects || [];
     actions[ai].appliesEffects.push({
       label: "Efeito", fxType: "bonus", fxTarget: "all", fxValue: 0,
-      durationRounds: 0, resist: false, resistAttr: "vigor", resistVsCast: true,
-      resistDc: 0, tickAmount: 0, tickType: "", tickResource: "hp",
+      durationMode: "scene", durationRounds: 1,
+      resist: false, resistAttr: "vigor", resistVsCast: true, resistDc: 0,
+      tickAmount: 0, tickType: "", tickResource: "hp",
     });
     await this._replaceActions(actions);
   }

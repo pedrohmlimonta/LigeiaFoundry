@@ -111,21 +111,9 @@
       </label>
     </div>
 
-    <div class="lig-cond-apply">
-      <div class="lig-subtitle">Condições aplicadas ao acertar</div>
-      <div class="lig-cond-checks">
-        {{#each act.conditionChoices as |c|}}
-        <label class="lig-cond-check">
-          <input type="checkbox" name="system.actions.{{i}}.appliesConditions" value="{{c.id}}" {{#if c.checked}}checked{{/if}}/>
-          {{c.label}}
-        </label>
-        {{/each}}
-      </div>
-    </div>
-
     <div class="lig-applies-fx-editor">
       <div class="lig-subtitle">
-        Efeitos aplicados ao alvo (buff/debuff)
+        Efeitos aplicados ao alvo (buff / debuff / condição)
         <button type="button" class="lig-mini-btn" data-action="addAppliesEffect" data-action-index="{{i}}">+ efeito</button>
       </div>
       {{#each act.appliesEffects as |fx fi|}}
@@ -138,19 +126,37 @@
           <label>Modificador
             <select name="system.actions.{{i}}.appliesEffects.{{fi}}.fxType">
               <option value="bonus" {{#if (eq fx.fxType "bonus")}}selected{{/if}}>Bônus</option>
-              <option value="dice" {{#if (eq fx.fxType "dice")}}selected{{/if}}>Dados</option>
-              <option value="stat" {{#if (eq fx.fxType "stat")}}selected{{/if}}>Atributo/Recurso</option>
+              <option value="dice" {{#if (eq fx.fxType "dice")}}selected{{/if}}>Dado de melhoria</option>
+              <option value="stat" {{#if (eq fx.fxType "stat")}}selected{{/if}}>Modificar valor</option>
+              <option value="set" {{#if (eq fx.fxType "set")}}selected{{/if}}>Definir valor</option>
+              <option value="damage" {{#if (eq fx.fxType "damage")}}selected{{/if}}>Bônus de dano</option>
+              <option value="rd" {{#if (eq fx.fxType "rd")}}selected{{/if}}>Redução de dano</option>
+              <option value="condition" {{#if (eq fx.fxType "condition")}}selected{{/if}}>Condição</option>
             </select>
           </label>
           <label>Alvo
-            <input type="text" name="system.actions.{{i}}.appliesEffects.{{fi}}.fxTarget" value="{{fx.fxTarget}}" placeholder="forca, esquiva, all, hp…"/>
+            <select name="system.actions.{{i}}.appliesEffects.{{fi}}.fxTarget">
+              {{selectOptions fx.targetChoices selected=fx.fxTarget}}
+            </select>
           </label>
+          {{#unless (eq fx.fxType "condition")}}
           <label>Valor
             <input type="number" name="system.actions.{{i}}.appliesEffects.{{fi}}.fxValue" value="{{fx.fxValue}}"/>
           </label>
-          <label>Duração (rodadas)
-            <input type="number" name="system.actions.{{i}}.appliesEffects.{{fi}}.durationRounds" value="{{fx.durationRounds}}" min="0" placeholder="0 = até fim da cena"/>
+          {{/unless}}
+        </div>
+        <div class="lig-item-row">
+          <label>Duração
+            <select name="system.actions.{{i}}.appliesEffects.{{fi}}.durationMode">
+              <option value="scene" {{#if (eq fx.durationMode "scene")}}selected{{/if}}>Até o fim da cena</option>
+              <option value="rounds" {{#if (eq fx.durationMode "rounds")}}selected{{/if}}>Em rodadas</option>
+            </select>
           </label>
+          {{#if (eq fx.durationMode "rounds")}}
+          <label>Rodadas
+            <input type="number" name="system.actions.{{i}}.appliesEffects.{{fi}}.durationRounds" value="{{fx.durationRounds}}" min="0"/>
+          </label>
+          {{/if}}
         </div>
         <div class="lig-item-row">
           <label class="lig-inline-check">
@@ -180,7 +186,7 @@
         </div>
         <div class="lig-item-row">
           <label>Dano contínuo/rodada
-            <input type="number" name="system.actions.{{i}}.appliesEffects.{{fi}}.tickAmount" value="{{fx.tickAmount}}" min="0" placeholder="0 = nenhum"/>
+            <input type="number" name="system.actions.{{i}}.appliesEffects.{{fi}}.tickAmount" value="{{fx.tickAmount}}" min="0"/>
           </label>
           <label>Tipo
             <select name="system.actions.{{i}}.appliesEffects.{{fi}}.tickType">

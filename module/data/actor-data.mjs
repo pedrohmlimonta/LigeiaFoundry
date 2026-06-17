@@ -24,6 +24,9 @@ function appliedEffectsField() {
       label: new fields.StringField({ blank: true, initial: "Efeito" }),
       icon: new fields.StringField({ blank: true, initial: "icons/svg/aura.svg" }),
       effects: effectField(),
+      // Se este efeito ativa uma condição, guarda o id dela (para removê-la
+      // quando o efeito terminar/for resistido).
+      conditionId: new fields.StringField({ blank: true, initial: "" }),
       disabled: new fields.BooleanField({ initial: false }),
       duration: new fields.SchemaField({
         rounds: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
@@ -159,6 +162,7 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
       if (a[k]) {
         a[k].value = (a[k].value || 0) + (mods.attr[k]?.bonus || 0);
         a[k].dice = (a[k].dice || 0) + (mods.attr[k]?.dice || 0);
+        if (mods.attr[k]?.set !== null && mods.attr[k]?.set !== undefined) a[k].value = mods.attr[k].set;
       }
     }
 
@@ -272,6 +276,7 @@ export class NpcData extends foundry.abstract.TypeDataModel {
       if (a[k]) {
         a[k].value = (a[k].value || 0) + (mods.attr[k]?.bonus || 0);
         a[k].dice = (a[k].dice || 0) + (mods.attr[k]?.dice || 0);
+        if (mods.attr[k]?.set !== null && mods.attr[k]?.set !== undefined) a[k].value = mods.attr[k].set;
       }
     }
 

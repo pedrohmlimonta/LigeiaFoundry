@@ -180,6 +180,15 @@ export function damageReductionFor(actor, damageType) {
       if (!t || t === "all" || t === damageType) rd += Number(e.value) || 0;
     }
   }
+  // Efeitos aplicados na ficha (buffs de resistência) também contam.
+  for (const ae of actor.system?.appliedEffects || []) {
+    if (ae.disabled) continue;
+    for (const e of ae.effects || []) {
+      if (e.type !== "rd" || e.enabled === false) continue;
+      const t = e.damageType || "";
+      if (!t || t === "all" || t === damageType) rd += Number(e.value) || 0;
+    }
+  }
   return rd;
 }
 
@@ -254,7 +263,6 @@ export async function applyConditionsToActor(actor, ids = []) {
  */
 async function resolveHitOnActor(action, tActor, { damageRoll, atkTotal, defTotal, acertou, cfg, attackerMods, caster }) {
   let dmgText = "";
-  let condText = "";
   const dmgTypeLabel = action.damageType ? (cfg.damageTypes?.[action.damageType] || action.damageType) : "";
 
   if (acertou && damageRoll) {
@@ -302,56 +310,59 @@ async function resolveHitOnActor(action, tActor, { damageRoll, atkTotal, defTota
     dmgText = `<div class="lig-atk-dmg">${resWord}: <strong>${dealt}</strong>${typeNote}${scaleNote}${rdNote}${multNote}</div>${applyNote}`;
   }
 
-  if (acertou && (action.appliesConditions || []).length) {
-    const added = await applyConditionsToActor(tActor, action.appliesConditions);
-    if (added.length) {
-      condText = `<div class="lig-atk-cond">Condições aplicadas: <strong>${added.join(", ")}</strong></div>`;
-    } else if (!tActor.isOwner) {
-      condText = `<div class="lig-atk-cond muted">Condições a aplicar: ${action.appliesConditions.join(", ")} (peça ao Mestre)</div>`;
-    }
-  }
-
-  // Aplica EFEITOS (buffs/debuffs) ao alvo quando acerta.
+  // Aplica EFEITOS (buffs/debuffs/condições) ao alvo quando acerta.
   let fxText = "";
   const fxList = action.appliesEffects || [];
   if (acertou && fxList.length) {
     if (tActor.isOwner) {
       const cur = foundry.utils.deepClone(tActor.system?.appliedEffects || []);
+      const conds = foundry.utils.deepClone(tActor.system?.conditions || []);
+      const condsBefore = conds.length;
       const names = [];
       for (const ae of fxList) {
-        const hasMod = (Number(ae.fxValue) || 0) !== 0;
+        const isCondition = ae.fxType === "condition";
+        const condId = isCondition ? (ae.fxTarget || "") : "";
+        // Tipos que viram modificador no array effects
+        let effects = [];
+        if (!isCondition && (Number(ae.fxValue) || 0) !== 0) {
+          const eff = { type: ae.fxType || "bonus", target: ae.fxTarget || "all", value: Number(ae.fxValue) || 0, enabled: true };
+          // Para dano/RD, o "alvo" é o tipo de dano.
+          if (ae.fxType === "damage" || ae.fxType === "rd") eff.damageType = ae.fxTarget || "";
+          effects = [eff];
+        }
+        // Ativa a condição no alvo (marcador), se for o caso.
+        if (isCondition && condId && !conds.includes(condId)) conds.push(condId);
+
+        const rounds = ae.durationMode === "rounds" ? (ae.durationRounds || 0) : 0;
+        const condLabel = CONFIG.LIGEIA?.conditions?.[condId]?.label || condId;
         cur.push({
-          label: ae.label || "Efeito",
-          icon: "icons/svg/aura.svg",
-          effects: hasMod
-            ? [{ type: ae.fxType || "bonus", target: ae.fxTarget || "all", value: Number(ae.fxValue) || 0, enabled: true }]
-            : [],
+          label: ae.label || (isCondition ? condLabel : "Efeito"),
+          icon: isCondition ? (CONFIG.LIGEIA?.conditions?.[condId]?.icon || "icons/svg/aura.svg") : "icons/svg/aura.svg",
+          effects,
+          conditionId: condId,
           disabled: false,
-          duration: { rounds: ae.durationRounds || 0, remaining: ae.durationRounds || 0 },
+          duration: { rounds, remaining: rounds }, // rounds 0 = até o fim da cena
           endRoll: {
             enabled: !!ae.resist,
             attr: ae.resistAttr || "vigor",
-            // CD = rolagem da conjuração (uma vez) ou CD fixa
             dc: ae.resistVsCast ? atkTotal : (ae.resistDc || 0),
             vsCast: !!ae.resistVsCast,
           },
-          tickDamage: {
-            amount: ae.tickAmount || 0,
-            type: ae.tickType || "",
-            resource: ae.tickResource || "hp",
-          },
+          tickDamage: { amount: ae.tickAmount || 0, type: ae.tickType || "", resource: ae.tickResource || "hp" },
           source: caster?.name || "",
         });
-        names.push(ae.label || "Efeito");
+        names.push(ae.label || (isCondition ? condLabel : "Efeito"));
       }
-      await tActor.update({ "system.appliedEffects": cur });
+      const update = { "system.appliedEffects": cur };
+      if (conds.length !== condsBefore) update["system.conditions"] = conds;
+      await tActor.update(update);
       fxText = `<div class="lig-atk-fx">Efeitos aplicados: <strong>${names.join(", ")}</strong></div>`;
     } else {
       fxText = `<div class="lig-atk-fx muted">Efeitos a aplicar: ${fxList.map((e) => e.label || "Efeito").join(", ")} (peça ao Mestre)</div>`;
     }
   }
 
-  return dmgText + condText + fxText;
+  return dmgText + fxText;
 }
 
 /**

@@ -451,9 +451,13 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       ae.duration.remaining = Math.max(0, (ae.duration.remaining ?? rounds) - 1);
       if (ae.duration.remaining <= 0) {
         arr.splice(idx, 1);
+        const upd = { "system.appliedEffects": arr };
+        if (ae.conditionId) {
+          upd["system.conditions"] = (this.document.system.conditions || []).filter((c) => c !== ae.conditionId);
+        }
         this.#fxOpInProgress = true;
-      try { await this.document.update({ "system.appliedEffects": arr }); }
-      finally { this.#fxOpInProgress = false; }
+        try { await this.document.update(upd); }
+        finally { this.#fxOpInProgress = false; }
         ChatMessage.create({
           speaker: ChatMessage.getSpeaker({ actor: this.document }),
           content: `<div class="ligeia-roll-flavor"><strong>${this.document.name}</strong>: o efeito <em>${ae.label}</em> terminou.</div>`,
@@ -494,8 +498,12 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     });
     if (success) {
       arr.splice(idx, 1);
+      const upd = { "system.appliedEffects": arr };
+      if (ae.conditionId) {
+        upd["system.conditions"] = (this.document.system.conditions || []).filter((c) => c !== ae.conditionId);
+      }
       this.#fxOpInProgress = true;
-      try { await this.document.update({ "system.appliedEffects": arr }); }
+      try { await this.document.update(upd); }
       finally { this.#fxOpInProgress = false; }
     }
   }

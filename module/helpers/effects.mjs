@@ -90,7 +90,7 @@ const STAT_TARGETS = ["hp", "mp", "heroic", "deslocamento"];
  */
 function emptyMods() {
   const attr = {};
-  for (const k of [...PRIMARY_ATTRS, ...SECONDARY_ATTRS]) attr[k] = { bonus: 0, dice: 0 };
+  for (const k of [...PRIMARY_ATTRS, ...SECONDARY_ATTRS]) attr[k] = { bonus: 0, dice: 0, set: null };
   const roll = {};
   for (const k of ROLL_CATEGORIES) roll[k] = { bonus: 0, dice: 0 };
   const stat = {};
@@ -103,11 +103,11 @@ function emptyMods() {
  *  - bonus: +valor ao destino (atributo, categoria de rolagem)
  *  - dice:  +valor de dados de melhoria ao destino
  *  - stat:  +valor a um recurso/derivado (hp/mp/heroic/deslocamento)
+ *  - set:   define (sobrescreve) o valor de um atributo
  */
 function applyEffectToMods(mods, effect) {
   const t = effect.target || "all";
   const v = Number(effect.value) || 0;
-  if (!v && effect.type !== "set") return;
 
   if (effect.type === "bonus") {
     if (mods.attr[t]) mods.attr[t].bonus += v;
@@ -117,8 +117,10 @@ function applyEffectToMods(mods, effect) {
     else if (mods.roll[t]) mods.roll[t].dice += v;
   } else if (effect.type === "stat") {
     if (t in mods.stat) mods.stat[t] += v;
+  } else if (effect.type === "set") {
+    if (mods.attr[t]) mods.attr[t].set = v; // último a definir vence
   }
-  // "set", "damage", "rd", "info" não entram aqui (tratados em outros lugares)
+  // "damage", "rd", "condition", "info" são tratados em outros lugares
 }
 
 /**
