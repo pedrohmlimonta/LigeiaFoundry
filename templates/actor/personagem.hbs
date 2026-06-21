@@ -158,17 +158,36 @@
       <div class="lig-applied-config">
         <label>Tipo
           <select name="system.appliedEffects.{{ae.index}}.effects.0.type">
-            <option value="bonus" {{#if (eq ae.effects.0.type "bonus")}}selected{{/if}}>Bônus</option>
-            <option value="dice" {{#if (eq ae.effects.0.type "dice")}}selected{{/if}}>Dados</option>
-            <option value="stat" {{#if (eq ae.effects.0.type "stat")}}selected{{/if}}>Atributo/Recurso</option>
+            <option value="bonus" {{#if (eq ae.fx0Type "bonus")}}selected{{/if}}>Bônus em Rolagem</option>
+            <option value="dice" {{#if (eq ae.fx0Type "dice")}}selected{{/if}}>Dados de Melhoria</option>
+            <option value="stat" {{#if (eq ae.fx0Type "stat")}}selected{{/if}}>Modificar Valor</option>
+            <option value="set" {{#if (eq ae.fx0Type "set")}}selected{{/if}}>Definir Valor</option>
+            <option value="damage" {{#if (eq ae.fx0Type "damage")}}selected{{/if}}>Bônus de Dano</option>
+            <option value="rd" {{#if (eq ae.fx0Type "rd")}}selected{{/if}}>Redução de Dano</option>
+            <option value="reroll1" {{#if (eq ae.fx0Type "reroll1")}}selected{{/if}}>Rerrolar dados que caem 1</option>
+            <option value="reroll6" {{#if (eq ae.fx0Type "reroll6")}}selected{{/if}}>Rerrolar dados que caem 6</option>
           </select>
         </label>
         <label>Alvo
-          <input type="text" name="system.appliedEffects.{{ae.index}}.effects.0.target" value="{{ae.effects.0.target}}" placeholder="forca, esquiva, all, attack, hp…"/>
+          {{#if (or (eq ae.fx0Type "damage") (eq ae.fx0Type "rd"))}}
+          <select name="system.appliedEffects.{{ae.index}}.effects.0.damageType">
+            {{selectOptions ae.fx0TargetChoices selected=ae.fx0.damageType}}
+          </select>
+          {{else}}
+          <select name="system.appliedEffects.{{ae.index}}.effects.0.target">
+            {{selectOptions ae.fx0TargetChoices selected=ae.fx0.target}}
+          </select>
+          {{/if}}
         </label>
-        <label>Valor
-          <input type="number" name="system.appliedEffects.{{ae.index}}.effects.0.value" value="{{ae.effects.0.value}}"/>
+        <label>{{#if ae.fx0IsReroll}}Qtd. dados{{else}}Valor{{/if}}
+          <input type="number" name="system.appliedEffects.{{ae.index}}.effects.0.value" value="{{ae.fx0.value}}"/>
         </label>
+        {{#if ae.fx0IsReroll}}
+        <label class="lig-inline-check" title="Rerrolar TODOS os dados que caírem nesse valor">
+          <input type="checkbox" name="system.appliedEffects.{{ae.index}}.effects.0.rerollAll" {{checked ae.fx0.rerollAll}}/>
+          Todos
+        </label>
+        {{/if}}
         <label>Duração (rodadas)
           <input type="number" name="system.appliedEffects.{{ae.index}}.duration.rounds" value="{{ae.duration.rounds}}" min="0"/>
         </label>

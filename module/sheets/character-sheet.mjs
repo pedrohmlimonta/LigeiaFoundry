@@ -153,19 +153,56 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     context.activeConditionCount = activeConds.length;
 
     // Efeitos aplicados na ficha (buffs/debuffs), enriquecidos para exibição.
-    const fxTypeLabels = { dice: "Dados", bonus: "Bônus", stat: "Atributo", set: "Define", damage: "Dano", rd: "Red. Dano", info: "Info" };
-    context.appliedEffects = (sys.appliedEffects || []).map((ae, idx) => ({
-      ...ae,
-      index: idx,
-      summary: (ae.effects || [])
-        .map((e) => {
-          const sign = (Number(e.value) || 0) >= 0 ? "+" : "";
-          const kind = e.type === "dice" ? "D" : "";
-          return `${fxTypeLabels[e.type] || e.type} ${sign}${e.value}${kind} ${e.target || ""}`.trim();
-        })
-        .join(", "),
-      hasDuration: (ae.duration?.rounds || 0) > 0,
-    }));
+    // Cada efeito recebe os alvos contextuais (como nos efeitos de habilidade).
+    const fxTypeLabels = {
+      dice: "Dados", bonus: "Bônus", stat: "Modificar", set: "Definir",
+      damage: "Dano", rd: "Red. Dano", reroll1: "Rerrola 1", reroll6: "Rerrola 6", info: "Info",
+    };
+    const rollTargets = {
+      all: "Todas as rolagens",
+      forca: "Força", agilidade: "Agilidade", vigor: "Vigor", mente: "Mente",
+      percepcao: "Percepção", conjuracao: "Conjuração",
+      esquiva: "Esquiva", bloqueio: "Bloqueio", iniciativa: "Iniciativa",
+      attack: "Ataque (qualquer)", defense: "Defesa (qualquer)",
+    };
+    const statTargets = { hp: "PV máximo", mp: "PM máximo", heroic: "Pontos Heroicos máx.", deslocamento: "Deslocamento" };
+    const setTargets = {
+      forca: "Força", agilidade: "Agilidade", vigor: "Vigor", mente: "Mente", percepcao: "Percepção",
+      bloqueio: "Bloqueio", esquiva: "Esquiva", conjuracao: "Conjuração", iniciativa: "Iniciativa", deslocamento: "Deslocamento",
+    };
+    const dmgTargets = { all: "Qualquer", ...(CONFIG.LIGEIA?.damageTypes || {}) };
+    const targetsFor = (type) => {
+      switch (type) {
+        case "bonus": case "dice": case "reroll1": case "reroll6": return rollTargets;
+        case "stat": return statTargets;
+        case "set": return setTargets;
+        case "damage": case "rd": return dmgTargets;
+        default: return rollTargets;
+      }
+    };
+    context.appliedEffects = (sys.appliedEffects || []).map((ae, idx) => {
+      const e0 = (ae.effects && ae.effects[0]) || {};
+      const type0 = e0.type || "bonus";
+      return {
+        ...ae,
+        index: idx,
+        fx0: e0,
+        fx0Type: type0,
+        fx0TargetChoices: targetsFor(type0),
+        fx0IsReroll: type0 === "reroll1" || type0 === "reroll6",
+        fx0NoValue: false,
+        summary: (ae.effects || [])
+          .map((e) => {
+            const sign = (Number(e.value) || 0) >= 0 ? "+" : "";
+            const kind = e.type === "dice" ? "D" : "";
+            if (e.type === "reroll1") return `Rerrola 1 (${e.rerollAll ? "todos" : e.value})`;
+            if (e.type === "reroll6") return `Rerrola 6 (${e.rerollAll ? "todos" : e.value})`;
+            return `${fxTypeLabels[e.type] || e.type} ${sign}${e.value}${kind} ${e.target || ""}`.trim();
+          })
+          .join(", "),
+        hasDuration: (ae.duration?.rounds || 0) > 0,
+      };
+    });
 
     // Anota em cada efeito de cada item se ele está ativo agora (considerando
     // modo do item, enabled e — para habilidades — o nível adquirido vs.
