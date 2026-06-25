@@ -15,7 +15,7 @@ export function effectField() {
       type: new fields.StringField({
         required: true,
         initial: "bonus",
-        choices: ["dice", "bonus", "stat", "set", "damage", "rd", "reroll1", "reroll6", "info"],
+        choices: ["dice", "bonus", "stat", "set", "damage", "rd", "reroll1", "reroll6", "crit", "fumble", "info"],
       }),
       target: new fields.StringField({ required: true, initial: "all" }),
       value: new fields.NumberField({ required: true, initial: 0, integer: true }),
@@ -132,7 +132,7 @@ export function actionEntryField() {
         // Tipo do modificador (mesma lista dos efeitos de itens + condição)
         fxType: new fields.StringField({
           initial: "bonus",
-          choices: ["bonus", "dice", "stat", "set", "damage", "rd", "reroll1", "reroll6", "condition"],
+          choices: ["bonus", "dice", "stat", "set", "damage", "rd", "reroll1", "reroll6", "crit", "fumble", "condition"],
         }),
         // Alvo do modificador — depende do tipo (atributo, recurso, tipo de
         // dano ou id de condição). Sempre escolhido por select.

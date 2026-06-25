@@ -54,6 +54,8 @@ export async function rollLigeia({
   difficulty = null,
   reroll1 = 0,
   reroll6 = 0,
+  critBonus = 0,
+  failBonus = 0,
 } = {}) {
   // Dados de melhoria: positivo = vantagem (mantém os 2 MAIORES);
   // negativo = desvantagem (rola os mesmos dados extras e mantém os 2
@@ -104,10 +106,17 @@ export async function rollLigeia({
   const dropped = results.filter((r) => !r.active).map((r) => r.result);
 
   // Crítico avaliado nos dados que entram na soma (os 2 maiores)
-  const keptSorted = [...kept].sort((a, b) => a - b);
-  const isCritSuccessDice =
-    kept.length >= 2 && kept.every((v) => v === 6);
-  const isCritFail = kept.length >= 2 && kept.every((v) => v === 1);
+  // Crítico avaliado pela SOMA dos dados que entram na rolagem (os 2
+  // mantidos), considerando apenas os dados (não soma atributo/bônus).
+  //  - Crítico de sucesso: soma dos 2 dados ≥ (12 − critBonus). Padrão
+  //    crita só com 12 (6+6); "crítico aprimorado" reduz o limiar (11, 10…).
+  //  - Falha crítica: soma dos 2 dados ≤ (2 + failBonus). Padrão falha só
+  //    com 2 (1+1); "falha piorada" aumenta o limiar (3, 4…).
+  const keptSum = kept.reduce((s, v) => s + v, 0);
+  const critThreshold = 12 - Math.max(0, Number(critBonus) || 0);
+  const failThreshold = 2 + Math.max(0, Number(failBonus) || 0);
+  const isCritSuccessDice = kept.length >= 2 && keptSum >= critThreshold;
+  const isCritFail = kept.length >= 2 && keptSum <= failThreshold;
 
   const total = roll.total;
 
@@ -117,9 +126,13 @@ export async function rollLigeia({
   }
 
   // Sucesso crítico só vale se igualar/superar a dificuldade (quando há uma).
-  // Sem dificuldade, 6+6 já conta como crítico.
+  // Sem dificuldade, atingir o limiar de dados já conta como crítico.
   const isCritSuccess =
     isCritSuccessDice && (difficulty == null || total >= difficulty);
+
+  // Se os limiares se sobrepõem (config extrema), o sucesso crítico tem
+  // prioridade: não marca falha crítica ao mesmo tempo.
+  const isCritFailFinal = isCritFail && !isCritSuccessDice;
 
   return {
     roll,
@@ -127,7 +140,7 @@ export async function rollLigeia({
     dropped,
     total,
     isCritSuccess,
-    isCritFail,
+    isCritFail: isCritFailFinal,
     outcome,
     difficulty,
     flat,
@@ -214,6 +227,24 @@ export function rerollFor(actor, key, category = null) {
     r6 = mergeReroll(r6, rm[category].reroll6 || 0);
   }
   return { reroll1: r1 === Infinity ? "all" : r1, reroll6: r6 === Infinity ? "all" : r6 };
+}
+
+/**
+ * Calcula o crítico aprimorado (critBonus) e a falha piorada (failBonus)
+ * efetivos para uma rolagem, combinando o atributo + categoria "all" +
+ * categoria extra ("attack"/"defense").
+ * @returns {{critBonus:number, failBonus:number}}
+ */
+export function critFor(actor, key, category = null) {
+  const ac = actor?.system?.attrCrit?.[key] || {};
+  const rm = actor?.system?.rollMods || {};
+  let critBonus = (ac.critBonus || 0) + (rm.all?.critBonus || 0);
+  let failBonus = (ac.failBonus || 0) + (rm.all?.failBonus || 0);
+  if (category && rm[category]) {
+    critBonus += rm[category].critBonus || 0;
+    failBonus += rm[category].failBonus || 0;
+  }
+  return { critBonus, failBonus };
 }
 
 /**
@@ -577,6 +608,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     const rmDice = (rm.all?.dice || 0) + (rm.attack?.dice || 0);
     const rmBonus = (rm.all?.bonus || 0) + (rm.attack?.bonus || 0);
     const atkRr = rerollFor(actor, atkKey, "attack");
+    const atkCrit = critFor(actor, atkKey, "attack");
     atkRoll = await rollLigeia({
       attribute: atk.value,
       improvement: atk.dice + (Number(action.rollDice) || 0) + atkCond.atkDice + rmDice,
@@ -584,6 +616,8 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
       difficulty: null,
       reroll1: atkRr.reroll1,
       reroll6: atkRr.reroll6,
+      critBonus: atkCrit.critBonus,
+      failBonus: atkCrit.failBonus,
     });
     atkRolls.push(atkRoll.roll);
   }
@@ -707,6 +741,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
           : "";
 
         const defRr = rerollFor(tActor, def.key, "defense");
+        const defCrit = critFor(tActor, def.key, "defense");
         const defRoll = await rollLigeia({
           attribute: def.base,
           improvement: def.dice + defCond.defDice + (tActor.system?.rollMods?.all?.dice || 0) + (tActor.system?.rollMods?.defense?.dice || 0),
@@ -714,6 +749,8 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
           difficulty: atkTotal,
           reroll1: defRr.reroll1,
           reroll6: defRr.reroll6,
+          critBonus: defCrit.critBonus,
+          failBonus: defCrit.failBonus,
         });
         defRolls.push(defRoll.roll);
         defTotal = defRoll.total;

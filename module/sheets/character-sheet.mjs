@@ -1,7 +1,7 @@
 /**
  * Ficha de Personagem do Ligeia — Foundry V13 (ApplicationV2).
  */
-import { rollLigeia, postRollToChat, rollItemAction, resolveAttr, rerollFor } from "../helpers/dice.mjs";
+import { rollLigeia, postRollToChat, rollItemAction, resolveAttr, rerollFor, critFor } from "../helpers/dice.mjs";
 import { placeTemplateForAction } from "../helpers/template.mjs";
 import { computeXpSpent } from "../helpers/xp.mjs";
 import { effectIsActive } from "../helpers/effects.mjs";
@@ -156,7 +156,8 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     // Cada efeito recebe os alvos contextuais (como nos efeitos de habilidade).
     const fxTypeLabels = {
       dice: "Dados", bonus: "Bônus", stat: "Modificar", set: "Definir",
-      damage: "Dano", rd: "Red. Dano", reroll1: "Rerrola 1", reroll6: "Rerrola 6", info: "Info",
+      damage: "Dano", rd: "Red. Dano", reroll1: "Rerrola 1", reroll6: "Rerrola 6",
+      crit: "Crít. apr.", fumble: "Falha pior.", info: "Info",
     };
     const rollTargets = {
       all: "Todas as rolagens",
@@ -173,7 +174,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     const dmgTargets = { all: "Qualquer", ...(CONFIG.LIGEIA?.damageTypes || {}) };
     const targetsFor = (type) => {
       switch (type) {
-        case "bonus": case "dice": case "reroll1": case "reroll6": return rollTargets;
+        case "bonus": case "dice": case "reroll1": case "reroll6": case "crit": case "fumble": return rollTargets;
         case "stat": return statTargets;
         case "set": return setTargets;
         case "damage": case "rd": return dmgTargets;
@@ -197,6 +198,8 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
             const kind = e.type === "dice" ? "D" : "";
             if (e.type === "reroll1") return `Rerrola 1 (${e.rerollAll ? "todos" : e.value})`;
             if (e.type === "reroll6") return `Rerrola 6 (${e.rerollAll ? "todos" : e.value})`;
+            if (e.type === "crit") return `Crítico ≥${12 - (Number(e.value) || 0)}`;
+            if (e.type === "fumble") return `Falha ≤${2 + (Number(e.value) || 0)}`;
             return `${fxTypeLabels[e.type] || e.type} ${sign}${e.value}${kind} ${e.target || ""}`.trim();
           })
           .join(", "),
@@ -518,6 +521,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     const r = resolveAttr(this.document, attrKey);
     const rm = this.document.system?.rollMods || {};
     const rr = rerollFor(this.document, attrKey);
+    const cr = critFor(this.document, attrKey);
     const dc = ae.endRoll.dc || 0;
     const result = await rollLigeia({
       attribute: r.value,
@@ -526,6 +530,8 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       difficulty: dc,
       reroll1: rr.reroll1,
       reroll6: rr.reroll6,
+      critBonus: cr.critBonus,
+      failBonus: cr.failBonus,
     });
     const success = result.total >= dc;
     const label = (CONFIG.LIGEIA?.attackAttrs?.[attrKey]) || attrKey;
@@ -608,12 +614,15 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
 
     const rm = actor.system?.rollMods || {};
     const rr = rerollFor(actor, key);
+    const cr = critFor(actor, key);
     const result = await rollLigeia({
       attribute: attr.value,
       improvement: attr.dice + (rm.all?.dice || 0),
       bonus: rm.all?.bonus || 0,
       reroll1: rr.reroll1,
       reroll6: rr.reroll6,
+      critBonus: cr.critBonus,
+      failBonus: cr.failBonus,
     });
 
     await postRollToChat({
@@ -642,12 +651,15 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     const r = resolveAttr(actor, key);
     const rm = actor.system?.rollMods || {};
     const rr = rerollFor(actor, key);
+    const cr = critFor(actor, key);
     const result = await rollLigeia({
       attribute: r.value,
       improvement: r.dice + (rm.all?.dice || 0),
       bonus: rm.all?.bonus || 0,
       reroll1: rr.reroll1,
       reroll6: rr.reroll6,
+      critBonus: cr.critBonus,
+      failBonus: cr.failBonus,
     });
 
     await postRollToChat({

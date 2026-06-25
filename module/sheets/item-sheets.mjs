@@ -157,6 +157,8 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       rd: "Redução de Dano",
       reroll1: "Rerrolar dados que caem 1",
       reroll6: "Rerrolar dados que caem 6",
+      crit: "Crítico aprimorado",
+      fumble: "Falha crítica piorada",
       info: "Condição / Texto",
     };
     context.costResources = {
@@ -208,7 +210,9 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         case "bonus":
         case "dice":
         case "reroll1":
-        case "reroll6": return TARGETS.roll;
+        case "reroll6":
+        case "crit":
+        case "fumble": return TARGETS.roll;
         case "stat": return TARGETS.stat;
         case "set": return TARGETS.set;
         case "damage":
@@ -238,6 +242,8 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       rd: "none",
       reroll1: "roll",
       reroll6: "roll",
+      crit: "roll",
+      fumble: "roll",
       info: "none",
     };
 

@@ -159,8 +159,10 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
     this.rollMods = mods.roll;
     // Reroll por atributo (primários + secundários) para as rolagens.
     this.attrReroll = {};
+    this.attrCrit = {};
     for (const k of [...Object.keys(mods.attr)]) {
       this.attrReroll[k] = { reroll1: mods.attr[k].reroll1 || 0, reroll6: mods.attr[k].reroll6 || 0 };
+      this.attrCrit[k] = { critBonus: mods.attr[k].critBonus || 0, failBonus: mods.attr[k].failBonus || 0 };
     }
     this.effectMods = mods; // exposto para depuração/uso externo
     for (const k of ["forca", "agilidade", "vigor", "mente", "percepcao"]) {
@@ -279,8 +281,10 @@ export class NpcData extends foundry.abstract.TypeDataModel {
     this.rollMods = mods.roll;
     // Reroll por atributo (primários + secundários) para as rolagens.
     this.attrReroll = {};
+    this.attrCrit = {};
     for (const k of [...Object.keys(mods.attr)]) {
       this.attrReroll[k] = { reroll1: mods.attr[k].reroll1 || 0, reroll6: mods.attr[k].reroll6 || 0 };
+      this.attrCrit[k] = { critBonus: mods.attr[k].critBonus || 0, failBonus: mods.attr[k].failBonus || 0 };
     }
     for (const k of ["forca", "agilidade", "vigor", "mente", "percepcao"]) {
       if (a[k]) {

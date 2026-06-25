@@ -90,9 +90,9 @@ const STAT_TARGETS = ["hp", "mp", "heroic", "deslocamento"];
  */
 function emptyMods() {
   const attr = {};
-  for (const k of [...PRIMARY_ATTRS, ...SECONDARY_ATTRS]) attr[k] = { bonus: 0, dice: 0, set: null, reroll1: 0, reroll6: 0 };
+  for (const k of [...PRIMARY_ATTRS, ...SECONDARY_ATTRS]) attr[k] = { bonus: 0, dice: 0, set: null, reroll1: 0, reroll6: 0, critBonus: 0, failBonus: 0 };
   const roll = {};
-  for (const k of ROLL_CATEGORIES) roll[k] = { bonus: 0, dice: 0, reroll1: 0, reroll6: 0 };
+  for (const k of ROLL_CATEGORIES) roll[k] = { bonus: 0, dice: 0, reroll1: 0, reroll6: 0, critBonus: 0, failBonus: 0 };
   const stat = {};
   for (const k of STAT_TARGETS) stat[k] = 0;
   return { attr, roll, stat };
@@ -140,6 +140,14 @@ function applyEffectToMods(mods, effect) {
     const val = effect.rerollAll ? "all" : (Number(effect.value) || 0);
     if (mods.attr[t]) mods.attr[t].reroll6 = combineReroll(mods.attr[t].reroll6, val);
     else if (mods.roll[t]) mods.roll[t].reroll6 = combineReroll(mods.roll[t].reroll6, val);
+  } else if (effect.type === "crit") {
+    // Crítico aprimorado: reduz o limiar de dados para crítico.
+    if (mods.attr[t]) mods.attr[t].critBonus += v;
+    else if (mods.roll[t]) mods.roll[t].critBonus += v;
+  } else if (effect.type === "fumble") {
+    // Falha piorada: aumenta o limiar de dados para falha crítica.
+    if (mods.attr[t]) mods.attr[t].failBonus += v;
+    else if (mods.roll[t]) mods.roll[t].failBonus += v;
   }
   // "damage", "rd", "condition", "info" são tratados em outros lugares
 }
