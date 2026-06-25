@@ -49,7 +49,7 @@ export class LigeiaActor extends Actor {
     const rerollSixes = has(ar.reroll6, rm.all?.reroll6);
     let diceMods = "";
     if (rerollOnes) diceMods += "ro1";
-    if (rerollSixes) diceMods += "ro6";
+    if (rerollSixes) diceMods += "rr6";
 
     const parts = [`${totalDice}d6${diceMods}${keep}`];
     if (bonus !== 0) parts.push(`${bonus >= 0 ? "+" : "-"} ${Math.abs(bonus)}`);

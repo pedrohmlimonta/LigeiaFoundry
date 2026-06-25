@@ -78,7 +78,7 @@ export async function rollLigeia({
   // Modificadores nativos só quando é "todos" (mais natural com Dice So Nice).
   let diceMods = "";
   if (r1All) diceMods += "ro1";
-  if (r6All) diceMods += "ro6";
+  if (r6All) diceMods += "rr6";
 
   const formulaParts = [`${totalDice}d6${diceMods}${keepMode}`];
   if (flat !== 0) formulaParts.push(`${flat >= 0 ? "+" : "-"} ${Math.abs(flat)}`);
