@@ -215,6 +215,22 @@
       </div>
       {{/each}}
     </div>
+
+    {{!-- Macro executada ao rodar a ação --}}
+    <div class="lig-macro-section">
+      <div class="lig-subtitle">Macro ao executar</div>
+      {{#if act.macroUuid}}
+      <div class="lig-macro-bound {{#unless act.macroEnabled}}off{{/unless}}">
+        <button type="button" class="lig-mini-btn" data-action="toggleMacro" data-action-index="{{i}}" title="Ativar/desativar">{{#if act.macroEnabled}}●{{else}}○{{/if}}</button>
+        <span class="lig-macro-name" data-action="openMacro" data-action-index="{{i}}" title="Abrir macro">🎬 {{act.macroName}}</span>
+        <button type="button" class="lig-mini-btn danger" data-action="removeMacro" data-action-index="{{i}}" title="Remover macro">✕</button>
+      </div>
+      {{else}}
+      <div class="lig-macro-drop" data-action-index="{{i}}">
+        Arraste uma macro aqui
+      </div>
+      {{/if}}
+    </div>
   </div>
   {{/each}}
   {{#unless actions.length}}

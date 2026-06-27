@@ -38,8 +38,10 @@ export class LigeiaActor extends Actor {
     // ----- Reroll (1s e/ou 6s) -----
     // Combina o reroll do atributo "iniciativa" com o da categoria "all".
     // O carrossel monta a Roll a partir da fórmula, então usamos os
-    // modificadores nativos do Foundry: `ro1` rerrola (uma vez) os dados que
-    // caem 1; `ro6` os que caem 6. Vale tanto para "todos" quanto para uma
+    // modificadores nativos do Foundry: `rr1` rerrola os dados que caem 1;
+    // `rr6` os que caem 6. (Nesta build o modificador `ro` não parseia o
+    // número e acaba rerolando 1s; por isso usamos `rr`.) Vale tanto para
+    // "todos" quanto para uma
     // contagem ≥1 (o Foundry não diferencia contagem na fórmula; havendo
     // qualquer reroll daquele valor, aplica o modificador).
     const ar = sys.attrReroll?.iniciativa || {};
@@ -48,7 +50,7 @@ export class LigeiaActor extends Actor {
     const rerollOnes = has(ar.reroll1, rm.all?.reroll1);
     const rerollSixes = has(ar.reroll6, rm.all?.reroll6);
     let diceMods = "";
-    if (rerollOnes) diceMods += "ro1";
+    if (rerollOnes) diceMods += "rr1";
     if (rerollSixes) diceMods += "rr6";
 
     const parts = [`${totalDice}d6${diceMods}${keep}`];

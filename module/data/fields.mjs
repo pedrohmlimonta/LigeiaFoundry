@@ -157,6 +157,11 @@ export function actionEntryField() {
     ),
     range: new fields.NumberField({ initial: 0, integer: false, min: 0 }),
     area: new fields.NumberField({ initial: 0, integer: false, min: 0 }),
+    // Macro executada ao rodar a ação (arrastada para o editor). Pode ser
+    // ligada/desligada sem remover. Guarda também o nome para exibição.
+    macroUuid: new fields.StringField({ blank: true, initial: "" }),
+    macroName: new fields.StringField({ blank: true, initial: "" }),
+    macroEnabled: new fields.BooleanField({ initial: true }),
     // Custo da ação ao ser executada (descontado do personagem). 0 = grátis.
     costMp: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
     costHp: new fields.NumberField({ initial: 0, integer: true, min: 0 }),

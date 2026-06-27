@@ -14,6 +14,8 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     classes: ["ligeia", "sheet", "item"],
     position: { width: 560, height: 620 },
     window: { resizable: true },
+    // Permite soltar Macros (e outros) sobre o editor de ações.
+    dragDrop: [{ dragSelector: null, dropSelector: null }],
     form: {
       submitOnChange: true,
       closeOnSubmit: false,
@@ -32,6 +34,9 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       removeAction: LigeiaItemSheetBase._onRemoveAction,
       addAppliesEffect: LigeiaItemSheetBase._onAddAppliesEffect,
       removeAppliesEffect: LigeiaItemSheetBase._onRemoveAppliesEffect,
+      removeMacro: LigeiaItemSheetBase._onRemoveMacro,
+      toggleMacro: LigeiaItemSheetBase._onToggleMacro,
+      openMacro: LigeiaItemSheetBase._onOpenMacro,
     },
   };
 
@@ -82,9 +87,17 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         }
         // Remove buracos ANTES de mexer (evita arr[i] undefined).
         arr = arr.filter((v) => v !== undefined && v !== null);
-        // Cada ação pode ter appliesEffects como objeto indexado {0:{...}}
-        // vindo do form → converte para array.
+        // Campos que NÃO têm input no form (a macro é vinculada por
+        // drag&drop e gerida pelos botões). Preserva-os a partir do
+        // documento atual para não serem zerados num submit normal.
+        const current = this.document.system.actions || [];
         for (let i = 0; i < arr.length; i++) {
+          const cur = current[i] || {};
+          if (arr[i].macroUuid === undefined) arr[i].macroUuid = cur.macroUuid || "";
+          if (arr[i].macroName === undefined) arr[i].macroName = cur.macroName || "";
+          if (arr[i].macroEnabled === undefined) arr[i].macroEnabled = cur.macroEnabled ?? true;
+          // Cada ação pode ter appliesEffects como objeto indexado {0:{...}}
+          // vindo do form → converte para array.
           const fx = arr[i].appliesEffects;
           if (fx && !Array.isArray(fx) && typeof fx === "object") {
             arr[i].appliesEffects = Object.keys(fx)
@@ -292,6 +305,22 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     // que troca o elemento raiz, fazendo os botões de Ação pararem de
     // funcionar até um F5.
 
+    // ----- Drag & drop de MACRO sobre as ações -----
+    // Liga um DragDrop a cada render (o elemento muda no re-render do
+    // submitOnChange). Permite soltar uma macro nas "drop zones" das ações.
+    const DragDropCls =
+      foundry.applications.ux?.DragDrop?.implementation ||
+      foundry.applications.ux?.DragDrop;
+    if (DragDropCls) {
+      const dd = new DragDropCls({
+        dragSelector: null,
+        dropSelector: ".lig-macro-drop",
+        permissions: { drop: () => this.isEditable },
+        callbacks: { drop: this._onDropMacro.bind(this) },
+      });
+      dd.bind(root);
+    }
+
     // ----- Preservação de scroll -----
     // O elemento que rola é .ligeia-item-body (o .window-content tem
     // overflow:hidden). Fazemos fallback para outros caso mude.
@@ -310,6 +339,46 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         this.#savedScroll = scroller.scrollTop;
       });
     }
+  }
+
+  /**
+   * Recebe uma Macro arrastada para a drop zone de uma ação e a vincula.
+   * O índice da ação vem do atributo data-action-index do alvo do drop.
+   */
+  async _onDropMacro(event) {
+    let data;
+    try {
+      data = JSON.parse(event.dataTransfer.getData("text/plain"));
+    } catch (e) {
+      return;
+    }
+    if (data?.type !== "Macro") {
+      ui.notifications?.warn("Arraste uma macro para este campo.");
+      return;
+    }
+    // Descobre a ação alvo pelo elemento da drop zone.
+    const zone = event.target?.closest?.(".lig-macro-drop");
+    const ai = Number(zone?.dataset?.actionIndex);
+    if (!Number.isInteger(ai)) return;
+
+    let macro;
+    try {
+      macro = await Macro.implementation.fromDropData(data);
+    } catch (e) {
+      macro = null;
+    }
+    if (!macro) {
+      ui.notifications?.warn("Não foi possível ler a macro arrastada.");
+      return;
+    }
+
+    const actions = foundry.utils.deepClone(this.document.system.actions || []);
+    if (!actions[ai]) return;
+    actions[ai].macroUuid = macro.uuid;
+    actions[ai].macroName = macro.name;
+    actions[ai].macroEnabled = true;
+    await this._replaceActions(actions);
+    ui.notifications?.info(`Macro "${macro.name}" vinculada à ação.`);
   }
 
   /* ---- helpers para mutar arrays do system ---- */
@@ -424,6 +493,31 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     if (!actions[ai]?.appliesEffects) return;
     actions[ai].appliesEffects.splice(fi, 1);
     await this._replaceActions(actions);
+  }
+
+  /* ---- Macro vinculada à ação ---- */
+  static async _onRemoveMacro(event, target) {
+    const ai = Number(target.dataset.actionIndex);
+    const actions = foundry.utils.deepClone(this.document.system.actions || []);
+    if (!actions[ai]) return;
+    actions[ai].macroUuid = "";
+    actions[ai].macroName = "";
+    await this._replaceActions(actions);
+  }
+  static async _onToggleMacro(event, target) {
+    const ai = Number(target.dataset.actionIndex);
+    const actions = foundry.utils.deepClone(this.document.system.actions || []);
+    if (!actions[ai]) return;
+    actions[ai].macroEnabled = !actions[ai].macroEnabled;
+    await this._replaceActions(actions);
+  }
+  static async _onOpenMacro(event, target) {
+    const ai = Number(target.dataset.actionIndex);
+    const uuid = this.document.system.actions?.[ai]?.macroUuid;
+    if (!uuid) return;
+    const macro = await fromUuid(uuid);
+    if (macro?.sheet) macro.sheet.render(true);
+    else ui.notifications?.warn("Macro não encontrada (foi removida?).");
   }
 }
 

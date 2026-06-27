@@ -66,32 +66,28 @@ export async function rollLigeia({
   const flat = (attribute || 0) + (bonus || 0);
 
   // ----- Reroll de dados (1 e/ou 6) -----
-  // Os modificadores de reroll do Foundry são aplicados na fórmula. Para
-  // "reroll de TODOS" usamos `ro` (reroll once por dado). Para um número
-  // limitado (rerrolar até N dados), aplicamos o reroll manualmente após a
-  // rolagem (o Foundry não tem sintaxe nativa para "rerrolar até N").
+  // Aplicamos o reroll SEMPRE manualmente após a rolagem (tanto para um
+  // número limitado quanto para "todos"). Evitamos os modificadores nativos
+  // do Foundry porque nesta build o `ro` não parseia o número corretamente
+  // (acaba rerolando 1s). O caminho manual rerola cada dado-alvo uma vez,
+  // respeitando a contagem ou "todos" (Infinity).
   const r1All = reroll1 === "all" || reroll1 === Infinity;
   const r6All = reroll6 === "all" || reroll6 === Infinity;
   const r1Count = r1All ? Infinity : Math.max(0, Number(reroll1) || 0);
   const r6Count = r6All ? Infinity : Math.max(0, Number(reroll6) || 0);
 
-  // Modificadores nativos só quando é "todos" (mais natural com Dice So Nice).
-  let diceMods = "";
-  if (r1All) diceMods += "ro1";
-  if (r6All) diceMods += "rr6";
-
-  const formulaParts = [`${totalDice}d6${diceMods}${keepMode}`];
+  const formulaParts = [`${totalDice}d6${keepMode}`];
   if (flat !== 0) formulaParts.push(`${flat >= 0 ? "+" : "-"} ${Math.abs(flat)}`);
   const formula = formulaParts.join(" ");
 
   const roll = new Roll(formula);
   await roll.evaluate();
 
-  // Reroll manual com CONTAGEM limitada (quando não é "todos").
-  // Reaproveita o termo de dados do roll, troca os resultados marcados e
-  // recalcula o total preservando o modo de manter (kh2/kl2).
+  // Reroll manual (contagem OU todos). Reaproveita o termo de dados do roll,
+  // troca os resultados marcados e recalcula o total preservando o modo de
+  // manter (kh2/kl2).
   const dieTerm0 = roll.dice[0];
-  if (dieTerm0 && (r1Count > 0 && r1Count !== Infinity || r6Count > 0 && r6Count !== Infinity)) {
+  if (dieTerm0 && (r1Count > 0 || r6Count > 0)) {
     await applyLimitedReroll(dieTerm0, { ones: r1Count, sixes: r6Count });
     // Recalcula quais dados ficam ativos (kh2/kl2) e o total da rolagem.
     recomputeKeep(dieTerm0, keepMode);
@@ -578,6 +574,43 @@ export async function spendActionCosts(actor, action) {
  * @param {object} opts.action  a entrada de ação (de system.actions)
  * @param {boolean} opts.hidden  rolagem oculta
  */
+/**
+ * Executa a macro vinculada a uma ação, se houver UUID e estiver ativa.
+ * A macro recebe um escopo com referências úteis (actor, item, action,
+ * token, alvos), além do contexto padrão do Foundry (speaker, character).
+ */
+async function executeActionMacro({ actor, item, action, overrideTargets = null }) {
+  if (!action?.macroUuid || action.macroEnabled === false) return;
+  let macro;
+  try {
+    macro = await fromUuid(action.macroUuid);
+  } catch (e) {
+    macro = null;
+  }
+  if (!macro) {
+    ui.notifications?.warn(`Macro da ação "${action.label || ""}" não encontrada.`);
+    return;
+  }
+  try {
+    const token = actor?.getActiveTokens?.()?.[0] ?? null;
+    const speaker = ChatMessage.getSpeaker({ actor });
+    const targets = overrideTargets ?? Array.from(game.user?.targets ?? []).map((t) => t.actor);
+    // O escopo é injetado como variáveis disponíveis dentro da macro.
+    await macro.execute({
+      actor,
+      item,
+      action,
+      token,
+      speaker,
+      targets,
+      character: game.user?.character ?? null,
+    });
+  } catch (err) {
+    console.error("Ligeia | erro ao executar macro da ação:", err);
+    ui.notifications?.error(`Erro ao executar a macro "${macro.name}". Veja o console.`);
+  }
+}
+
 export async function rollItemAction({ actor, item, action, hidden = false, overrideTargets = null }) {
   const cfg = CONFIG.LIGEIA || {};
   // Compatibilidade: se nenhuma ação for passada, usa a primeira do item.
@@ -595,6 +628,9 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
 
   // Gasta os custos da ação (PM/PV/PH) do executor.
   const costText = await spendActionCosts(actor, action);
+
+  // Executa a macro vinculada à ação (se houver e estiver ativa).
+  await executeActionMacro({ actor, item, action, overrideTargets });
 
   // Rolagem de ataque (se a ação rola)
   // Modificadores de condição do ATACANTE
