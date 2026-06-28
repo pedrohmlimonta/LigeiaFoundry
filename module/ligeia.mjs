@@ -283,6 +283,16 @@ const UNIQUE_DEFINITION_LABELS = { raca: "raça", heranca: "herança", vocacao: 
 Hooks.on("preCreateItem", function (item, data, options, userId) {
   const parent = item.parent; // o Actor, se embutido
   if (!parent || parent.documentName !== "Actor") return;
+
+  // Carreira só pode ser adicionada a um personagem de nível 6.
+  if (item.type === "carreira" && parent.type === "personagem") {
+    const level = Number(parent.system?.details?.level) || 1;
+    if (level < 6) {
+      ui.notifications?.warn(`Carreira só pode ser adicionada a personagens de nível 6 (${parent.name} está no nível ${level}).`);
+      return false; // impede a criação
+    }
+  }
+
   if (!UNIQUE_DEFINITION_TYPES.includes(item.type)) return;
   // Se esta criação já foi autorizada pelo diálogo de substituição, deixa passar.
   if (options.ligeiaConfirmedReplace) return;

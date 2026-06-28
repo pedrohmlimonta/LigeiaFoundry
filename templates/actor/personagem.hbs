@@ -435,7 +435,11 @@
       <button type="button" class="lig-mini-btn" data-action="itemCreate" data-type="raca">+ Raça</button>
       <button type="button" class="lig-mini-btn" data-action="itemCreate" data-type="heranca">+ Herança</button>
       <button type="button" class="lig-mini-btn" data-action="itemCreate" data-type="vocacao">+ Vocação</button>
+      {{#if canAddCareer}}
       <button type="button" class="lig-mini-btn" data-action="itemCreate" data-type="carreira">+ Carreira</button>
+      {{else}}
+      <button type="button" class="lig-mini-btn" disabled title="Carreira só no nível 6">+ Carreira (nível 6)</button>
+      {{/if}}
       <button type="button" class="lig-mini-btn" data-action="itemCreate" data-type="organizacao">+ Organização</button>
     </div>
     {{/if}}

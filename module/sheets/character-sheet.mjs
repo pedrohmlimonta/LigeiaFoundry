@@ -102,6 +102,8 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     context.system = sys;
     context.isGM = game.user.isGM;
     context.editable = this.isEditable;
+    // Carreira só pode ser adicionada no nível 6.
+    context.canAddCareer = (Number(sys.details?.level) || 1) >= 6;
 
     // Enriquece campos HTML para exibição
     context.enriched = {
