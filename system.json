@@ -54,5 +54,14 @@
   "manifest": "https://github.com/pedrohmlimonta/LigeiaFoundry/releases/latest/download/system.json",
   "download": "https://github.com/pedrohmlimonta/LigeiaFoundry/releases/download/v0.1.0/ligeia-rpg.zip",
   "bugs": "https://github.com/pedrohmlimonta/LigeiaFoundry/issues",
-  "readme": "https://github.com/pedrohmlimonta/LigeiaFoundry/blob/main/README.md"
+  "readme": "https://github.com/pedrohmlimonta/LigeiaFoundry/blob/main/README.md",
+  "relationships": {
+    "recommends": [
+      {
+        "id": "autoanimations",
+        "type": "module",
+        "reason": "Animações automáticas ao executar ações (opcional)."
+      }
+    ]
+  }
 }

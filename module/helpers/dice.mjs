@@ -33,6 +33,7 @@ async function waitForDiceAnimation(fallbackMs = 1100) {
 }
 
 import { conditionModifiers } from "./conditions.mjs";
+import { playAutomatedAnimation } from "./integrations.mjs";
 
 /**
  * Executa uma rolagem do Ligeia e devolve um objeto Roll do Foundry
@@ -736,6 +737,15 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     }
   }
   // mode "none": nenhum alvo
+
+  // Integração com Automated Animations: dispara a animação configurada para
+  // o item (se o módulo estiver instalado e o item configurado nele). Não
+  // bloqueia o resto da resolução (fire-and-forget).
+  playAutomatedAnimation({
+    actor,
+    item,
+    targetActors: affected.filter((x) => !x.isSelf).map((x) => x.actor),
+  });
 
   // Cabeçalho do ataque (atacante) — usado na 1ª mensagem.
   // Mostra o resultado da CD no cabeçalho apenas quando NÃO há alvos
