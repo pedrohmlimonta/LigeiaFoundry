@@ -38,21 +38,13 @@ jobs:
             console.log('system.json -> versão', d.version);
           "
 
-      # Os packs LevelDB já vêm versionados no repositório. Se você mantiver
-      # um build-packs.mjs + bibliotecas, descomente o bloco abaixo para
-      # regenerá-los no release.
-      # - name: Gerar compendia
-      #   run: |
-      #     npm install classic-level --no-save
-      #     node build-packs.mjs
-
       # Empacota o sistema com o system.json na RAIZ do zip
+      # (Os compêndios serão distribuídos em um módulo separado, então não
+      # entram no pacote do sistema.)
       - name: Empacotar ligeia-rpg.zip
         run: |
-          find packs -name "LOCK" -delete 2>/dev/null || true
-          find packs -name "LOG.old" -delete 2>/dev/null || true
           zip -r ligeia-rpg.zip \
-            system.json module templates styles lang assets packs README.md LICENSE \
+            system.json module templates styles lang assets README.md LICENSE \
             -x "*.DS_Store" "node_modules/*" ".git/*" "build-*" "package*.json"
 
       # Anexa system.json e ligeia-rpg.zip como assets da release

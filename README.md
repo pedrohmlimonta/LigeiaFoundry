@@ -16,7 +16,7 @@ mecânicas do livro e **compendia prontas** com o conteúdo do Livro de Regras.
    ```
    Data/systems/ligeia-rpg/system.json
    Data/systems/ligeia-rpg/module/...
-   Data/systems/ligeia-rpg/packs/...
+   Data/systems/ligeia-rpg/templates/...
    ```
    (o `system.json` deve estar em `Data/systems/ligeia-rpg/`, não dentro de
    uma subpasta extra).
@@ -80,32 +80,17 @@ Cada Item pode conceder **efeitos mecânicos** quando ativo:
 
 ---
 
-## Compendia (conteúdo do Livro de Regras)
+## Conteúdo (Livro de Regras)
 
-O sistema vem com quatro compendia prontas, na pasta
-**"Ligeia — Livro de Regras"**:
+Os compêndios de conteúdo (habilidades, magias, traços e equipamentos do
+Livro de Regras) **não fazem parte deste sistema**. Eles serão distribuídos
+em um **módulo separado**, instalável à parte. Assim o sistema fica enxuto e
+o conteúdo pode ser atualizado de forma independente.
 
-| Compêndio | Conteúdo |
-|---|---|
-| **Habilidades (Livro)** | ~114 habilidades + 1 modelo de referência |
-| **Magias (Livro)** | ~66 magias menores + 1 modelo de referência |
-| **Traços (Livro)** | ~44 traços raciais/de herança + 1 modelo |
-| **Equipamentos (Livro)** | ~43 equipamentos + 1 modelo |
-
-### Como usar
-1. Abra o compêndio (aba **Compendium Packs**).
-2. **Arraste** o item desejado para dentro de uma ficha de personagem.
-3. O item entra na ficha como cópia editável. Se tiver efeitos
-   pré-configurados, eles já vêm preenchidos; itens ativos entram desligados
-   (off) para o jogador ligar quando precisar.
-
-> Cada compêndio inclui uma entrada **"★ Modelo Completo"** que demonstra
-> todos os tipos de efeito e custos — útil como referência ao criar itens.
-
-### Observação sobre o conteúdo extraído
-As descrições foram extraídas automaticamente do PDF do Livro de Regras.
-Algumas magias podem ter pequenas imperfeições de formatação (texto cortado
-em quebras de coluna). Você pode editar qualquer item livremente.
+Enquanto o módulo não estiver disponível, você pode criar itens manualmente
+pelas fichas — todos os tipos (habilidade, magia, traço, equipamento, raça,
+herança, vocação, carreira, organização) estão disponíveis na barra lateral
+de Itens.
 
 ---
 
@@ -113,7 +98,6 @@ em quebras de coluna). Você pode editar qualquer item livremente.
 - Foundry **V13** (verificado no build 13).
 - DataModels (`foundry.abstract.TypeDataModel`) para Ator e Item.
 - Sheets em **ApplicationV2** (`foundry.applications.*`).
-- Compendia em **LevelDB** nativo do V13.
 - Interface **somente em português (pt-BR)**.
 
 Sistema não-oficial, feito pela comunidade, sem vínculo com os autores de

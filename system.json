@@ -47,64 +47,7 @@
     "distance": 1,
     "units": "m"
   },
-  "packs": [
-    {
-      "name": "habilidades",
-      "label": "Habilidades (Livro)",
-      "path": "packs/habilidades",
-      "type": "Item",
-      "system": "ligeia-rpg",
-      "ownership": {
-        "PLAYER": "OBSERVER",
-        "ASSISTANT": "OWNER"
-      }
-    },
-    {
-      "name": "magias",
-      "label": "Magias (Livro)",
-      "path": "packs/magias",
-      "type": "Item",
-      "system": "ligeia-rpg",
-      "ownership": {
-        "PLAYER": "OBSERVER",
-        "ASSISTANT": "OWNER"
-      }
-    },
-    {
-      "name": "tracos",
-      "label": "Traços (Livro)",
-      "path": "packs/tracos",
-      "type": "Item",
-      "system": "ligeia-rpg",
-      "ownership": {
-        "PLAYER": "OBSERVER",
-        "ASSISTANT": "OWNER"
-      }
-    },
-    {
-      "name": "equipamentos",
-      "label": "Equipamentos (Livro)",
-      "path": "packs/equipamentos",
-      "type": "Item",
-      "system": "ligeia-rpg",
-      "ownership": {
-        "PLAYER": "OBSERVER",
-        "ASSISTANT": "OWNER"
-      }
-    }
-  ],
-  "packFolders": [
-    {
-      "name": "Ligeia — Livro de Regras",
-      "sorting": "m",
-      "packs": [
-        "habilidades",
-        "magias",
-        "tracos",
-        "equipamentos"
-      ]
-    }
-  ],
+  "packs": [],
   "primaryTokenAttribute": "resources.hp",
   "secondaryTokenAttribute": "resources.mp",
   "url": "https://github.com/pedrohmlimonta/LigeiaFoundry",
