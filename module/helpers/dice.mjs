@@ -744,6 +744,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
   playAutomatedAnimation({
     actor,
     item,
+    action,
     targetActors: affected.filter((x) => !x.isSelf).map((x) => x.actor),
   });
 

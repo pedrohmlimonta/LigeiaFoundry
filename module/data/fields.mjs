@@ -171,6 +171,12 @@ export function actionEntryField() {
     macroUuid: new fields.StringField({ blank: true, initial: "" }),
     macroName: new fields.StringField({ blank: true, initial: "" }),
     macroEnabled: new fields.BooleanField({ initial: true }),
+    // Animação PRÓPRIA da ação (Automated Animations). Guarda uma cópia da
+    // config `flags.autoanimations` capturada do item, para esta ação ter sua
+    // própria animação independente das outras ações do mesmo item.
+    aaConfig: new fields.ObjectField({ required: false, nullable: true, initial: null }),
+    aaName: new fields.StringField({ blank: true, initial: "" }),
+    aaEnabled: new fields.BooleanField({ initial: true }),
     // Custo da ação ao ser executada (descontado do personagem). 0 = grátis.
     costMp: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
     costHp: new fields.NumberField({ initial: 0, integer: true, min: 0 }),

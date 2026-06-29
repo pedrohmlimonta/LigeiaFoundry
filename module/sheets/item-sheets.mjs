@@ -37,6 +37,9 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       removeMacro: LigeiaItemSheetBase._onRemoveMacro,
       toggleMacro: LigeiaItemSheetBase._onToggleMacro,
       openMacro: LigeiaItemSheetBase._onOpenMacro,
+      captureAA: LigeiaItemSheetBase._onCaptureAA,
+      clearAA: LigeiaItemSheetBase._onClearAA,
+      toggleAA: LigeiaItemSheetBase._onToggleAA,
     },
   };
 
@@ -96,6 +99,10 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
           if (arr[i].macroUuid === undefined) arr[i].macroUuid = cur.macroUuid || "";
           if (arr[i].macroName === undefined) arr[i].macroName = cur.macroName || "";
           if (arr[i].macroEnabled === undefined) arr[i].macroEnabled = cur.macroEnabled ?? true;
+          // Animação por ação (sem input no form): preserva do documento.
+          if (arr[i].aaConfig === undefined) arr[i].aaConfig = cur.aaConfig ?? null;
+          if (arr[i].aaName === undefined) arr[i].aaName = cur.aaName || "";
+          if (arr[i].aaEnabled === undefined) arr[i].aaEnabled = cur.aaEnabled ?? true;
           // Cada ação pode ter appliesEffects como objeto indexado {0:{...}}
           // vindo do form → converte para array.
           const fx = arr[i].appliesEffects;
@@ -251,8 +258,12 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     };
 
     // Ações do item (lista). Cada efeito aplicado recebe targetChoices conforme seu tipo.
+    const aaActive = !!game.modules.get("autoanimations")?.active;
+    context.aaActive = aaActive;
     context.actions = (item.system?.actions || []).map((a) => ({
       ...a,
+      // Tem animação própria capturada? (config não-vazia)
+      hasAnim: !!(a.aaConfig && typeof a.aaConfig === "object" && Object.keys(a.aaConfig).length > 0),
       appliesEffects: (a.appliesEffects || []).map((fx) => ({
         ...fx,
         targetChoices: targetsForType(fx.fxType),
@@ -536,6 +547,45 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     const macro = await fromUuid(uuid);
     if (macro?.sheet) macro.sheet.render(true);
     else ui.notifications?.warn("Macro não encontrada (foi removida?).");
+  }
+
+  /* ---- Animação por ação (Automated Animations) ---- */
+  // Captura a config de animação ATUAL do item (definida no menu do Automated
+  // Animations) e a guarda nesta ação, para ela ter animação própria.
+  static async _onCaptureAA(event, target) {
+    const ai = Number(target.dataset.actionIndex);
+    if (!game.modules.get("autoanimations")?.active) {
+      ui.notifications?.warn("O módulo Automated Animations não está ativo.");
+      return;
+    }
+    const cfg = foundry.utils.deepClone(this.document.flags?.autoanimations ?? null);
+    const hasCfg = cfg && typeof cfg === "object" && Object.keys(cfg).length > 0;
+    if (!hasCfg) {
+      ui.notifications?.warn("O item ainda não tem animação configurada no Automated Animations. Configure-a primeiro (no menu do módulo, na ficha do item) e depois capture.");
+      return;
+    }
+    const actions = foundry.utils.deepClone(this.document.system.actions || []);
+    if (!actions[ai]) return;
+    actions[ai].aaConfig = cfg;
+    actions[ai].aaName = this.document.name;
+    actions[ai].aaEnabled = true;
+    await this._replaceActions(actions);
+    ui.notifications?.info("Animação capturada para esta ação.");
+  }
+  static async _onClearAA(event, target) {
+    const ai = Number(target.dataset.actionIndex);
+    const actions = foundry.utils.deepClone(this.document.system.actions || []);
+    if (!actions[ai]) return;
+    actions[ai].aaConfig = null;
+    actions[ai].aaName = "";
+    await this._replaceActions(actions);
+  }
+  static async _onToggleAA(event, target) {
+    const ai = Number(target.dataset.actionIndex);
+    const actions = foundry.utils.deepClone(this.document.system.actions || []);
+    if (!actions[ai]) return;
+    actions[ai].aaEnabled = !actions[ai].aaEnabled;
+    await this._replaceActions(actions);
   }
 }
 

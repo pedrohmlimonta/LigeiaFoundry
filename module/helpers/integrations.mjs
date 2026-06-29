@@ -24,14 +24,17 @@ function activeTokenOf(actor) {
  * Dispara a animação do Automated Animations para uma ação.
  *
  * @param {object}  opts
- * @param {Actor}   opts.actor         ator que executa a ação (origem)
- * @param {Item}    opts.item          item da ação (usado para achar a config)
+ * @param {Actor}   opts.actor          ator que executa a ação (origem)
+ * @param {Item}    opts.item           item da ação (config geral / fallback)
+ * @param {object}  [opts.action]       a ação (pode ter animação própria)
  * @param {Actor[]} [opts.targetActors] atores-alvo da ação
  *
- * É tolerante a falhas: se o módulo não estiver presente, a API divergir ou
- * algo falhar, apenas registra um aviso e segue (a ação acontece normalmente).
+ * Se a ação tiver animação PRÓPRIA capturada (action.aaConfig) e estiver
+ * habilitada, montamos um clone do item com essa config na flag
+ * `flags.autoanimations` e entregamos ao módulo — assim cada ação pode ter
+ * sua animação independente. Sem isso, usa a animação geral do item.
  */
-export async function playAutomatedAnimation({ actor, item, targetActors = [] } = {}) {
+export async function playAutomatedAnimation({ actor, item, action = null, targetActors = [] } = {}) {
   try {
     if (!isAutomatedAnimationsActive()) return;
     const AA = globalThis.AutomatedAnimations;
@@ -41,18 +44,31 @@ export async function playAutomatedAnimation({ actor, item, targetActors = [] } 
     const sourceToken = activeTokenOf(actor);
     if (!sourceToken) return; // sem token na cena, não há de onde animar
 
-    // Converte os atores-alvo nos seus tokens na cena (o módulo trabalha com
-    // tokens). Ignora alvos sem token visível.
     const targets = [];
     for (const ta of targetActors) {
       const tk = activeTokenOf(ta);
       if (tk && tk !== sourceToken) targets.push(tk);
     }
 
+    // Decide qual "item" entregar ao módulo: o item real (animação geral) ou
+    // um clone carregando a animação própria da ação.
+    let aaItem = item;
+    const cfg = action?.aaConfig;
+    const hasOwn =
+      action?.aaEnabled !== false &&
+      cfg && typeof cfg === "object" && Object.keys(cfg).length > 0;
+    if (hasOwn) {
+      try {
+        // Clone em memória do item com a flag de animação da ação.
+        aaItem = item.clone({ "flags.autoanimations": foundry.utils.deepClone(cfg) }, { keepId: false });
+      } catch (e) {
+        console.warn("Ligeia | não foi possível montar a animação própria da ação; usando a do item:", e);
+        aaItem = item;
+      }
+    }
+
     // API do Automated Animations: playAnimation(sourceToken, item, options).
-    // Passamos os alvos explicitamente; o módulo também lê game.user.targets,
-    // que já marcamos no fluxo de área/aura.
-    await AA.playAnimation(sourceToken, item, { targets });
+    await AA.playAnimation(sourceToken, aaItem, { targets });
   } catch (e) {
     console.warn("Ligeia | falha ao acionar Automated Animations:", e);
   }

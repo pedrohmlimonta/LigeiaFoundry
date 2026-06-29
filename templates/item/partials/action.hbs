@@ -281,6 +281,23 @@
       </div>
       {{/if}}
     </div>
+
+    {{#if ../aaActive}}
+    <div class="lig-aa-section">
+      <div class="lig-subtitle">Animação própria (Automated Animations)</div>
+      {{#if act.hasAnim}}
+      <div class="lig-macro-bound {{#unless act.aaEnabled}}off{{/unless}}">
+        <button type="button" class="lig-mini-btn" data-action="toggleAA" data-action-index="{{i}}" title="Ativar/desativar">{{#if act.aaEnabled}}●{{else}}○{{/if}}</button>
+        <span class="lig-macro-name">🎞️ Animação própria capturada</span>
+        <button type="button" class="lig-mini-btn" data-action="captureAA" data-action-index="{{i}}" title="Recapturar do item">⟳</button>
+        <button type="button" class="lig-mini-btn danger" data-action="clearAA" data-action-index="{{i}}" title="Remover animação desta ação">✕</button>
+      </div>
+      {{else}}
+      <button type="button" class="lig-mini-btn" data-action="captureAA" data-action-index="{{i}}">Capturar animação do item para esta ação</button>
+      {{/if}}
+      <p class="lig-hint">Configure a animação no menu do Automated Animations (na ficha do item) e clique em capturar para esta ação tê-la de forma independente. Sem captura, a ação usa a animação geral do item.</p>
+    </div>
+    {{/if}}
   </div>
   {{/each}}
   {{#unless actions.length}}
