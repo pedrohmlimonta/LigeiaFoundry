@@ -469,10 +469,24 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
   static async #onRemoveAppliedEffect(event, target) {
     const idx = Number(target.dataset.index);
     const arr = foundry.utils.deepClone(this.document.system.appliedEffects || []);
+    const removed = arr[idx];
     arr.splice(idx, 1);
+
+    const upd = { "system.appliedEffects": arr };
+
+    // Se o efeito removido aplicava uma condição, só mantém a condição se
+    // ainda houver outro efeito ATIVO que a aplique.
+    const condId = removed?.conditionId;
+    if (condId) {
+      const stillActive = arr.some((ae) => ae.conditionId === condId && !ae.disabled);
+      if (!stillActive) {
+        upd["system.conditions"] = (this.document.system.conditions || []).filter((c) => c !== condId);
+      }
+    }
+
     this.#fxOpInProgress = true;
-      try { await this.document.update({ "system.appliedEffects": arr }); }
-      finally { this.#fxOpInProgress = false; }
+    try { await this.document.update(upd); }
+    finally { this.#fxOpInProgress = false; }
   }
 
   static async #onToggleAppliedEffect(event, target) {
@@ -480,9 +494,28 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     const arr = foundry.utils.deepClone(this.document.system.appliedEffects || []);
     if (!arr[idx]) return;
     arr[idx].disabled = !arr[idx].disabled;
+
+    const upd = { "system.appliedEffects": arr };
+
+    // Sincroniza a condição associada ao efeito (se houver).
+    const condId = arr[idx].conditionId;
+    if (condId) {
+      const conds = new Set(this.document.system.conditions || []);
+      // Ainda há ALGUM efeito ATIVO (não desativado) que aplica esta condição?
+      const stillActive = arr.some((ae) => ae.conditionId === condId && !ae.disabled);
+      if (stillActive) {
+        // Ao reativar (ou se outro efeito ainda a mantém): garante a condição.
+        conds.add(condId);
+      } else {
+        // Nenhum efeito ativo mantém a condição → desativa automaticamente.
+        conds.delete(condId);
+      }
+      upd["system.conditions"] = Array.from(conds);
+    }
+
     this.#fxOpInProgress = true;
-      try { await this.document.update({ "system.appliedEffects": arr }); }
-      finally { this.#fxOpInProgress = false; }
+    try { await this.document.update(upd); }
+    finally { this.#fxOpInProgress = false; }
   }
 
   /** Passa uma rodada: aplica dano contínuo e decrementa a duração. */
