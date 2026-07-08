@@ -92,20 +92,26 @@ Hooks.once("init", function () {
 
     // Tipos de dano. A redução de dano (RD) de um tipo reduz apenas o dano
     // daquele tipo.
+    // Tipos de dano REDUTÍVEIS (sujeitos à Redução de Dano).
     damageTypes: {
-      corte: "Corte",
-      perfuracao: "Perfuração",
-      concussao: "Concussão",
-      fogo: "Fogo",
-      gelo: "Gelo",
-      eletrico: "Elétrico",
       acido: "Ácido",
-      veneno: "Veneno",
+      concussao: "Concussão",
+      corte: "Corte",
+      energia: "Energia",
+      fogo: "Fogo",
+      frio: "Frio",
+      necrotico: "Necrótico",
+      perfuracao: "Perfuração",
       psiquico: "Psíquico",
-      sagrado: "Sagrado",
-      profano: "Profano",
-      puro: "Puro",
+      radiante: "Radiante",
+      raio: "Raio",
+      sonico: "Sônico",
+      veneno: "Veneno",
     },
+    // Dano FINAL: não é redutível (ignora Redução de Dano). Fica separado dos
+    // tipos acima na escolha do dano a causar.
+    finalDamageType: "final",
+    finalDamageLabel: "Final",
 
     // Atributos usáveis como ATAQUE (rolagem do atacante).
     attackAttrs: {

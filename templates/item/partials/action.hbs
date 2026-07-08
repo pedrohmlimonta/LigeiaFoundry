@@ -136,9 +136,11 @@
       </label>
       {{#if (eq act.damageResource "hp")}}
       <label>Tipo de dano
-        <select name="system.actions.{{i}}.damageType">
+        <select name="system.actions.{{i}}.damageType" class="lig-dmgtype-select">
           <option value="" {{#unless act.damageType}}selected{{/unless}}>—</option>
           {{selectOptions ../damageTypes selected=act.damageType}}
+          <option class="lig-dmg-sep" disabled>──────────</option>
+          <option value="final" {{#if (eq act.damageType "final")}}selected{{/if}}>Final (não redutível)</option>
         </select>
       </label>
       {{/if}}
@@ -166,9 +168,11 @@
         </label>
         {{#if (eq xd.resource "hp")}}
         <label>Tipo
-          <select name="system.actions.{{../i}}.extraDamage.{{di}}.type">
+          <select name="system.actions.{{../i}}.extraDamage.{{di}}.type" class="lig-dmgtype-select">
             <option value="" {{#unless xd.type}}selected{{/unless}}>—</option>
             {{selectOptions ../../damageTypes selected=xd.type}}
+            <option class="lig-dmg-sep" disabled>──────────</option>
+            <option value="final" {{#if (eq xd.type "final")}}selected{{/if}}>Final (não redutível)</option>
           </select>
         </label>
         {{/if}}

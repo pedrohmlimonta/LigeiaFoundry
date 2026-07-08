@@ -329,7 +329,17 @@ export function resolveAttr(actor, key) {
  * Requer importar effectIsActive de effects.mjs no chamador? Não — fazemos
  * aqui uma checagem simples de enabled + modo, espelhando a lógica.
  */
+/** Rótulo de um tipo de dano, tratando também o dano "Final". */
+export function dmgTypeLabel(type) {
+  if (!type) return "";
+  const cfg = CONFIG.LIGEIA || {};
+  if (type === (cfg.finalDamageType || "final")) return cfg.finalDamageLabel || "Final";
+  return cfg.damageTypes?.[type] || type;
+}
+
 export function damageReductionFor(actor, damageType) {
+  // Dano "Final" não é redutível: ignora qualquer Redução de Dano.
+  if (damageType === (CONFIG.LIGEIA?.finalDamageType || "final")) return 0;
   let rd = 0;
   for (const item of actor.items) {
     const mode = item.system?.mode;
@@ -424,7 +434,6 @@ export async function applyConditionsToActor(actor, ids = []) {
  */
 async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls = [], atkTotal, defTotal, acertou, cfg, attackerMods, caster }) {
   let dmgText = "";
-  const dmgTypeLabel = action.damageType ? (cfg.damageTypes?.[action.damageType] || action.damageType) : "";
 
   const hasExtra = Array.isArray(extraDamageRolls) && extraDamageRolls.length > 0;
   if (acertou && (damageRoll || hasExtra)) {
@@ -447,7 +456,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       amount = amount - rd;
       amount = amount * takenMult;
       const dealt = Math.max(0, Math.floor(amount));
-      const typeLabel = type ? (cfg.damageTypes?.[type] || type) : "";
+      const typeLabel = dmgTypeLabel(type);
       const scaleNote = scaling ? ` <span class="lig-scale">(+${scaling} escalonado)</span>` : "";
       const typeNote = isHp && typeLabel ? " " + typeLabel : "";
       const rdNote = rd ? ` <span class="lig-rd">(RD ${rd})</span>` : "";
@@ -1016,7 +1025,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
   } else if (mode === "none" && (damageRoll || (extraDamageRolls && extraDamageRolls.length))) {
     const dmgLine = (total, type, resource) => {
       const resWord = { hp: "Dano", mp: "Mana drenada", heroic: "Heroico drenado" }[resource];
-      const typeLabel = type ? (cfg.damageTypes?.[type] || type) : "";
+      const typeLabel = dmgTypeLabel(type);
       const typeNote = resource === "hp" && typeLabel ? " " + typeLabel : "";
       return `<div class="lig-atk-dmg">${resWord}: <strong>${total}</strong>${typeNote}</div>`;
     };

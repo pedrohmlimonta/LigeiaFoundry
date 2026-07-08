@@ -1336,3 +1336,6 @@
 .lig-extra-damage { margin-top: 0.5rem; padding: 0.4rem; border: 1px dashed var(--lig-border, #5a4a2a); border-radius: 4px; }
 .lig-xd-row { align-items: flex-end; }
 .lig-extra-tag { font-size: 0.75rem; color: var(--lig-gold, #c9a84a); font-style: italic; }
+
+/* Separador do dano Final no select de tipo de dano */
+.lig-dmgtype-select .lig-dmg-sep { color: var(--lig-border, #5a4a2a); text-align: center; }
