@@ -2,11 +2,11 @@
   "id": "ligeia-rpg",
   "title": "Ligeia RPG",
   "description": "Sistema não-oficial para o RPG de mesa Ligeia. Fichas de personagem, habilidades, magias, equipamentos, traços, sistema de listas de habilidades e descanso.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "compatibility": {
     "minimum": "13",
-    "verified": "13",
-    "maximum": "13"
+    "verified": "14",
+    "maximum": "14"
   },
   "authors": [
     {

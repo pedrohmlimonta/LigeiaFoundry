@@ -1,4 +1,4 @@
-# Ligeia RPG — Sistema para Foundry VTT V13
+# Ligeia RPG — Sistema para Foundry VTT V13 e V14
 
 Sistema **não-oficial** para o RPG de mesa **Ligeia**. Fichas de personagem,
 habilidades, magias, equipamentos e traços — tudo em português, com as
@@ -95,7 +95,11 @@ de Itens.
 ---
 
 ## Notas técnicas
-- Foundry **V13** (verificado no build 13).
+- Foundry **V13 e V14** (compatibilidade declarada até a geração 14).
+- **Nota V14:** o Foundry V14 removeu os *Measured Templates*. Enquanto a
+  área/aura visual não é reescrita para *Template Regions*, no V14 as ações de
+  área/aura ainda funcionam (afetam os alvos), porém sem o círculo visual, e a
+  emanação persistente fica desativada. No V13 tudo funciona normalmente.
 - DataModels (`foundry.abstract.TypeDataModel`) para Ator e Item.
 - Sheets em **ApplicationV2** (`foundry.applications.*`).
 - Interface **somente em português (pt-BR)**.

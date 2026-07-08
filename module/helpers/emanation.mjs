@@ -27,7 +27,10 @@ function emanationOf(template) {
 function emanationTemplates(scene) {
   const sc = scene || canvas?.scene;
   if (!sc) return [];
-  return sc.templates.filter((t) => !!emanationOf(t));
+  // V14 removeu os Measured Templates: scene.templates pode não existir.
+  const templates = sc.templates;
+  if (!templates?.filter) return [];
+  return templates.filter((t) => !!emanationOf(t));
 }
 
 /** Converte raio (unidades do grid) para pixels. */

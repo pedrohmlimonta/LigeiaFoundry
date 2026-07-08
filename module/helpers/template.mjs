@@ -10,7 +10,14 @@
  *
  * Toda a interação com o canvas é embrulhada em try/catch pelo chamador, de
  * modo que, se a API divergir nesta build, a rolagem ainda acontece.
+ *
+ * COMPATIBILIDADE V14: o V14 removeu os Measured Templates. Quando eles não
+ * estão disponíveis, degradamos com elegância — a ação ainda afeta os alvos
+ * (aura: quem está no raio ao redor do lançador; área: os alvos mirados),
+ * apenas sem o círculo visual (que dependerá de uma reescrita para Regions).
  */
+
+import { measuredTemplatesAvailable } from "./compat.mjs";
 
 function MTObjectClass() {
   return (
@@ -238,6 +245,29 @@ export async function placeTemplateForAction(actor, item, action) {
   if (mode !== "area" && mode !== "aura") return { proceed: true, actors: null };
   if (radius <= 0) return { proceed: true, actors: null };
   if (!canvas?.scene) return { proceed: true, actors: null };
+
+  // --- Compatibilidade V14: sem Measured Templates ---
+  // Não há como desenhar o círculo (o documento foi removido). Degradamos:
+  //  - aura: mira quem está no raio ao redor do token do lançador;
+  //  - área: usa os alvos atualmente mirados (o jogador seleciona os alvos).
+  if (!measuredTemplatesAvailable()) {
+    if (action.persistArea) {
+      ui.notifications?.warn("Emanação persistente (área/aura contínua) ainda não é suportada no Foundry V14 — os templates visuais serão reescritos para Regions. A ação será resolvida uma vez.");
+    }
+    if (mode === "aura") {
+      const token = actor.getActiveTokens?.(true)?.[0] || actor.getActiveTokens?.()?.[0];
+      if (token?.center) {
+        const actors = targetTokensInCircle(token.center.x, token.center.y, radius);
+        ui.notifications?.info(`Aura de ${radius}m resolvida ao redor de ${actor.name} (sem círculo visual no V14).`);
+        return { proceed: true, actors, templateId: null };
+      }
+      return { proceed: true, actors: [], templateId: null };
+    }
+    // área: usa os alvos mirados
+    const targeted = Array.from(game.user?.targets ?? []).map((t) => t.actor).filter(Boolean);
+    ui.notifications?.info(`Área de ${radius}m: usando os alvos mirados (sem círculo visual no V14). Mire os alvos atingidos.`);
+    return { proceed: true, actors: targeted, templateId: null };
+  }
 
   // Se a ação cria emanação persistente, monta os metadados para gravar na
   // flag do template (usados para refazer a rolagem por turno).
