@@ -56,6 +56,22 @@ export function expandConditions(ids) {
  *  damageTakenMult — 0.5 se Intangível (recebe metade do dano)
  *  moveMult — 0.5 se Lento (deslocamento pela metade)
  */
+/**
+ * Penalidade/bônus de DADOS por condição para um atributo específico.
+ * Ex.: Surdo → -1D em rolagens de Conjuração.
+ */
+export function attributeConditionDice(actor, attrKey) {
+  const set = expandConditions(actor?.system?.conditions || []);
+  let dice = 0;
+  if (set.has("surdo") && attrKey === "conjuracao") dice -= 1;
+  return dice;
+}
+
+/** O ator tem a condição (considerando condições implícitas)? */
+export function actorHasCondition(actor, id) {
+  return expandConditions(actor?.system?.conditions || []).has(id);
+}
+
 export function conditionModifiers(actor) {
   const set = expandConditions(actor?.system?.conditions || []);
   let atkDice = 0;

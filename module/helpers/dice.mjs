@@ -32,7 +32,7 @@ async function waitForDiceAnimation(fallbackMs = 1100) {
   await delay(fallbackMs);
 }
 
-import { conditionModifiers } from "./conditions.mjs";
+import { conditionModifiers, attributeConditionDice, actorHasCondition } from "./conditions.mjs";
 import { playActionAnimation } from "./integrations.mjs";
 
 /**
@@ -751,9 +751,22 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     const rmBonus = (rm.all?.bonus || 0) + (rm.attack?.bonus || 0);
     const atkRr = rerollFor(actor, atkKey, "attack");
     const atkCrit = critFor(actor, atkKey, "attack");
+    // Surdo: -1D em rolagens de Conjuração.
+    const attrCondDice = attributeConditionDice(actor, atkKey);
+    // Surpreso: +1D para o atacante se o(s) alvo(s) diretos estão surpresos.
+    let surpriseDice = 0;
+    if (action.canRoll && (action.targetMode || "target") === "target") {
+      const preTargets = (Array.isArray(overrideTargets)
+        ? overrideTargets.filter(Boolean)
+        : Array.from(game.user?.targets ?? []).map((t) => t.actor).filter(Boolean)
+      ).filter((a) => a && a !== actor);
+      if (preTargets.length && preTargets.every((a) => actorHasCondition(a, "surpreso"))) {
+        surpriseDice = 1;
+      }
+    }
     atkRoll = await rollLigeia({
       attribute: atk.value,
-      improvement: atk.dice + (Number(action.rollDice) || 0) + atkCond.atkDice + rmDice,
+      improvement: atk.dice + (Number(action.rollDice) || 0) + atkCond.atkDice + rmDice + attrCondDice + surpriseDice,
       bonus: (Number(action.rollBonus) || 0) + rmBonus,
       // Passa a CD fixa (quando houver) para marcar sucesso/falha e crítico.
       difficulty: fixedDC,
@@ -970,9 +983,11 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
 
         const defRr = rerollFor(tActor, def.key, "defense");
         const defCrit = critFor(tActor, def.key, "defense");
+        // Surdo: -1D se a defesa usar Conjuração.
+        const defAttrCondDice = attributeConditionDice(tActor, def.key);
         const defRoll = await rollLigeia({
           attribute: def.base,
-          improvement: def.dice + defCond.defDice + (tActor.system?.rollMods?.all?.dice || 0) + (tActor.system?.rollMods?.defense?.dice || 0),
+          improvement: def.dice + defCond.defDice + (tActor.system?.rollMods?.all?.dice || 0) + (tActor.system?.rollMods?.defense?.dice || 0) + defAttrCondDice,
           bonus: def.penalty + (tActor.system?.rollMods?.all?.bonus || 0) + (tActor.system?.rollMods?.defense?.bonus || 0),
           difficulty: atkTotal,
           reroll1: defRr.reroll1,

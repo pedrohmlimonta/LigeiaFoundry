@@ -230,6 +230,16 @@ Hooks.once("init", function () {
         icon: "icons/svg/stoned.svg",
         desc: "Faz apenas uma ação por turno. Anula com Mente.",
       },
+      surdo: {
+        label: "Surdo",
+        icon: "icons/svg/silenced.svg",
+        desc: "Não pode ouvir. Perde 1D em rolagens de Conjuração e em rolagens que exijam audição. Salvo indicado, anula com Vigor antes do fim da cena.",
+      },
+      surpreso: {
+        label: "Surpreso",
+        icon: "icons/svg/hazard.svg",
+        desc: "Ainda não agiu em combate. Ataques contra criaturas surpresas recebem 1D nas rolagens.",
+      },
     },
   };
 
