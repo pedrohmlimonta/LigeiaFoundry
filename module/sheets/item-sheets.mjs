@@ -34,6 +34,8 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       removeAction: LigeiaItemSheetBase._onRemoveAction,
       addAppliesEffect: LigeiaItemSheetBase._onAddAppliesEffect,
       removeAppliesEffect: LigeiaItemSheetBase._onRemoveAppliesEffect,
+      addExtraDamage: LigeiaItemSheetBase._onAddExtraDamage,
+      removeExtraDamage: LigeiaItemSheetBase._onRemoveExtraDamage,
       removeMacro: LigeiaItemSheetBase._onRemoveMacro,
       toggleMacro: LigeiaItemSheetBase._onToggleMacro,
       openMacro: LigeiaItemSheetBase._onOpenMacro,
@@ -112,6 +114,13 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
             arr[i].appliesEffects = Object.keys(fx)
               .sort((a, b) => Number(a) - Number(b))
               .map((k) => fx[k]);
+          }
+          // Idem para o dano extra (objeto indexado → array).
+          const xd = arr[i].extraDamage;
+          if (xd && !Array.isArray(xd) && typeof xd === "object") {
+            arr[i].extraDamage = Object.keys(xd)
+              .sort((a, b) => Number(a) - Number(b))
+              .map((k) => xd[k]);
           }
         }
         sys.actions = arr;
@@ -493,7 +502,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       label: "Ação", canRoll: true, rollAttr: "forca", rollBonus: 0, rollDice: 0,
       vsDifficulty: false, fixedDifficulty: 8, difficultyAttr: "nenhum",
       targetMode: "target", includeSelf: false, defenseAttr: "esquiva", defenseAttr2: "",
-      damage: "", damageType: "", damageResource: "hp", scalingDamage: false,
+      damage: "", damageType: "", damageResource: "hp", scalingDamage: false, extraDamage: [],
       appliesEffects: [], range: 0, area: 0, costMp: 0, costHp: 0, costHeroic: 0,
       persistArea: false, persistRounds: 1, persistAffectsSelf: false,
       persistRerollAttack: false, persistTrigger: "both",
@@ -531,6 +540,24 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     const actions = foundry.utils.deepClone(this.document.system.actions || []);
     if (!actions[ai]?.appliesEffects) return;
     actions[ai].appliesEffects.splice(fi, 1);
+    await this._replaceActions(actions);
+  }
+
+  /* ---- Dano extra da ação ---- */
+  static async _onAddExtraDamage(event, target) {
+    const ai = Number(target.dataset.actionIndex);
+    const actions = foundry.utils.deepClone(this.document.system.actions || []);
+    if (!actions[ai]) return;
+    actions[ai].extraDamage = actions[ai].extraDamage || [];
+    actions[ai].extraDamage.push({ formula: "", type: "", resource: "hp", scaling: false });
+    await this._replaceActions(actions);
+  }
+  static async _onRemoveExtraDamage(event, target) {
+    const ai = Number(target.dataset.actionIndex);
+    const di = Number(target.dataset.index);
+    const actions = foundry.utils.deepClone(this.document.system.actions || []);
+    if (!actions[ai]?.extraDamage) return;
+    actions[ai].extraDamage.splice(di, 1);
     await this._replaceActions(actions);
   }
 

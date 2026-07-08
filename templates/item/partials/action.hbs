@@ -149,6 +149,39 @@
       Dano escalonado (+1 por 2 pontos acima da defesa)
     </label>
 
+    {{!-- Dano extra: parcelas adicionais, cada uma com fórmula e tipo próprios --}}
+    <div class="lig-extra-damage">
+      <div class="lig-subtitle">Dano extra</div>
+      {{#each act.extraDamage as |xd di|}}
+      <div class="lig-item-row lig-xd-row">
+        <label style="flex:1.4">Fórmula
+          <input type="text" name="system.actions.{{../i}}.extraDamage.{{di}}.formula" value="{{xd.formula}}" placeholder="ex.: 1d6"/>
+        </label>
+        <label>Recurso
+          <select name="system.actions.{{../i}}.extraDamage.{{di}}.resource">
+            <option value="hp" {{#if (eq xd.resource "hp")}}selected{{/if}}>PV</option>
+            <option value="mp" {{#if (eq xd.resource "mp")}}selected{{/if}}>PM</option>
+            <option value="heroic" {{#if (eq xd.resource "heroic")}}selected{{/if}}>PH</option>
+          </select>
+        </label>
+        {{#if (eq xd.resource "hp")}}
+        <label>Tipo
+          <select name="system.actions.{{../i}}.extraDamage.{{di}}.type">
+            <option value="" {{#unless xd.type}}selected{{/unless}}>—</option>
+            {{selectOptions ../../damageTypes selected=xd.type}}
+          </select>
+        </label>
+        {{/if}}
+        <label class="lig-inline-check" title="Esta parcela também recebe o bônus de dano escalonado por superar a defesa.">
+          <input type="checkbox" name="system.actions.{{../i}}.extraDamage.{{di}}.scaling" {{checked xd.scaling}}/>
+          Escalonado
+        </label>
+        <button type="button" class="lig-mini-btn danger" data-action="removeExtraDamage" data-action-index="{{../i}}" data-index="{{di}}" title="Remover este dano extra">✕</button>
+      </div>
+      {{/each}}
+      <button type="button" class="lig-mini-btn" data-action="addExtraDamage" data-action-index="{{i}}">+ dano extra</button>
+    </div>
+
     <div class="lig-item-row lig-action-costs">
       <label>Custo PM
         <input type="number" name="system.actions.{{i}}.costMp" value="{{act.costMp}}" min="0"/>

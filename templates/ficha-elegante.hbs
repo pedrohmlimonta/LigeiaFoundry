@@ -1,0 +1,568 @@
+{{!--
+  Ligéia — Ficha Elegante
+  Mesmo contexto da ficha original do sistema (itemGroups, appliedEffects,
+  conditions, skillCosts, enriched, xp...). Acrescenta: bars, tabs, activeTab.
+  Todos os blocos de item são cópias fiéis do template do sistema, então os
+  data-action, name="..." e partials continuam idênticos — só a organização
+  visual muda (barras + abas).
+--}}
+<div class="ligeia-sheet-body">
+
+  {{!-- ============================================================ --}}
+  {{!--  Barra superior fixa: identidade + recursos + navegação      --}}
+  {{!-- ============================================================ --}}
+  <div class="lig-topbar">
+
+    <header class="lig-fe-head">
+      <div class="lig-portrait-wrap">
+        <img class="lig-portrait" src="{{actor.img}}"
+             data-action="editImage" data-target="img"
+             alt="Retrato" title="Clique para trocar o retrato"/>
+        {{#if editable}}
+        <button type="button" class="lig-token-img-btn"
+                data-action="editImage" data-target="prototypeToken.texture.src"
+                title="Trocar a imagem do token">⛀ token</button>
+        {{/if}}
+      </div>
+
+      <div class="lig-identity">
+        <input type="text" name="name" value="{{actor.name}}"
+               class="lig-charname" placeholder="Nome do personagem"/>
+        <input type="text" name="system.details.concept"
+               value="{{system.details.concept}}" class="lig-concept"
+               placeholder="Conceito (ex: lâmina solitária do norte)"/>
+        <div class="lig-id-mini">
+          <span class="lig-id-chip"><b>Nível</b> {{system.details.level}}</span>
+          <span class="lig-id-chip {{#if (lt xpAvailable 0)}}neg{{/if}}"><b>XP livre</b> {{xpAvailable}}</span>
+          <span class="lig-id-chip"><b>Corrupção</b> {{system.details.corruption}}</span>
+        </div>
+      </div>
+
+      <div class="lig-brand">
+        <div class="lig-brand-mark">LIGEIA</div>
+        <div class="lig-brand-sub">RPG</div>
+        {{#if isGM}}
+        <label class="lig-hidden-toggle" title="Rolar ocultamente (resultado vai só para o Narrador)">
+          <input type="checkbox" name="system.rollHidden" {{#if system.rollHidden}}checked{{/if}}/>
+          🕶 oculto
+        </label>
+        {{/if}}
+      </div>
+    </header>
+
+    {{!-- ===== Barras de recurso ===== --}}
+    <div class="lig-bars">
+      <div class="lig-bar-box hp {{#if bars.hp.low}}is-low{{/if}}">
+        <div class="lig-bar-top">
+          <span class="lig-bar-name">Pontos de Vida</span>
+          <span class="lig-bar-nums">
+            <input type="number" class="lig-bar-input" name="system.resources.hp.value" value="{{system.resources.hp.value}}"/>
+            <span class="lig-bar-max">/ {{system.resources.hp.max}}</span>
+            {{#if editable}}
+            <span class="lig-bar-temp" title="PV temporário">+<input type="number" name="system.resources.hp.temp" value="{{system.resources.hp.temp}}" min="0"/></span>
+            {{else}}{{#if system.resources.hp.temp}}<span class="lig-bar-temp">+{{system.resources.hp.temp}}</span>{{/if}}{{/if}}
+          </span>
+        </div>
+        <div class="lig-bar-track">
+          <div class="lig-bar-fill hp" style="width: {{bars.hp.pct}}%"></div>
+          {{#if bars.hp.tempPct}}<div class="lig-bar-temp-fill" style="width: {{bars.hp.tempPct}}%"></div>{{/if}}
+        </div>
+      </div>
+
+      <div class="lig-bar-box mp">
+        <div class="lig-bar-top">
+          <span class="lig-bar-name">Pontos de Magia</span>
+          <span class="lig-bar-nums">
+            <input type="number" class="lig-bar-input" name="system.resources.mp.value" value="{{system.resources.mp.value}}"/>
+            <span class="lig-bar-max">/ {{system.resources.mp.max}}</span>
+          </span>
+        </div>
+        <div class="lig-bar-track">
+          <div class="lig-bar-fill mp" style="width: {{bars.mp.pct}}%"></div>
+        </div>
+      </div>
+
+      <div class="lig-bar-box heroic">
+        <div class="lig-bar-top">
+          <span class="lig-bar-name">Pontos Heroicos</span>
+          <span class="lig-bar-nums">
+            <input type="number" class="lig-bar-input" name="system.resources.heroic.value" value="{{system.resources.heroic.value}}"/>
+            <span class="lig-bar-max">/ {{system.resources.heroic.max}}</span>
+          </span>
+        </div>
+        <div class="lig-bar-track">
+          <div class="lig-bar-fill heroic" style="width: {{bars.heroic.pct}}%"></div>
+        </div>
+      </div>
+    </div>
+
+    {{!-- ===== Navegação por abas ===== --}}
+    <nav class="lig-tabs">
+      {{#each tabs as |t|}}
+      <button type="button" class="lig-tab {{#if t.active}}active{{/if}}"
+              data-tab="{{t.id}}" title="{{t.label}}">
+        <i class="{{t.icon}}"></i>
+        <span class="lig-tab-label">{{t.label}}</span>
+        {{#if t.count}}<span class="lig-tab-count">{{t.count}}</span>{{/if}}
+      </button>
+      {{/each}}
+    </nav>
+  </div>
+
+  {{!-- ============================================================ --}}
+  {{!--  Painéis das abas                                             --}}
+  {{!-- ============================================================ --}}
+  <div class="lig-tab-panels">
+
+    {{!-- ========================== FAVORITOS ========================= --}}
+    <section class="lig-tab-panel {{#if (eq activeTab "favoritos")}}active{{/if}}" data-tab="favoritos">
+      {{#if favCount}}
+
+        {{#if favItems.length}}
+        <div class="lig-item-group">
+          <div class="lig-item-group-head"><span>Itens favoritos</span></div>
+          {{#each favItems as |item|}}
+          <div class="lig-item-entry" data-item-id="{{item.id}}" draggable="true">
+            <img class="lig-item-icon" src="{{item.img}}" alt=""/>
+            <span class="lig-item-title">{{item.name}}</span>
+            <span class="lig-item-tag fav-kind">{{item.kindLabel}}</span>
+            {{> systems/ligeia-rpg/templates/actor/partials/item-actions.hbs item=item}}
+            {{#if (eq item.system.mode "active")}}
+            <button type="button" class="lig-item-toggle {{#if item.system.active}}on{{/if}}" data-action="itemToggle" title="Ativar/desativar">{{#if item.system.active}}●{{else}}○{{/if}}</button>
+            {{/if}}
+            <button type="button" class="lig-mini-btn" data-action="itemEdit" title="Editar">✎</button>
+            <button type="button" class="lig-fav-btn on" title="Remover dos favoritos">★</button>
+          </div>
+          {{/each}}
+        </div>
+        {{/if}}
+
+        {{#if favEffects.length}}
+        <section class="lig-applied-fx">
+          <div class="lig-section-title">Efeitos favoritos</div>
+          {{#each favEffects as |ae|}}
+          <div class="lig-applied-item {{#if ae.disabled}}off{{/if}}">
+            <div class="lig-applied-head">
+              <img src="{{ae.icon}}" alt="" class="lig-applied-icon"/>
+              <span class="lig-applied-label">{{ae.label}}</span>
+              <button type="button" class="lig-mini-btn" data-action="toggleAppliedEffect" data-index="{{ae.index}}" title="Ligar/desligar">{{#if ae.disabled}}○{{else}}●{{/if}}</button>
+              {{#if ae.hasDuration}}
+              <button type="button" class="lig-mini-btn" data-action="tickAppliedEffect" data-index="{{ae.index}}" title="Passar 1 rodada">⏱ {{ae.duration.remaining}}</button>
+              {{/if}}
+              {{#if ae.endRoll.enabled}}
+              <button type="button" class="lig-mini-btn" data-action="rollEndEffect" data-index="{{ae.index}}" title="Rolar para encerrar">🎲</button>
+              {{/if}}
+              <button type="button" class="lig-fav-effect on" data-fav-effect="{{ae.label}}" title="Remover dos favoritos">★</button>
+            </div>
+            {{#if ae.summary}}<div class="lig-applied-summary">{{ae.summary}}</div>{{/if}}
+          </div>
+          {{/each}}
+        </section>
+        {{/if}}
+
+      {{else}}
+      <div class="lig-empty lig-fav-empty">
+        Nenhum favorito ainda. Clique na <strong>☆</strong> ao lado de uma habilidade, magia, traço, equipamento ou efeito para fixá-lo aqui — com as ações dele à mão.
+      </div>
+      {{/if}}
+    </section>
+
+    {{!-- ========================= ATRIBUTOS ========================= --}}
+    <section class="lig-tab-panel {{#if (eq activeTab "atributos")}}active{{/if}}" data-tab="atributos">
+
+      {{!-- Identidade --}}
+      <div class="lig-id-row">
+        <label>Raça
+          <input type="text" name="system.details.race" value="{{system.details.race}}"/>
+        </label>
+        <label>Herança
+          <input type="text" name="system.details.heritage" value="{{system.details.heritage}}"/>
+        </label>
+        <label>Vocação
+          <input type="text" name="system.details.vocation" value="{{system.details.vocation}}"/>
+        </label>
+        <label>Nação
+          <input type="text" name="system.details.nation" value="{{system.details.nation}}"/>
+        </label>
+      </div>
+      <div class="lig-id-row">
+        <label>Carreiras
+          <input type="text" name="system.details.careers" value="{{system.details.careers}}"/>
+        </label>
+        <label>Organizações
+          <input type="text" name="system.details.organizations" value="{{system.details.organizations}}"/>
+        </label>
+        <label>Nível
+          <input type="number" name="system.details.level" value="{{system.details.level}}" min="1" max="6"/>
+        </label>
+        <label>XP total
+          <input type="number" name="system.details.xp" value="{{system.details.xp}}" min="0"/>
+        </label>
+        <label>Corrupção
+          <input type="number" name="system.details.corruption" value="{{system.details.corruption}}"/>
+        </label>
+      </div>
+
+      {{!-- Painel de XP --}}
+      <div class="lig-xp-bar">
+        <div class="lig-xp-cell">
+          <span class="lig-xp-label">XP gasto em habilidades</span>
+          <span class="lig-xp-value">{{xpSpent}}</span>
+        </div>
+        <div class="lig-xp-cell {{#if (lt xpAvailable 0)}}negative{{/if}}">
+          <span class="lig-xp-label">XP disponível</span>
+          <span class="lig-xp-value">{{xpAvailable}}</span>
+        </div>
+        <div class="lig-xp-hint">Habilidades fora das suas listas de acesso custam o dobro.</div>
+      </div>
+
+      {{!-- Atributos primários --}}
+      <section class="lig-attributes">
+        {{#each system.attributes as |attr key|}}
+        <div class="lig-attr-block">
+          <button type="button" class="lig-attr-circle" data-action="rollAttribute" data-attr="{{key}}"
+                  title="Rolar {{lookup ../attrLabels key}}">
+            <span class="lig-attr-name">{{lookup ../attrLabels key}}</span>
+            <span class="lig-attr-value">{{attr.value}}</span>
+            <span class="lig-attr-dice">{{#if attr.dice}}+{{attr.dice}}D{{else}}—{{/if}}</span>
+          </button>
+          <div class="lig-attr-edit">
+            <label>Valor
+              <input type="number" name="system.attributes.{{key}}.value" value="{{attr.value}}" min="0"/>
+            </label>
+            <label>Dados
+              <input type="number" name="system.attributes.{{key}}.dice" value="{{attr.dice}}" min="0"/>
+            </label>
+          </div>
+        </div>
+        {{/each}}
+      </section>
+
+      {{!-- Atributos secundários --}}
+      <section class="lig-secondaries">
+        <button type="button" class="lig-sec-pill" data-action="rollSecondary" data-secondary="bloqueio">
+          <span class="lig-sec-label">Bloqueio</span>
+          <span class="lig-sec-value">{{system.secondary.bloqueio}}</span>
+        </button>
+        <button type="button" class="lig-sec-pill" data-action="rollSecondary" data-secondary="esquiva">
+          <span class="lig-sec-label">Esquiva</span>
+          <span class="lig-sec-value">{{system.secondary.esquiva}}</span>
+        </button>
+        <button type="button" class="lig-sec-pill" data-action="rollSecondary" data-secondary="conjuracao">
+          <span class="lig-sec-label">Conjuração</span>
+          <span class="lig-sec-value">{{system.secondary.conjuracao}}</span>
+        </button>
+        <button type="button" class="lig-sec-pill" data-action="rollSecondary" data-secondary="iniciativa">
+          <span class="lig-sec-label">Iniciativa</span>
+          <span class="lig-sec-value">{{system.secondary.iniciativa}}{{#if system.secondary.iniciativaDice}} +{{system.secondary.iniciativaDice}}D{{/if}}</span>
+        </button>
+        <div class="lig-sec-pill static">
+          <span class="lig-sec-label">Deslocamento</span>
+          <span class="lig-sec-value">{{system.secondary.deslocamento}} m</span>
+        </div>
+      </section>
+
+      {{!-- Definições (raça, herança, vocação, carreira, organização) --}}
+      <section class="lig-defs">
+        <div class="lig-defs-head">
+          <span>Definições &amp; Acesso a Listas</span>
+        </div>
+        <p class="lig-hint">Raça, herança, vocação, carreira e organização concedem acesso a listas de habilidades. Arraste-as para cá ou crie abaixo. (Raça, herança, vocação e carreira são únicas — ao adicionar outra, o sistema pergunta se deseja substituir.)</p>
+        <div class="lig-defs-grid">
+          {{#each itemGroups.raca as |item|}}
+          <div class="lig-item-entry def" data-item-id="{{item.id}}" draggable="true">
+            <span class="lig-def-kind">Raça</span>
+            <span class="lig-item-title">{{item.name}}</span>
+            <button type="button" class="lig-mini-btn" data-action="itemEdit" title="Editar">✎</button>
+            {{#if ../editable}}<button type="button" class="lig-mini-btn danger" data-action="itemDelete" title="Remover">✕</button>{{/if}}
+          </div>
+          {{/each}}
+          {{#each itemGroups.heranca as |item|}}
+          <div class="lig-item-entry def" data-item-id="{{item.id}}" draggable="true">
+            <span class="lig-def-kind">Herança</span>
+            <span class="lig-item-title">{{item.name}}</span>
+            <button type="button" class="lig-mini-btn" data-action="itemEdit" title="Editar">✎</button>
+            {{#if ../editable}}<button type="button" class="lig-mini-btn danger" data-action="itemDelete" title="Remover">✕</button>{{/if}}
+          </div>
+          {{/each}}
+          {{#each itemGroups.vocacao as |item|}}
+          <div class="lig-item-entry def" data-item-id="{{item.id}}" draggable="true">
+            <span class="lig-def-kind">Vocação</span>
+            <span class="lig-item-title">{{item.name}}</span>
+            <button type="button" class="lig-mini-btn" data-action="itemEdit" title="Editar">✎</button>
+            {{#if ../editable}}<button type="button" class="lig-mini-btn danger" data-action="itemDelete" title="Remover">✕</button>{{/if}}
+          </div>
+          {{/each}}
+          {{#each itemGroups.carreira as |item|}}
+          <div class="lig-item-entry def" data-item-id="{{item.id}}" draggable="true">
+            <span class="lig-def-kind">Carreira</span>
+            <span class="lig-item-title">{{item.name}}</span>
+            <button type="button" class="lig-mini-btn" data-action="itemEdit" title="Editar">✎</button>
+            {{#if ../editable}}<button type="button" class="lig-mini-btn danger" data-action="itemDelete" title="Remover">✕</button>{{/if}}
+          </div>
+          {{/each}}
+          {{#each itemGroups.organizacao as |item|}}
+          <div class="lig-item-entry def" data-item-id="{{item.id}}" draggable="true">
+            <span class="lig-def-kind">Organização</span>
+            <span class="lig-item-title">{{item.name}}</span>
+            <button type="button" class="lig-mini-btn" data-action="itemEdit" title="Editar">✎</button>
+            {{#if ../editable}}<button type="button" class="lig-mini-btn danger" data-action="itemDelete" title="Remover">✕</button>{{/if}}
+          </div>
+          {{/each}}
+        </div>
+        {{#if editable}}
+        <div class="lig-defs-create">
+          <button type="button" class="lig-mini-btn" data-action="itemCreate" data-type="raca">+ Raça</button>
+          <button type="button" class="lig-mini-btn" data-action="itemCreate" data-type="heranca">+ Herança</button>
+          <button type="button" class="lig-mini-btn" data-action="itemCreate" data-type="vocacao">+ Vocação</button>
+          {{#if canAddCareer}}
+          <button type="button" class="lig-mini-btn" data-action="itemCreate" data-type="carreira">+ Carreira</button>
+          {{else}}
+          <button type="button" class="lig-mini-btn" disabled title="Carreira só no nível 6">+ Carreira (nível 6)</button>
+          {{/if}}
+          <button type="button" class="lig-mini-btn" data-action="itemCreate" data-type="organizacao">+ Organização</button>
+        </div>
+        {{/if}}
+      </section>
+    </section>
+
+    {{!-- ======================= EQUIPAMENTOS ======================= --}}
+    <section class="lig-tab-panel {{#if (eq activeTab "equipamentos")}}active{{/if}}" data-tab="equipamentos">
+      <div class="lig-item-group">
+        <div class="lig-item-group-head">
+          <span>Equipamentos</span>
+          {{#if editable}}<button type="button" class="lig-mini-btn" data-action="itemCreate" data-type="equipamento">+ novo</button>{{/if}}
+        </div>
+        {{#each itemGroups.equipamento as |item|}}
+        <div class="lig-item-entry" data-item-id="{{item.id}}" draggable="true">
+          <img class="lig-item-icon" src="{{item.img}}" alt=""/>
+          <span class="lig-item-title">{{item.name}}</span>
+          {{#if item.system.qty}}<span class="lig-item-tag">×{{item.system.qty}}</span>{{/if}}
+          {{#if item.system.isWeapon}}<span class="lig-item-tag weapon">⚔</span>{{/if}}
+          {{> systems/ligeia-rpg/templates/actor/partials/item-actions.hbs item=item}}
+          {{#if (eq item.system.mode "active")}}
+          <button type="button" class="lig-item-toggle {{#if item.system.active}}on{{/if}}" data-action="itemToggle" title="Ativar/desativar">{{#if item.system.active}}●{{else}}○{{/if}}</button>
+          {{/if}}
+          <button type="button" class="lig-fav-btn {{#if item.isFav}}on{{/if}}" title="{{#if item.isFav}}Remover dos favoritos{{else}}Favoritar{{/if}}">{{#if item.isFav}}★{{else}}☆{{/if}}</button>
+          <button type="button" class="lig-mini-btn" data-action="itemEdit" title="Editar">✎</button>
+          {{#if ../editable}}<button type="button" class="lig-mini-btn danger" data-action="itemDelete" title="Remover">✕</button>{{/if}}
+        </div>
+        {{> systems/ligeia-rpg/templates/actor/partials/item-effects-inline.hbs item=item effectTypeLabels=../effectTypeLabels effectTargetLabels=../effectTargetLabels editable=../editable}}
+        {{else}}<div class="lig-empty">Nenhum equipamento.</div>{{/each}}
+      </div>
+    </section>
+
+    {{!-- ======================== HABILIDADES ======================= --}}
+    <section class="lig-tab-panel {{#if (eq activeTab "habilidades")}}active{{/if}}" data-tab="habilidades">
+      <div class="lig-item-group">
+        <div class="lig-item-group-head">
+          <span>Habilidades</span>
+          {{#if editable}}<button type="button" class="lig-mini-btn" data-action="itemCreate" data-type="habilidade">+ nova</button>{{/if}}
+        </div>
+        {{#each itemGroups.habilidade as |item|}}
+        {{#with (lookup ../skillCosts item.id) as |cost|}}
+        <div class="lig-item-entry" data-item-id="{{item.id}}" draggable="true">
+          <img class="lig-item-icon" src="{{item.img}}" alt=""/>
+          <span class="lig-item-title">{{item.name}}</span>
+          <span class="lig-item-tag">{{item.system.level}}</span>
+          {{#if cost}}
+          <span class="lig-cost-tag {{#if cost.onList}}on-list{{else}}off-list{{/if}}"
+                title="{{#if cost.onList}}Na sua lista de acesso (custo normal){{else}}Fora das suas listas — custo dobrado{{/if}}">
+            {{cost.total}} XP{{#unless cost.onList}} ×2{{/unless}}
+          </span>
+          {{/if}}
+          {{> systems/ligeia-rpg/templates/actor/partials/item-actions.hbs item=item}}
+          {{#if (eq item.system.mode "active")}}
+          <button type="button" class="lig-item-toggle {{#if item.system.active}}on{{/if}}" data-action="itemToggle" title="Ativar/desativar">{{#if item.system.active}}●{{else}}○{{/if}}</button>
+          {{/if}}
+          <button type="button" class="lig-fav-btn {{#if item.isFav}}on{{/if}}" title="{{#if item.isFav}}Remover dos favoritos{{else}}Favoritar{{/if}}">{{#if item.isFav}}★{{else}}☆{{/if}}</button>
+          <button type="button" class="lig-mini-btn" data-action="itemEdit" title="Editar">✎</button>
+          {{#if ../../editable}}<button type="button" class="lig-mini-btn danger" data-action="itemDelete" title="Remover">✕</button>{{/if}}
+        </div>
+        {{> systems/ligeia-rpg/templates/actor/partials/item-effects-inline.hbs item=item effectTypeLabels=../../effectTypeLabels effectTargetLabels=../../effectTargetLabels editable=../../editable}}
+        {{/with}}
+        {{else}}<div class="lig-empty">Nenhuma habilidade.</div>{{/each}}
+      </div>
+    </section>
+
+    {{!-- =========================== MAGIAS ========================== --}}
+    <section class="lig-tab-panel {{#if (eq activeTab "magias")}}active{{/if}}" data-tab="magias">
+      <div class="lig-item-group">
+        <div class="lig-item-group-head">
+          <span>Magias</span>
+          {{#if editable}}<button type="button" class="lig-mini-btn" data-action="itemCreate" data-type="magia">+ nova</button>{{/if}}
+        </div>
+        {{#each itemGroups.magia as |item|}}
+        <div class="lig-item-entry" data-item-id="{{item.id}}" draggable="true">
+          <img class="lig-item-icon" src="{{item.img}}" alt=""/>
+          <span class="lig-item-title">{{item.name}}</span>
+          <span class="lig-item-tag">{{item.system.tier}}</span>
+          {{> systems/ligeia-rpg/templates/actor/partials/item-actions.hbs item=item}}
+          {{#if (eq item.system.mode "active")}}
+          <button type="button" class="lig-item-toggle {{#if item.system.active}}on{{/if}}" data-action="itemToggle" title="Ativar/desativar">{{#if item.system.active}}●{{else}}○{{/if}}</button>
+          {{/if}}
+          <button type="button" class="lig-fav-btn {{#if item.isFav}}on{{/if}}" title="{{#if item.isFav}}Remover dos favoritos{{else}}Favoritar{{/if}}">{{#if item.isFav}}★{{else}}☆{{/if}}</button>
+          <button type="button" class="lig-mini-btn" data-action="itemEdit" title="Editar">✎</button>
+          {{#if ../editable}}<button type="button" class="lig-mini-btn danger" data-action="itemDelete" title="Remover">✕</button>{{/if}}
+        </div>
+        {{> systems/ligeia-rpg/templates/actor/partials/item-effects-inline.hbs item=item effectTypeLabels=../effectTypeLabels effectTargetLabels=../effectTargetLabels editable=../editable}}
+        {{else}}<div class="lig-empty">Nenhuma magia.</div>{{/each}}
+      </div>
+    </section>
+
+    {{!-- =========================== TRAÇOS ========================== --}}
+    <section class="lig-tab-panel {{#if (eq activeTab "tracos")}}active{{/if}}" data-tab="tracos">
+      <div class="lig-item-group">
+        <div class="lig-item-group-head">
+          <span>Traços</span>
+          {{#if editable}}<button type="button" class="lig-mini-btn" data-action="itemCreate" data-type="traco">+ novo</button>{{/if}}
+        </div>
+        {{#each itemGroups.traco as |item|}}
+        <div class="lig-item-entry" data-item-id="{{item.id}}" draggable="true">
+          <img class="lig-item-icon" src="{{item.img}}" alt=""/>
+          <span class="lig-item-title">{{item.name}}</span>
+          {{#if item.system.isWeapon}}<span class="lig-item-tag weapon">⚔</span>{{/if}}
+          {{> systems/ligeia-rpg/templates/actor/partials/item-actions.hbs item=item}}
+          {{#if (eq item.system.mode "active")}}
+          <button type="button" class="lig-item-toggle {{#if item.system.active}}on{{/if}}" data-action="itemToggle" title="Ativar/desativar">{{#if item.system.active}}●{{else}}○{{/if}}</button>
+          {{/if}}
+          <button type="button" class="lig-fav-btn {{#if item.isFav}}on{{/if}}" title="{{#if item.isFav}}Remover dos favoritos{{else}}Favoritar{{/if}}">{{#if item.isFav}}★{{else}}☆{{/if}}</button>
+          <button type="button" class="lig-mini-btn" data-action="itemEdit" title="Editar">✎</button>
+          {{#if ../editable}}<button type="button" class="lig-mini-btn danger" data-action="itemDelete" title="Remover">✕</button>{{/if}}
+        </div>
+        {{> systems/ligeia-rpg/templates/actor/partials/item-effects-inline.hbs item=item effectTypeLabels=../effectTypeLabels effectTargetLabels=../effectTargetLabels editable=../editable}}
+        {{else}}<div class="lig-empty">Nenhum traço.</div>{{/each}}
+      </div>
+    </section>
+
+    {{!-- ==================== EFEITOS & CONDIÇÕES ==================== --}}
+    <section class="lig-tab-panel {{#if (eq activeTab "efeitos")}}active{{/if}}" data-tab="efeitos">
+
+      {{!-- Efeitos aplicados (buffs/debuffs) --}}
+      <section class="lig-applied-fx">
+        <div class="lig-section-title">
+          Efeitos ativos
+          <button type="button" class="lig-mini-btn" data-action="addAppliedEffect">+ efeito</button>
+        </div>
+        {{#each appliedEffects as |ae|}}
+        <div class="lig-applied-item {{#if ae.disabled}}off{{/if}}">
+          <div class="lig-applied-head">
+            <img src="{{ae.icon}}" alt="" class="lig-applied-icon"/>
+            <input type="text" name="system.appliedEffects.{{ae.index}}.label" value="{{ae.label}}" class="lig-applied-label" placeholder="Nome do efeito"/>
+            <button type="button" class="lig-mini-btn" data-action="toggleAppliedEffect" data-index="{{ae.index}}" title="Ligar/desligar">{{#if ae.disabled}}○{{else}}●{{/if}}</button>
+            {{#if ae.hasDuration}}
+            <button type="button" class="lig-mini-btn" data-action="tickAppliedEffect" data-index="{{ae.index}}" title="Passar 1 rodada">⏱ {{ae.duration.remaining}}</button>
+            {{/if}}
+            {{#if ae.endRoll.enabled}}
+            <button type="button" class="lig-mini-btn" data-action="rollEndEffect" data-index="{{ae.index}}" title="Rolar para encerrar">🎲</button>
+            {{/if}}
+            <button type="button" class="lig-fav-effect {{#if ae.isFav}}on{{/if}}" data-fav-effect="{{ae.label}}" title="{{#if ae.isFav}}Remover dos favoritos{{else}}Favoritar{{/if}}">{{#if ae.isFav}}★{{else}}☆{{/if}}</button>
+            <button type="button" class="lig-mini-btn danger" data-action="removeAppliedEffect" data-index="{{ae.index}}" title="Remover">✕</button>
+          </div>
+          {{#if ae.summary}}<div class="lig-applied-summary">{{ae.summary}}</div>{{/if}}
+          <div class="lig-applied-config">
+            <label>Tipo
+              <select name="system.appliedEffects.{{ae.index}}.effects.0.type">
+                <option value="bonus" {{#if (eq ae.fx0Type "bonus")}}selected{{/if}}>Bônus em Rolagem</option>
+                <option value="dice" {{#if (eq ae.fx0Type "dice")}}selected{{/if}}>Dados de Melhoria</option>
+                <option value="stat" {{#if (eq ae.fx0Type "stat")}}selected{{/if}}>Modificar Valor</option>
+                <option value="set" {{#if (eq ae.fx0Type "set")}}selected{{/if}}>Definir Valor</option>
+                <option value="damage" {{#if (eq ae.fx0Type "damage")}}selected{{/if}}>Bônus de Dano</option>
+                <option value="rd" {{#if (eq ae.fx0Type "rd")}}selected{{/if}}>Redução de Dano</option>
+                <option value="reroll1" {{#if (eq ae.fx0Type "reroll1")}}selected{{/if}}>Rerrolar dados que caem 1</option>
+                <option value="reroll6" {{#if (eq ae.fx0Type "reroll6")}}selected{{/if}}>Rerrolar dados que caem 6</option>
+                <option value="crit" {{#if (eq ae.fx0Type "crit")}}selected{{/if}}>Crítico aprimorado</option>
+                <option value="fumble" {{#if (eq ae.fx0Type "fumble")}}selected{{/if}}>Falha crítica piorada</option>
+              </select>
+            </label>
+            <label>Alvo
+              {{#if (or (eq ae.fx0Type "damage") (eq ae.fx0Type "rd"))}}
+              <select name="system.appliedEffects.{{ae.index}}.effects.0.damageType">
+                {{selectOptions ae.fx0TargetChoices selected=ae.fx0.damageType}}
+              </select>
+              {{else}}
+              <select name="system.appliedEffects.{{ae.index}}.effects.0.target">
+                {{selectOptions ae.fx0TargetChoices selected=ae.fx0.target}}
+              </select>
+              {{/if}}
+            </label>
+            <label>{{#if ae.fx0IsReroll}}Qtd. dados{{else}}Valor{{/if}}
+              <input type="number" name="system.appliedEffects.{{ae.index}}.effects.0.value" value="{{ae.fx0.value}}"/>
+            </label>
+            {{#if ae.fx0IsReroll}}
+            <label class="lig-inline-check" title="Rerrolar TODOS os dados que caírem nesse valor">
+              <input type="checkbox" name="system.appliedEffects.{{ae.index}}.effects.0.rerollAll" {{checked ae.fx0.rerollAll}}/>
+              Todos
+            </label>
+            {{/if}}
+            <label>Duração (rodadas)
+              <input type="number" name="system.appliedEffects.{{ae.index}}.duration.rounds" value="{{ae.duration.rounds}}" min="0"/>
+            </label>
+          </div>
+          <div class="lig-applied-config">
+            <label class="lig-inline-check">
+              <input type="checkbox" name="system.appliedEffects.{{ae.index}}.endRoll.enabled" {{checked ae.endRoll.enabled}}/>
+              Rolagem p/ encerrar
+            </label>
+            {{#if ae.endRoll.enabled}}
+            <label>Atributo
+              <select name="system.appliedEffects.{{ae.index}}.endRoll.attr">
+                {{selectOptions ../attrLabels selected=ae.endRoll.attr}}
+              </select>
+            </label>
+            <label>CD
+              <input type="number" name="system.appliedEffects.{{ae.index}}.endRoll.dc" value="{{ae.endRoll.dc}}" min="0"/>
+            </label>
+            {{/if}}
+          </div>
+        </div>
+        {{else}}<div class="lig-empty">Nenhum efeito ativo.</div>{{/each}}
+      </section>
+
+      {{!-- Condições --}}
+      <section class="lig-conditions">
+        <div class="lig-section-title">
+          Condições {{#if activeConditionCount}}<span class="lig-cond-count">{{activeConditionCount}}</span>{{/if}}
+        </div>
+        <div class="lig-cond-grid">
+          {{#each conditions as |c|}}
+          <button type="button"
+                  class="lig-cond-pill {{#if c.active}}active{{/if}}"
+                  data-action="conditionToggle"
+                  data-condition-id="{{c.id}}"
+                  data-tooltip="{{c.desc}}"
+                  title="{{c.desc}}">
+            <img src="{{c.icon}}" alt=""/>
+            <span>{{c.label}}</span>
+          </button>
+          {{/each}}
+        </div>
+      </section>
+    </section>
+
+    {{!-- ================= PERSONALIDADE & NOTAS ==================== --}}
+    <section class="lig-tab-panel {{#if (eq activeTab "notas")}}active{{/if}}" data-tab="notas">
+      <section class="lig-prose">
+        <div class="lig-prose-block">
+          <div class="lig-prose-title">Personalidade</div>
+          {{#if editable}}
+          <textarea name="system.details.personality" rows="6"
+                    placeholder="Personalidade, ideais, vínculos, defeitos...">{{system.details.personality}}</textarea>
+          {{else}}
+          <div class="lig-prose-rendered">{{{enriched.personality}}}</div>
+          {{/if}}
+        </div>
+        <div class="lig-prose-block">
+          <div class="lig-prose-title">Notas</div>
+          {{#if editable}}
+          <textarea name="system.details.notes" rows="8"
+                    placeholder="Notas, história, anotações...">{{system.details.notes}}</textarea>
+          {{else}}
+          <div class="lig-prose-rendered">{{{enriched.notes}}}</div>
+          {{/if}}
+        </div>
+      </section>
+    </section>
+
+  </div>
+</div>

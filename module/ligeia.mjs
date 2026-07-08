@@ -6,6 +6,9 @@ import { LigeiaActor } from "./documents/actor.mjs";
 import { LigeiaItem } from "./documents/item.mjs";
 import { LigeiaCombatant } from "./documents/combatant.mjs";
 import { LigeiaCharacterSheet } from "./sheets/character-sheet.mjs";
+// Ficha alternativa "Elegante" (abas + barras + favoritos). Agora parte do
+// sistema: importar aqui faz ela se registrar (init) e pré-carregar partials.
+import "./sheets/ficha-elegante.mjs";
 import { registerEmanationHooks } from "./helpers/emanation.mjs";
 import { registerTurnEffectHooks } from "./helpers/turn-effects.mjs";
 import {
@@ -228,10 +231,12 @@ Hooks.once("init", function () {
   // Foundry V13: foundry.applications.apps.DocumentSheetConfig
   const DSC = foundry.applications.apps.DocumentSheetConfig;
 
+  // A ficha básica continua disponível, mas NÃO é mais a padrão: a "Ficha
+  // Elegante" (registrada em ./sheets/ficha-elegante.mjs) é a padrão.
   DSC.registerSheet(Actor, "ligeia-rpg", LigeiaCharacterSheet, {
     types: ["personagem"],
-    makeDefault: true,
-    label: "Ligeia — Ficha de Personagem",
+    makeDefault: false,
+    label: "Ligeia — Ficha de Personagem (clássica)",
   });
 
   // Folhas de Item

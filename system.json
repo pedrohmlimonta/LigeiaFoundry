@@ -17,7 +17,8 @@
     "module/ligeia.mjs"
   ],
   "styles": [
-    "styles/ligeia.css"
+    "styles/ligeia.css",
+    "styles/ficha-elegante.css"
   ],
   "languages": [
     {

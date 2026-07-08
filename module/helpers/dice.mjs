@@ -422,53 +422,73 @@ export async function applyConditionsToActor(actor, ids = []) {
  * personagem (self/area/aura com includeSelf). `acertou` indica se a defesa
  * falhou (ou se não houve defesa, em self/auto).
  */
-async function resolveHitOnActor(action, tActor, { damageRoll, atkTotal, defTotal, acertou, cfg, attackerMods, caster }) {
+async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls = [], atkTotal, defTotal, acertou, cfg, attackerMods, caster }) {
   let dmgText = "";
   const dmgTypeLabel = action.damageType ? (cfg.damageTypes?.[action.damageType] || action.damageType) : "";
 
-  if (acertou && damageRoll) {
-    let scaling = 0;
-    if (action.scalingDamage && Number.isFinite(defTotal)) {
-      scaling = Math.floor((atkTotal - defTotal) / 2);
-      if (scaling < 0) scaling = 0;
-    }
-    const resource = action.damageResource || "hp";
-    const isHp = resource === "hp";
-    const rd = isHp ? damageReductionFor(tActor, action.damageType || "") : 0;
-
-    // Multiplicadores de condição:
+  const hasExtra = Array.isArray(extraDamageRolls) && extraDamageRolls.length > 0;
+  if (acertou && (damageRoll || hasExtra)) {
+    // Multiplicadores de condição (valem para todas as parcelas de dano):
     //  - Enfraquecido (atacante): causa metade do dano
     //  - Intangível (alvo): recebe metade do dano
     const targetMods = conditionModifiers(tActor);
     const dealtMult = (attackerMods?.damageDealtMult ?? 1);
     const takenMult = targetMods.damageTakenMult;
-
-    // raw → aplica enfraquecido → subtrai RD → aplica intangível
-    let amount = (damageRoll.total + scaling) * dealtMult;
-    amount = amount - rd;
-    amount = amount * takenMult;
-    const dealt = Math.max(0, Math.floor(amount));
-
-    const scaleNote = scaling ? ` <span class="lig-scale">(+${scaling} escalonado)</span>` : "";
-    const typeNote = isHp && dmgTypeLabel ? " " + dmgTypeLabel : "";
-    const rdNote = rd ? ` <span class="lig-rd">(RD ${rd})</span>` : "";
     const multBits = [];
     if (dealtMult !== 1) multBits.push("½ Enfraquecido");
     if (takenMult !== 1) multBits.push("½ Intangível");
     const multNote = multBits.length ? ` <span class="lig-cond-note">(${multBits.join(", ")})</span>` : "";
-    const resWord = { hp: "Dano", mp: "Mana drenada", heroic: "Heroico drenado" }[resource];
 
-    const applied = await applyDamageToActor(tActor, dealt, resource);
-    let applyNote = "";
-    if (applied.applied) {
-      const resLabel = { hp: "PV", mp: "PM", heroic: "PH" }[resource];
-      const parts = [];
-      if (applied.fromTemp) parts.push(`${applied.fromTemp} do PV temp.`);
-      applyNote = `<div class="lig-dmg-applied">${resLabel}: ${applied.newValue}/${applied.newMax}${parts.length ? " — " + parts.join(", ") : ""}${applied.downed ? ' <span class="lig-downed">⚠ Caído!</span>' : ""}</div>`;
-    } else if (applied.noPermission) {
-      applyNote = `<div class="lig-dmg-applied muted">Sem permissão para alterar a ficha do alvo (peça ao Mestre).</div>`;
+    // Aplica UMA parcela de dano (tipo/recurso/fórmula) e devolve a linha HTML.
+    const applyParcel = async (total, type, resource, scaling, isMain) => {
+      const isHp = resource === "hp";
+      const rd = isHp ? damageReductionFor(tActor, type || "") : 0;
+      let amount = (total + (scaling || 0)) * dealtMult;
+      amount = amount - rd;
+      amount = amount * takenMult;
+      const dealt = Math.max(0, Math.floor(amount));
+      const typeLabel = type ? (cfg.damageTypes?.[type] || type) : "";
+      const scaleNote = scaling ? ` <span class="lig-scale">(+${scaling} escalonado)</span>` : "";
+      const typeNote = isHp && typeLabel ? " " + typeLabel : "";
+      const rdNote = rd ? ` <span class="lig-rd">(RD ${rd})</span>` : "";
+      const resWord = { hp: "Dano", mp: "Mana drenada", heroic: "Heroico drenado" }[resource];
+      const applied = await applyDamageToActor(tActor, dealt, resource);
+      let applyNote = "";
+      if (applied.applied) {
+        const resLabel = { hp: "PV", mp: "PM", heroic: "PH" }[resource];
+        const parts = [];
+        if (applied.fromTemp) parts.push(`${applied.fromTemp} do PV temp.`);
+        applyNote = `<div class="lig-dmg-applied">${resLabel}: ${applied.newValue}/${applied.newMax}${parts.length ? " — " + parts.join(", ") : ""}${applied.downed ? ' <span class="lig-downed">⚠ Caído!</span>' : ""}</div>`;
+      } else if (applied.noPermission) {
+        applyNote = `<div class="lig-dmg-applied muted">Sem permissão para alterar a ficha do alvo (peça ao Mestre).</div>`;
+      }
+      const tag = isMain ? "" : ' <span class="lig-extra-tag">extra</span>';
+      return `<div class="lig-atk-dmg">${resWord}: <strong>${dealt}</strong>${typeNote}${tag}${scaleNote}${rdNote}${isMain ? multNote : ""}</div>${applyNote}`;
+    };
+
+    // Valor do escalonamento (bônus por superar a defesa) — calculado uma vez;
+    // cada parcela decide se o recebe pelo próprio toggle.
+    let scalingAmount = 0;
+    if (Number.isFinite(defTotal)) {
+      scalingAmount = Math.floor((atkTotal - defTotal) / 2);
+      if (scalingAmount < 0) scalingAmount = 0;
     }
-    dmgText = `<div class="lig-atk-dmg">${resWord}: <strong>${dealt}</strong>${typeNote}${scaleNote}${rdNote}${multNote}</div>${applyNote}`;
+
+    const lines = [];
+
+    // Dano principal (recebe escalonamento se o toggle da ação estiver ligado).
+    if (damageRoll) {
+      const sc = action.scalingDamage ? scalingAmount : 0;
+      lines.push(await applyParcel(damageRoll.total, action.damageType || "", action.damageResource || "hp", sc, true));
+    }
+
+    // Parcelas de dano extra (cada uma com seu próprio toggle de escalonamento).
+    for (const ex of extraDamageRolls) {
+      const sc = ex.scaling ? scalingAmount : 0;
+      lines.push(await applyParcel(ex.roll.total, ex.type || "", ex.resource || "hp", sc, false));
+    }
+
+    dmgText = lines.join("");
   }
 
   // Aplica EFEITOS (buffs/debuffs/condições) ao alvo quando acerta.
@@ -767,6 +787,19 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     catch (e) { damageRoll = null; }
   }
 
+  // Rola cada parcela de DANO EXTRA (fórmula + tipo + recurso próprios).
+  const extraDamageRolls = [];
+  for (const ex of (action.extraDamage || [])) {
+    const f = String(ex?.formula || "").trim();
+    if (!f) continue;
+    try {
+      const r = new Roll(f);
+      await r.evaluate();
+      atkRolls.push(r);
+      extraDamageRolls.push({ roll: r, type: ex.type || "", resource: ex.resource || "hp", scaling: !!ex.scaling });
+    } catch (e) { /* fórmula inválida — ignora esta parcela */ }
+  }
+
   // Resumo de alcance/área
   const meta = [];
   if (action.range) meta.push(`Alcance ${action.range}m`);
@@ -975,17 +1008,22 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
         defInfo = isSelf ? ' <span class="lig-outcome self">(em si)</span>' : ' <span class="lig-outcome ok">(automático)</span>';
       }
 
-      const detail = await resolveHitOnActor(action, tActor, { damageRoll, atkTotal, defTotal, acertou, cfg, attackerMods: atkCond, caster: actor });
+      const detail = await resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls, atkTotal, defTotal, acertou, cfg, attackerMods: atkCond, caster: actor });
       lines.push(`<div class="lig-atk-target"><div class="lig-atk-line"><strong>${tActor.name}</strong>${defInfo}</div>${detail}</div>`);
     }
   } else if (mode === "target") {
     lines.push(`<div class="lig-atk-hint">Selecione um ou mais alvos (target) para resolver a ação.</div>`);
-  } else if (mode === "none" && damageRoll) {
-    const resource = action.damageResource || "hp";
-    const resWord = { hp: "Dano", mp: "Mana drenada", heroic: "Heroico drenado" }[resource];
-    const dmgTypeLabel = action.damageType ? (cfg.damageTypes?.[action.damageType] || action.damageType) : "";
-    const typeNote = resource === "hp" && dmgTypeLabel ? " " + dmgTypeLabel : "";
-    lines.push(`<div class="lig-atk-dmg">${resWord}: <strong>${damageRoll.total}</strong>${typeNote}</div>`);
+  } else if (mode === "none" && (damageRoll || (extraDamageRolls && extraDamageRolls.length))) {
+    const dmgLine = (total, type, resource) => {
+      const resWord = { hp: "Dano", mp: "Mana drenada", heroic: "Heroico drenado" }[resource];
+      const typeLabel = type ? (cfg.damageTypes?.[type] || type) : "";
+      const typeNote = resource === "hp" && typeLabel ? " " + typeLabel : "";
+      return `<div class="lig-atk-dmg">${resWord}: <strong>${total}</strong>${typeNote}</div>`;
+    };
+    if (damageRoll) lines.push(dmgLine(damageRoll.total, action.damageType || "", action.damageResource || "hp"));
+    for (const ex of (extraDamageRolls || [])) {
+      lines.push(dmgLine(ex.roll.total, ex.type || "", ex.resource || "hp") + ' <span class="lig-extra-tag">extra</span>');
+    }
   }
 
   // ---- Monta a mensagem final ----

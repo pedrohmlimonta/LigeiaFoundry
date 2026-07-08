@@ -1331,3 +1331,8 @@
 
 /* Alvo fora de alcance */
 .lig-out-range { opacity: 0.85; }
+
+/* Dano extra da ação */
+.lig-extra-damage { margin-top: 0.5rem; padding: 0.4rem; border: 1px dashed var(--lig-border, #5a4a2a); border-radius: 4px; }
+.lig-xd-row { align-items: flex-end; }
+.lig-extra-tag { font-size: 0.75rem; color: var(--lig-gold, #c9a84a); font-style: italic; }

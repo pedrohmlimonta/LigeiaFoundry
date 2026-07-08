@@ -134,6 +134,20 @@ export function actionEntryField() {
       choices: ["hp", "mp", "heroic"],
     }),
     scalingDamage: new fields.BooleanField({ initial: false }),
+    // Dano EXTRA: parcelas adicionais de dano, cada uma com sua fórmula e tipo
+    // (podem repetir o tipo ou variar). Aplicadas junto do dano principal ao
+    // acertar. Não recebem o escalonamento (esse é só do dano principal).
+    extraDamage: new fields.ArrayField(
+      new fields.SchemaField({
+        formula: new fields.StringField({ blank: true, initial: "" }),
+        type: new fields.StringField({ blank: true, initial: "" }),
+        resource: new fields.StringField({ initial: "hp", choices: ["hp", "mp", "heroic"] }),
+        // Se esta parcela extra também recebe o dano escalonado (bônus por
+        // superar a defesa). Independente do escalonamento do dano principal.
+        scaling: new fields.BooleanField({ initial: false }),
+      }),
+      { initial: [] },
+    ),
     // Efeitos aplicados ao ALVO quando a ação acerta. Cada um é como um
     // efeito de habilidade (qualquer tipo, incluindo "condition") e vira um
     // "efeito ativo" na ficha do alvo, com duração e resistência por rodada.
@@ -282,6 +296,7 @@ export function migrateFlatActionToArray(source) {
     damageType: source.damageType ?? "",
     damageResource: source.damageResource ?? "hp",
     scalingDamage: source.scalingDamage ?? false,
+    extraDamage: Array.isArray(source.extraDamage) ? source.extraDamage : [],
     range: 0,
     area: 0,
   }];
