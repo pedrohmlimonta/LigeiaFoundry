@@ -347,7 +347,6 @@
         <img class="lig-item-icon" src="{{item.img}}" alt=""/>
         <span class="lig-item-title">{{item.name}}</span>
         {{#if item.system.qty}}<span class="lig-item-tag">×{{item.system.qty}}</span>{{/if}}
-        {{#if item.system.isWeapon}}<span class="lig-item-tag weapon">⚔</span>{{/if}}
         {{> systems/ligeia-rpg/templates/actor/partials/item-actions.hbs item=item}}
         {{#if (eq item.system.mode "active")}}
         <button type="button" class="lig-item-toggle {{#if item.system.active}}on{{/if}}" data-action="itemToggle" title="Ativar/desativar">{{#if item.system.active}}●{{else}}○{{/if}}</button>

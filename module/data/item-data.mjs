@@ -104,8 +104,6 @@ export class EquipamentoData extends foundry.abstract.TypeDataModel {
       price: new fields.StringField({ blank: true, initial: "" }),
       notes: new fields.StringField({ blank: true, initial: "" }),
       description: new fields.HTMLField({ blank: true, initial: "" }),
-      // Se este equipamento é uma arma (gera ataque derivado)
-      isWeapon: new fields.BooleanField({ initial: false }),
       actions: actionsField(),
       ...activatableFields(),
     };
