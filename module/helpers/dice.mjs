@@ -1106,7 +1106,20 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
   // Roda depois de resolvidos os alvos, pois depende de quem foi atingido.
   if (action.movement?.enabled) {
     try {
-      const moveLines = await executeActionMovement({ caster: actor, action, hits });
+      // Sucesso GERAL da ação — decide se o conjurador chega a se mover.
+      //  - sem CD fixa e sem rolagem de defesa → automático
+      //  - com alvos → precisa ter acertado algum (acertou já cobre defesa+CD)
+      //  - modo "em si"/"nenhum" com CD → o total precisa alcançar a CD
+      const others = hits.filter((h) => !h.isSelf);
+      const selfEntry = hits.find((h) => h.isSelf);
+      const hasDefenseTest = !!action.canRoll && others.length > 0;
+      const hasDCTest = fixedDC != null && rollsDice;
+      let actionOk;
+      if (!hasDefenseTest && !hasDCTest) actionOk = true;
+      else if (others.length) actionOk = others.some((h) => h.acertou);
+      else if (selfEntry) actionOk = selfEntry.acertou;
+      else actionOk = atkTotal >= fixedDC;
+      const moveLines = await executeActionMovement({ caster: actor, action, hits, actionOk });
       if (moveLines) lines.push(moveLines);
     } catch (e) {
       console.warn("Ligeia | falha no efeito de movimento:", e);

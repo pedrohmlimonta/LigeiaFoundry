@@ -108,6 +108,61 @@ function clampToWalls(origin, dest) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Ações de movimento próprias (deslize animado, sem gastar movimento) */
+/* ------------------------------------------------------------------ */
+
+/** Nomes das ações de movimento registradas pelo sistema. */
+const FORCED_WALLS = "ligeiaForced";
+const FORCED_NOWALLS = "ligeiaForcedNoWalls";
+
+/**
+ * Registra ações de movimento usadas pelos efeitos (empurrar, puxar, lateral,
+ * telecinese). Diferente de "displace"/"blink" (que são teleporte), estas
+ * ANIMAM o token deslizando até o destino, como um deslocamento normal — mas
+ * não consomem o deslocamento do alvo (`measure: false`).
+ *
+ * Chamada no hook `init`. Se a API não existir, é ignorada em silêncio.
+ */
+export function registerForcedMovementActions() {
+  const actions = CONFIG?.Token?.movement?.actions;
+  if (!actions) return;
+  const common = {
+    order: 90,
+    teleport: false,   // percorre o caminho (anima), não salta
+    measure: false,    // não consome o deslocamento do alvo
+    visualize: true,
+    canSelect: () => false,  // não aparece para o usuário escolher
+    getCostFunction: () => () => 0,
+    getAnimationOptions: () => ({}),
+  };
+  try {
+    actions[FORCED_WALLS] = {
+      ...common,
+      label: "Movimento forçado",
+      icon: "fa-solid fa-hand-back-fist",
+      walls: "move",   // barrado por paredes
+    };
+    actions[FORCED_NOWALLS] = {
+      ...common,
+      label: "Movimento forçado (atravessa)",
+      icon: "fa-solid fa-hand-sparkles",
+      walls: null,     // atravessa paredes
+    };
+  } catch (e) {
+    console.warn("Ligeia | não foi possível registrar as ações de movimento:", e);
+  }
+}
+
+/** A ação de movimento forçado está disponível nesta versão? */
+function forcedActionName(ignoreWalls) {
+  const actions = CONFIG?.Token?.movement?.actions;
+  const name = ignoreWalls ? FORCED_NOWALLS : FORCED_WALLS;
+  if (actions?.[name]) return name;
+  // Sem as ações próprias: "walk" também anima (mas conta como deslocamento).
+  return actions?.walk ? "walk" : null;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Aplicação do movimento (com repasse ao Mestre quando necessário)    */
 /* ------------------------------------------------------------------ */
 
@@ -117,14 +172,17 @@ function canMove(tokenDoc) {
   catch (e) { return !!game.user.isGM; }
 }
 
-/** Executa o movimento localmente (quem chama já tem permissão). */
-async function applyMoveLocal(tokenDoc, centerDest, teleport) {
+/**
+ * Executa o movimento localmente (quem chama já tem permissão).
+ * @param {boolean} teleport     salto instantâneo (ignora paredes)
+ * @param {boolean} ignoreWalls  movimento físico que atravessa paredes
+ */
+async function applyMoveLocal(tokenDoc, centerDest, teleport, ignoreWalls = false) {
   const pos = centerToTopLeft(tokenDoc, centerDest);
-  // V13: ações de movimento — "blink" teleporta, "displace" é deslocamento
-  // forçado (não consome o movimento do alvo).
-  const action = teleport ? "blink" : "displace";
+  // Teleporte: "blink" salta direto. Físico: ação própria que ANIMA o deslize.
+  const action = teleport ? "blink" : forcedActionName(ignoreWalls);
   try {
-    if (typeof tokenDoc.move === "function") {
+    if (typeof tokenDoc.move === "function" && action) {
       await tokenDoc.move({ x: pos.x, y: pos.y, action }, { ligeiaForced: true });
       return true;
     }
@@ -132,6 +190,7 @@ async function applyMoveLocal(tokenDoc, centerDest, teleport) {
     console.warn("Ligeia | TokenDocument#move falhou; usando update:", e);
   }
   try {
+    // Fallback: update animado (físico) ou instantâneo (teleporte).
     await tokenDoc.update({ x: pos.x, y: pos.y }, { animate: !teleport, ligeiaForced: true });
     return true;
   } catch (e) {
@@ -141,8 +200,8 @@ async function applyMoveLocal(tokenDoc, centerDest, teleport) {
 }
 
 /** Move um token, repassando ao Mestre se o usuário não tiver permissão. */
-async function moveToken(tokenDoc, centerDest, teleport) {
-  if (canMove(tokenDoc)) return applyMoveLocal(tokenDoc, centerDest, teleport);
+async function moveToken(tokenDoc, centerDest, teleport, ignoreWalls = false) {
+  if (canMove(tokenDoc)) return applyMoveLocal(tokenDoc, centerDest, teleport, ignoreWalls);
   // Sem permissão: pede ao Mestre (via socket) para executar.
   game.socket?.emit(SOCKET, {
     type: "moveToken",
@@ -150,6 +209,7 @@ async function moveToken(tokenDoc, centerDest, teleport) {
     tokenId: tokenDoc.id,
     center: centerDest,
     teleport: !!teleport,
+    ignoreWalls: !!ignoreWalls,
   });
   return "relayed";
 }
@@ -169,7 +229,7 @@ export function registerMovementSocket() {
     const scene = game.scenes.get(payload.sceneId);
     const tokenDoc = scene?.tokens?.get(payload.tokenId);
     if (!tokenDoc || !payload.center) return;
-    await applyMoveLocal(tokenDoc, payload.center, !!payload.teleport);
+    await applyMoveLocal(tokenDoc, payload.center, !!payload.teleport, !!payload.ignoreWalls);
   });
 }
 
@@ -314,12 +374,17 @@ function directionalDestination(mv, moverC, refC) {
  * @param {Array}    opts.hits     [{ actor, acertou, isSelf }]
  * @returns {Promise<string>} HTML com as linhas para o chat
  */
-export async function executeActionMovement({ caster, action, hits = [] }) {
+export async function executeActionMovement({ caster, action, hits = [], actionOk = true }) {
   const mv = action?.movement;
   if (!mv?.enabled) return "";
   if (!canvas?.ready) return "";
+  // Sem sucesso na ação (CD e/ou rolagem de defesa), nada se move.
+  if (!actionOk) return "";
 
-  const teleport = mv.kind === "teleport" || !!mv.ignoreWalls;
+  // Teleporte = salto instantâneo. Os demais são FÍSICOS: animam o deslize.
+  // "Ignorar paredes" num movimento físico o faz atravessar, mas ainda anima.
+  const teleport = mv.kind === "teleport";
+  const ignoreWalls = teleport || !!mv.ignoreWalls;
   const lines = [];
 
   const casterToken = tokenOf(caster);
@@ -330,14 +395,14 @@ export async function executeActionMovement({ caster, action, hits = [] }) {
   const doMove = async (tokenDoc, destCenter, nameLabel) => {
     let dest = mv.snap === false ? destCenter : snapCenter(destCenter);
     let blocked = false;
-    if (!teleport) {
+    if (!ignoreWalls) {
       const r = clampToWalls(centerOf(tokenDoc), dest);
       dest = r.point;
       blocked = r.blocked;
       if (mv.snap !== false) dest = snapCenter(dest);
     }
     const moved = pxToMeters(Math.hypot(dest.x - centerOf(tokenDoc).x, dest.y - centerOf(tokenDoc).y));
-    const res = await moveToken(tokenDoc, dest, teleport);
+    const res = await moveToken(tokenDoc, dest, teleport, ignoreWalls);
     const verb = KIND_LABEL[mv.kind] || "movido";
     const dm = Math.round(moved * 10) / 10;
     if (res === "relayed") {
@@ -352,11 +417,6 @@ export async function executeActionMovement({ caster, action, hits = [] }) {
   /* ---- Movimento do PRÓPRIO conjurador ---- */
   if (mv.who === "self") {
     if (!casterToken) return "";
-    // Só move se a ação teve sucesso: com alvos, precisa ter acertado algum;
-    // sem alvos (modo self/none), o sucesso já vem do teste da própria ação.
-    const selfEntry = hits.find((h) => h.isSelf);
-    const ok = hitTargets.length > 0 || (selfEntry ? selfEntry.acertou : hits.length === 0);
-    if (!ok) return "";
 
     const originC = centerOf(casterToken);
     let dest = null;

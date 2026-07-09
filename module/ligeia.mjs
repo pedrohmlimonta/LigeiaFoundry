@@ -11,7 +11,7 @@ import { LigeiaCharacterSheet } from "./sheets/character-sheet.mjs";
 import "./sheets/ficha-elegante.mjs";
 import { registerEmanationHooks } from "./helpers/emanation.mjs";
 import { registerTokenRuler } from "./helpers/token-ruler.mjs";
-import { registerMovementHooks, registerMovementSocket } from "./helpers/movement.mjs";
+import { registerMovementHooks, registerMovementSocket, registerForcedMovementActions } from "./helpers/movement.mjs";
 import { registerTurnEffectHooks } from "./helpers/turn-effects.mjs";
 import {
   HabilidadeSheet,
@@ -58,6 +58,8 @@ Hooks.once("init", function () {
 
   // Rastro de movimento colorido pelo Deslocamento (verde/amarelo/vermelho).
   registerTokenRuler();
+  // Ações de movimento forçado (empurrão/puxão/telecinese) — deslize animado.
+  registerForcedMovementActions();
 
   // DataModels — Actors
   CONFIG.Actor.dataModels = {
