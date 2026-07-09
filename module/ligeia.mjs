@@ -10,6 +10,8 @@ import { LigeiaCharacterSheet } from "./sheets/character-sheet.mjs";
 // sistema: importar aqui faz ela se registrar (init) e pré-carregar partials.
 import "./sheets/ficha-elegante.mjs";
 import { registerEmanationHooks } from "./helpers/emanation.mjs";
+import { registerTokenRuler } from "./helpers/token-ruler.mjs";
+import { registerMovementHooks, registerMovementSocket } from "./helpers/movement.mjs";
 import { registerTurnEffectHooks } from "./helpers/turn-effects.mjs";
 import {
   HabilidadeSheet,
@@ -53,6 +55,9 @@ Hooks.once("init", function () {
   CONFIG.Actor.documentClass = LigeiaActor;
   CONFIG.Item.documentClass = LigeiaItem;
   CONFIG.Combatant.documentClass = LigeiaCombatant;
+
+  // Rastro de movimento colorido pelo Deslocamento (verde/amarelo/vermelho).
+  registerTokenRuler();
 
   // DataModels — Actors
   CONFIG.Actor.dataModels = {
@@ -240,6 +245,11 @@ Hooks.once("init", function () {
         icon: "icons/svg/hazard.svg",
         desc: "Ainda não agiu em combate. Ataques contra criaturas surpresas recebem 1D nas rolagens.",
       },
+      telecinese: {
+        label: "Telecinese",
+        icon: "icons/svg/explosion.svg",
+        desc: "Sob controle telecinético: não se move por conta própria. Quem o controla o reposiciona; o Mestre pode movê-lo. Sair do efeito devolve o movimento.",
+      },
     },
   };
 
@@ -295,6 +305,9 @@ Hooks.once("ready", function () {
   registerEmanationHooks();
   // Rolagens automáticas de fim de efeito no início do turno.
   registerTurnEffectHooks();
+  // Efeitos de movimento: trava da Telecinese e receptor de pedidos ao Mestre.
+  registerMovementHooks();
+  registerMovementSocket();
 });
 
 /* ------------------------------------------------------------------ */

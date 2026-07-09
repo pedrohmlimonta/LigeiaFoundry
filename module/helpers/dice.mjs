@@ -34,6 +34,8 @@ async function waitForDiceAnimation(fallbackMs = 1100) {
 
 import { conditionModifiers, attributeConditionDice, actorHasCondition } from "./conditions.mjs";
 import { playActionAnimation } from "./integrations.mjs";
+import { executeActionMovement } from "./movement.mjs";
+import { promptRollConfig, shouldPromptRoll } from "../apps/roll-dialog.mjs";
 
 /**
  * Executa uma rolagem do Ligeia e devolve um objeto Roll do Foundry
@@ -57,13 +59,17 @@ export async function rollLigeia({
   reroll6 = 0,
   critBonus = 0,
   failBonus = 0,
+  baseDice = 2,
 } = {}) {
-  // Dados de melhoria: positivo = vantagem (mantém os 2 MAIORES);
-  // negativo = desvantagem (rola os mesmos dados extras e mantém os 2
-  // MENORES). Ex.: -1D → 3d6kl2. Sempre ao menos 2d6.
+  // Dados BÁSICOS: normalmente 2. Podem ser reduzidos até 1 (penalidade forte)
+  // quando não há dados de melhoria para remover.
+  const base = Math.max(1, Math.min(2, Math.round(Number(baseDice) || 2)));
+  // Dados de melhoria: positivo = vantagem (mantém os MAIORES);
+  // negativo = desvantagem (rola os mesmos dados extras e mantém os
+  // MENORES). Ex.: -1D → 3d6kl2.
   const extra = Math.abs(improvement || 0);
-  const totalDice = 2 + extra;
-  const keepMode = (improvement || 0) < 0 ? "kl2" : "kh2";
+  const totalDice = base + extra;
+  const keepMode = ((improvement || 0) < 0 ? "kl" : "kh") + base;
   const flat = (attribute || 0) + (bonus || 0);
 
   // ----- Reroll de dados (1 e/ou 6) -----
@@ -110,10 +116,12 @@ export async function rollLigeia({
   //  - Falha crítica: soma dos 2 dados ≤ (2 + failBonus). Padrão falha só
   //    com 2 (1+1); "falha piorada" aumenta o limiar (3, 4…).
   const keptSum = kept.reduce((s, v) => s + v, 0);
-  const critThreshold = 12 - Math.max(0, Number(critBonus) || 0);
-  const failThreshold = 2 + Math.max(0, Number(failBonus) || 0);
-  const isCritSuccessDice = kept.length >= 2 && keptSum >= critThreshold;
-  const isCritFail = kept.length >= 2 && keptSum <= failThreshold;
+  // Limiares escalam com os dados básicos: com 2 dados → 12 e 2 (padrão);
+  // com 1 dado → 6 e 1.
+  const critThreshold = (6 * base) - Math.max(0, Number(critBonus) || 0);
+  const failThreshold = base + Math.max(0, Number(failBonus) || 0);
+  const isCritSuccessDice = kept.length >= base && keptSum >= critThreshold;
+  const isCritFail = kept.length >= base && keptSum <= failThreshold;
 
   const total = roll.total;
 
@@ -142,6 +150,7 @@ export async function rollLigeia({
     difficulty,
     flat,
     totalDice,
+    baseDice: base,
   };
 }
 
@@ -184,10 +193,14 @@ async function applyLimitedReroll(dieTerm, { ones = 0, sixes = 0 } = {}) {
  * rerrolados (os rerrolados já estão com active=false).
  */
 function recomputeKeep(dieTerm, keepMode) {
+  // keepMode: "kh2" | "kl2" | "kh1" | "kl1" ...
+  const m = /^(kl|kh)(\d+)$/.exec(String(keepMode)) || [];
+  const low = m[1] === "kl";
+  const n = Math.max(1, Number(m[2]) || 2);
   const live = dieTerm.results.filter((r) => !r.rerolled);
   // Ordena por valor
   const sorted = [...live].sort((a, b) => a.result - b.result);
-  const keep = keepMode === "kl2" ? sorted.slice(0, 2) : sorted.slice(-2);
+  const keep = low ? sorted.slice(0, n) : sorted.slice(-n);
   const keepSet = new Set(keep);
   for (const r of live) r.active = keepSet.has(r);
 }
@@ -709,6 +722,17 @@ function activeTokenOfActor(actor) {
   return actor.getActiveTokens(true)?.[0] || actor.getActiveTokens()?.[0] || null;
 }
 
+/** +1D no ataque quando TODOS os alvos diretos estão Surpresos. */
+function surpriseDiceFor(actor, action, overrideTargets) {
+  if (!action.canRoll || (action.targetMode || "target") !== "target") return 0;
+  const preTargets = (Array.isArray(overrideTargets)
+    ? overrideTargets.filter(Boolean)
+    : Array.from(game.user?.targets ?? []).map((t) => t.actor).filter(Boolean)
+  ).filter((a) => a && a !== actor);
+  if (!preTargets.length) return 0;
+  return preTargets.every((a) => actorHasCondition(a, "surpreso")) ? 1 : 0;
+}
+
 export async function rollItemAction({ actor, item, action, hidden = false, overrideTargets = null, frozenAttackTotal = null }) {
   const cfg = CONFIG.LIGEIA || {};
   // Compatibilidade: se nenhuma ação for passada, usa a primeira do item.
@@ -740,7 +764,36 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
 
   // A ação rola se faz ataque OU se testa contra dificuldade fixa.
   const rollsDice = action.canRoll || action.vsDifficulty;
-  const fixedDC = action.vsDifficulty ? (Number(action.fixedDifficulty) || 0) : null;
+  let fixedDC = action.vsDifficulty ? (Number(action.fixedDifficulty) || 0) : null;
+
+  // Caixa de rolagem (se habilitada para este ator e esta ação). Permite
+  // ajustar bônus, dados de melhoria, a CD e o atributo de defesa do alvo.
+  let dlgBonus = 0;
+  let dlgImprovement = null; // null = manter o cálculo normal
+  let dlgBaseDice = 2;
+  let defAttrOverride = "";
+  if (rollsDice && !isFrozen && shouldPromptRoll(actor, action)) {
+    const atkPre = resolveAttr(actor, atkKey);
+    const rmPre = actor.system?.rollMods || {};
+    const impPre =
+      atkPre.dice + (Number(action.rollDice) || 0) + atkCond.atkDice +
+      (rmPre.all?.dice || 0) + (rmPre.attack?.dice || 0) +
+      attributeConditionDice(actor, atkKey) +
+      surpriseDiceFor(actor, action, overrideTargets);
+    const cfg2 = await promptRollConfig({
+      title: `${item.name} — ${action.label || "Ação"}`,
+      improvement: impPre,
+      difficulty: fixedDC,
+      defenseAttr: action.canRoll ? (action.defenseAttr || "") : "",
+      allowDefense: !!action.canRoll,
+    });
+    if (!cfg2) return; // cancelado pelo usuário
+    dlgBonus = cfg2.bonus;
+    dlgImprovement = cfg2.improvement;
+    dlgBaseDice = cfg2.baseDice;
+    if (cfg2.difficulty != null) fixedDC = cfg2.difficulty;
+    if (cfg2.defenseAttr) defAttrOverride = cfg2.defenseAttr;
+  }
 
   let atkRoll = null;
   if (rollsDice && !isFrozen) {
@@ -754,20 +807,14 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     // Surdo: -1D em rolagens de Conjuração.
     const attrCondDice = attributeConditionDice(actor, atkKey);
     // Surpreso: +1D para o atacante se o(s) alvo(s) diretos estão surpresos.
-    let surpriseDice = 0;
-    if (action.canRoll && (action.targetMode || "target") === "target") {
-      const preTargets = (Array.isArray(overrideTargets)
-        ? overrideTargets.filter(Boolean)
-        : Array.from(game.user?.targets ?? []).map((t) => t.actor).filter(Boolean)
-      ).filter((a) => a && a !== actor);
-      if (preTargets.length && preTargets.every((a) => actorHasCondition(a, "surpreso"))) {
-        surpriseDice = 1;
-      }
-    }
+    const surpriseDice = surpriseDiceFor(actor, action, overrideTargets);
     atkRoll = await rollLigeia({
       attribute: atk.value,
-      improvement: atk.dice + (Number(action.rollDice) || 0) + atkCond.atkDice + rmDice + attrCondDice + surpriseDice,
-      bonus: (Number(action.rollBonus) || 0) + rmBonus,
+      improvement: dlgImprovement != null
+        ? dlgImprovement
+        : atk.dice + (Number(action.rollDice) || 0) + atkCond.atkDice + rmDice + attrCondDice + surpriseDice,
+      bonus: (Number(action.rollBonus) || 0) + rmBonus + dlgBonus,
+      baseDice: dlgBaseDice,
       // Passa a CD fixa (quando houver) para marcar sucesso/falha e crítico.
       difficulty: fixedDC,
       reroll1: atkRr.reroll1,
@@ -941,6 +988,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
   }
 
   // ---- Resolve cada alvo afetado ----
+  const hits = []; // { actor, acertou, isSelf } — usado pelo efeito de movimento
   if (affected.length) {
     for (const { actor: tActor, isSelf, outOfRange, dist } of affected) {
       // Alvo fora de alcance: não é atingido; mostra uma linha informativa.
@@ -960,8 +1008,11 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
         const defCond = conditionModifiers(tActor);
 
         // Monta as defesas candidatas; Indefeso não pode usar Bloqueio.
-        let keys = [action.defenseAttr || "esquiva"];
-        if (action.defenseAttr2 && action.defenseAttr2 !== keys[0]) keys.push(action.defenseAttr2);
+        // A caixa de rolagem pode sobrescrever o atributo de defesa do alvo.
+        let keys = defAttrOverride
+          ? [defAttrOverride]
+          : [action.defenseAttr || "esquiva"];
+        if (!defAttrOverride && action.defenseAttr2 && action.defenseAttr2 !== keys[0]) keys.push(action.defenseAttr2);
         if (defCond.blockDisabled) {
           const filtered = keys.filter((k) => k !== "bloqueio");
           keys = filtered.length ? filtered : ["esquiva"]; // só tinha bloqueio → vira esquiva
@@ -1033,6 +1084,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
       }
 
       const detail = await resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls, atkTotal, defTotal, acertou, cfg, attackerMods: atkCond, caster: actor });
+      hits.push({ actor: tActor, acertou, isSelf });
       lines.push(`<div class="lig-atk-target"><div class="lig-atk-line"><strong>${tActor.name}</strong>${defInfo}</div>${detail}</div>`);
     }
   } else if (mode === "target") {
@@ -1047,6 +1099,17 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     if (damageRoll) lines.push(dmgLine(damageRoll.total, action.damageType || "", action.damageResource || "hp"));
     for (const ex of (extraDamageRolls || [])) {
       lines.push(dmgLine(ex.roll.total, ex.type || "", ex.resource || "hp") + ' <span class="lig-extra-tag">extra</span>');
+    }
+  }
+
+  // ---- Efeito de movimento (teleporte/empurrar/puxar/lateral/telecinese) ----
+  // Roda depois de resolvidos os alvos, pois depende de quem foi atingido.
+  if (action.movement?.enabled) {
+    try {
+      const moveLines = await executeActionMovement({ caster: actor, action, hits });
+      if (moveLines) lines.push(moveLines);
+    } catch (e) {
+      console.warn("Ligeia | falha no efeito de movimento:", e);
     }
   }
 

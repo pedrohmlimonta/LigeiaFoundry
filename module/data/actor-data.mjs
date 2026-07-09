@@ -166,6 +166,8 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
 
       // Rolagem oculta por ficha
       rollHidden: new fields.BooleanField({ initial: false }),
+      // Não abrir a caixa de configuração antes das rolagens deste ator.
+      skipRollDialog: new fields.BooleanField({ initial: false }),
     };
   }
 
@@ -300,6 +302,8 @@ export class NpcData extends foundry.abstract.TypeDataModel {
         }),
       }),
       rollHidden: new fields.BooleanField({ initial: true }),
+      // Não abrir a caixa de configuração antes das rolagens deste ator.
+      skipRollDialog: new fields.BooleanField({ initial: false }),
     };
   }
 

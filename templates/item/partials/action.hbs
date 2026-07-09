@@ -151,6 +151,11 @@
       Dano escalonado (+1 por 2 pontos acima da defesa)
     </label>
 
+    <label class="lig-inline-check" title="Quando ligado, executar esta ação não abre a caixa de configuração da rolagem.">
+      <input type="checkbox" name="system.actions.{{i}}.skipRollDialog" {{checked act.skipRollDialog}}/>
+      Não abrir caixa de rolagem
+    </label>
+
     {{!-- Dano extra: parcelas adicionais, cada uma com fórmula e tipo próprios --}}
     <div class="lig-extra-damage">
       <div class="lig-subtitle">Dano extra</div>
@@ -184,6 +189,62 @@
       </div>
       {{/each}}
       <button type="button" class="lig-mini-btn" data-action="addExtraDamage" data-action-index="{{i}}">+ dano extra</button>
+    </div>
+
+    {{!-- Efeito de movimento: teleporte / empurrar / puxar / lateral / telecinese --}}
+    <div class="lig-movement-box">
+      <label class="lig-inline-check">
+        <input type="checkbox" name="system.actions.{{i}}.movement.enabled" {{checked act.movement.enabled}}/>
+        <strong>Move tokens</strong> (teleporte, empurrão, puxão, lateral, telecinese)
+      </label>
+      {{#if act.movement.enabled}}
+      <div class="lig-item-row">
+        <label>Tipo
+          <select name="system.actions.{{i}}.movement.kind">
+            <option value="push" {{#if (eq act.movement.kind "push")}}selected{{/if}}>Empurrar (afasta do conjurador)</option>
+            <option value="pull" {{#if (eq act.movement.kind "pull")}}selected{{/if}}>Puxar (aproxima do conjurador)</option>
+            <option value="lateral" {{#if (eq act.movement.kind "lateral")}}selected{{/if}}>Lateral (perpendicular)</option>
+            <option value="place" {{#if (eq act.movement.kind "place")}}selected{{/if}}>Telecinese (escolher o destino)</option>
+            <option value="teleport" {{#if (eq act.movement.kind "teleport")}}selected{{/if}}>Teleporte (instantâneo, ignora paredes)</option>
+          </select>
+        </label>
+        <label>Quem se move
+          <select name="system.actions.{{i}}.movement.who">
+            <option value="targets" {{#if (eq act.movement.who "targets")}}selected{{/if}}>Os alvos</option>
+            <option value="self" {{#if (eq act.movement.who "self")}}selected{{/if}}>O próprio conjurador</option>
+          </select>
+        </label>
+        <label>Distância (m)
+          <input type="number" name="system.actions.{{i}}.movement.distance" value="{{act.movement.distance}}" min="0" step="0.5"/>
+        </label>
+      </div>
+      <div class="lig-item-row">
+        {{#if (eq act.movement.kind "lateral")}}
+        <label>Lado
+          <select name="system.actions.{{i}}.movement.lateralSide">
+            <option value="right" {{#if (eq act.movement.lateralSide "right")}}selected{{/if}}>Direita</option>
+            <option value="left" {{#if (eq act.movement.lateralSide "left")}}selected{{/if}}>Esquerda</option>
+          </select>
+        </label>
+        {{/if}}
+        {{#unless (eq act.movement.kind "teleport")}}
+        <label class="lig-inline-check" title="Se marcado, o movimento atravessa paredes (como um teleporte).">
+          <input type="checkbox" name="system.actions.{{i}}.movement.ignoreWalls" {{checked act.movement.ignoreWalls}}/>
+          Ignorar paredes
+        </label>
+        {{/unless}}
+        <label class="lig-inline-check">
+          <input type="checkbox" name="system.actions.{{i}}.movement.snap" {{checked act.movement.snap}}/>
+          Encaixar no grid
+        </label>
+      </div>
+      <p class="lig-hint">
+        O movimento só acontece se a ação tiver sucesso: passa na CD fixa, vence a defesa (rolagem resistida), ambas — ou automaticamente, se nenhuma estiver ativa.
+        {{#if (or (eq act.movement.kind "place") (eq act.movement.kind "teleport"))}} Você clica no destino no mapa (o alcance é mostrado).{{/if}}
+        {{#if (eq act.movement.who "self")}} Em Empurrar/Puxar/Lateral com "o próprio conjurador", a direção usa o primeiro alvo atingido como referência.{{/if}}
+      </p>
+      <p class="lig-hint">Para <strong>telecinese sustentada</strong>, combine este movimento com um efeito de condição <em>Telecinese</em> (abaixo): o alvo deixa de se mover sozinho e você o reposiciona reusando esta ação.</p>
+      {{/if}}
     </div>
 
     <div class="lig-item-row lig-action-costs">

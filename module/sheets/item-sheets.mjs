@@ -122,6 +122,17 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
               .sort((a, b) => Number(a) - Number(b))
               .map((k) => xd[k]);
           }
+          // Movimento: os subcampos só aparecem no form quando visíveis, então
+          // mesclamos com o que já está salvo para não perder configuração.
+          if (arr[i].movement === undefined) {
+            if (cur.movement) arr[i].movement = foundry.utils.deepClone(cur.movement);
+          } else if (typeof arr[i].movement === "object") {
+            arr[i].movement = foundry.utils.mergeObject(
+              foundry.utils.deepClone(cur.movement || {}),
+              arr[i].movement,
+              { inplace: false },
+            );
+          }
         }
         sys.actions = arr;
       } else {
@@ -503,10 +514,12 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       vsDifficulty: false, fixedDifficulty: 8, difficultyAttr: "nenhum",
       targetMode: "target", includeSelf: false, defenseAttr: "esquiva", defenseAttr2: "",
       damage: "", damageType: "", damageResource: "hp", scalingDamage: false, extraDamage: [],
+      skipRollDialog: true,
       appliesEffects: [], range: 0, area: 0, costMp: 0, costHp: 0, costHeroic: 0,
       persistArea: false, persistRounds: 1, persistAffectsSelf: false,
       persistRerollAttack: false, persistTrigger: "both",
       animFile: "", animPlacement: "target", animScale: 1, animEnabled: true,
+      movement: { enabled: false, kind: "push", who: "targets", distance: 0, lateralSide: "right", ignoreWalls: false, snap: true },
     });
   }
   static async _onRemoveAction(event, target) {

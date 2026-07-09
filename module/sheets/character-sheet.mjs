@@ -3,6 +3,7 @@
  */
 import { rollLigeia, postRollToChat, rollItemAction, resolveAttr, rerollFor, critFor, spendItemCosts } from "../helpers/dice.mjs";
 import { rollSingleEndEffect } from "../helpers/turn-effects.mjs";
+import { promptRollConfig, shouldPromptRoll, currentTargetActors } from "../apps/roll-dialog.mjs";
 import { placeTemplateForAction } from "../helpers/template.mjs";
 import { computeXpSpent } from "../helpers/xp.mjs";
 import { effectIsActive } from "../helpers/effects.mjs";
@@ -649,22 +650,78 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     const rm = actor.system?.rollMods || {};
     const rr = rerollFor(actor, key);
     const cr = critFor(actor, key);
-    const result = await rollLigeia({
+    await LigeiaCharacterSheet.#rollWithDialog({
+      actor,
+      label: labels[key] || key,
       attribute: attr.value,
       improvement: attr.dice + (rm.all?.dice || 0),
       bonus: rm.all?.bonus || 0,
-      reroll1: rr.reroll1,
-      reroll6: rr.reroll6,
-      critBonus: cr.critBonus,
-      failBonus: cr.failBonus,
+      reroll: rr,
+      crit: cr,
+    });
+  }
+
+  /**
+   * Rola um atributo/secundário passando (se configurado) pela caixa de
+   * rolagem, que permite ajustar bônus, dados, CD ou a defesa do alvo.
+   */
+  static async #rollWithDialog({ actor, label, attribute, improvement, bonus, reroll, crit }) {
+    let imp = improvement;
+    let bns = bonus;
+    let baseDice = 2;
+    let difficulty = null;
+    let defAttr = "";
+
+    if (shouldPromptRoll(actor)) {
+      const cfg = await promptRollConfig({ title: `${actor.name} — ${label}`, improvement: imp });
+      if (!cfg) return; // cancelado
+      imp = cfg.improvement;
+      baseDice = cfg.baseDice;
+      bns += cfg.bonus;
+      difficulty = cfg.difficulty;
+      defAttr = cfg.defenseAttr || "";
+    }
+
+    // Se um atributo de defesa do alvo foi escolhido, o alvo rola a defesa e
+    // o resultado dele vira a dificuldade desta rolagem.
+    let defResult = null;
+    let defActor = null;
+    if (defAttr) {
+      defActor = currentTargetActors()[0] || null;
+      if (defActor) {
+        const d = resolveAttr(defActor, defAttr);
+        const drm = defActor.system?.rollMods || {};
+        const drr = rerollFor(defActor, defAttr, "defense");
+        const dcr = critFor(defActor, defAttr, "defense");
+        defResult = await rollLigeia({
+          attribute: d.value,
+          improvement: d.dice + (drm.all?.dice || 0) + (drm.defense?.dice || 0),
+          bonus: (drm.all?.bonus || 0) + (drm.defense?.bonus || 0),
+          reroll1: drr.reroll1, reroll6: drr.reroll6,
+          critBonus: dcr.critBonus, failBonus: dcr.failBonus,
+        });
+        difficulty = defResult.total;
+      }
+    }
+
+    const result = await rollLigeia({
+      attribute,
+      improvement: imp,
+      bonus: bns,
+      baseDice,
+      difficulty,
+      reroll1: reroll.reroll1,
+      reroll6: reroll.reroll6,
+      critBonus: crit.critBonus,
+      failBonus: crit.failBonus,
     });
 
-    await postRollToChat({
-      actor,
-      label: labels[key] || key,
-      result,
-      hidden: !!actor.system.rollHidden,
-    });
+    const hidden = !!actor.system.rollHidden;
+    await postRollToChat({ actor, label, result, hidden });
+    if (defResult && defActor) {
+      const defLabel = CONFIG.LIGEIA?.defenseAttrs?.[defAttr] || defAttr;
+      await postRollToChat({ actor: defActor, label: `Defesa (${defLabel})`, result: defResult, hidden });
+    }
   }
 
   /** Rola um atributo secundário. */
@@ -686,21 +743,14 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     const rm = actor.system?.rollMods || {};
     const rr = rerollFor(actor, key);
     const cr = critFor(actor, key);
-    const result = await rollLigeia({
+    await LigeiaCharacterSheet.#rollWithDialog({
+      actor,
+      label: labels[key] || key,
       attribute: r.value,
       improvement: r.dice + (rm.all?.dice || 0),
       bonus: rm.all?.bonus || 0,
-      reroll1: rr.reroll1,
-      reroll6: rr.reroll6,
-      critBonus: cr.critBonus,
-      failBonus: cr.failBonus,
-    });
-
-    await postRollToChat({
-      actor,
-      label: labels[key] || key,
-      result,
-      hidden: !!actor.system.rollHidden,
+      reroll: rr,
+      crit: cr,
     });
   }
 }

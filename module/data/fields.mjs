@@ -134,6 +134,9 @@ export function actionEntryField() {
       choices: ["hp", "mp", "heroic"],
     }),
     scalingDamage: new fields.BooleanField({ initial: false }),
+    // Não abrir a caixa de rolagem ao executar esta ação. Ligado por padrão:
+    // nas ações a rolagem já vem planejada.
+    skipRollDialog: new fields.BooleanField({ initial: true }),
     // Dano EXTRA: parcelas adicionais de dano, cada uma com sua fórmula e tipo
     // (podem repetir o tipo ou variar). Aplicadas junto do dano principal ao
     // acertar. Não recebem o escalonamento (esse é só do dano principal).
@@ -148,6 +151,24 @@ export function actionEntryField() {
       }),
       { initial: [] },
     ),
+    // Efeito de MOVIMENTO: teleporta, empurra, puxa, desloca lateralmente ou
+    // reposiciona (telecinese) o alvo ou o próprio conjurador. Aciona sob as
+    // mesmas regras da ação (CD fixa / resistida / ambas / automático).
+    movement: new fields.SchemaField({
+      enabled: new fields.BooleanField({ initial: false }),
+      kind: new fields.StringField({
+        initial: "push",
+        choices: ["teleport", "push", "pull", "lateral", "place"],
+      }),
+      who: new fields.StringField({ initial: "targets", choices: ["self", "targets"] }),
+      // Distância em metros. Em teleporte/telecinese, 0 = sem limite.
+      distance: new fields.NumberField({ initial: 0, min: 0 }),
+      lateralSide: new fields.StringField({ initial: "right", choices: ["left", "right"] }),
+      // Ignora paredes (sempre verdadeiro no teleporte).
+      ignoreWalls: new fields.BooleanField({ initial: false }),
+      // Encaixa o destino no centro da casa do grid.
+      snap: new fields.BooleanField({ initial: true }),
+    }),
     // Efeitos aplicados ao ALVO quando a ação acerta. Cada um é como um
     // efeito de habilidade (qualquer tipo, incluindo "condition") e vira um
     // "efeito ativo" na ficha do alvo, com duração e resistência por rodada.

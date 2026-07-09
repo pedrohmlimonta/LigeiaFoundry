@@ -86,6 +86,14 @@ async function triggerEmanationOn(ema, targetActor) {
   // A área já existe; ao disparar por turno NÃO recriamos template.
   turnAction.targetMode = "target";
   turnAction.persistArea = false;
+  // Disparo automático: nunca abrir a caixa de rolagem.
+  turnAction.skipRollDialog = true;
+  // Movimentos INTERATIVOS (teleporte/telecinese) pediriam um clique a cada
+  // turno — desligamos. Os direcionais (empurrar/puxar/lateral) continuam,
+  // permitindo auras que arrastam quem está dentro.
+  if (turnAction.movement?.enabled && ["teleport", "place"].includes(turnAction.movement.kind)) {
+    turnAction.movement = { ...turnAction.movement, enabled: false };
+  }
 
   // A rolagem de ataque: se a emanação marcar "refazer", rola de novo a cada
   // disparo (frozen = null). Senão, usa o total congelado na criação como CD.

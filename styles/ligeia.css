@@ -1339,3 +1339,18 @@
 
 /* Separador do dano Final no select de tipo de dano */
 .lig-dmgtype-select .lig-dmg-sep { color: var(--lig-border, #5a4a2a); text-align: center; }
+
+/* Efeito de movimento da ação */
+.lig-movement-box {
+  margin-top: 0.5rem; padding: 0.5rem;
+  border: 1px solid var(--lig-border, #5a4a2a); border-radius: 4px;
+  background: rgba(102, 204, 255, 0.05);
+}
+.lig-move-line { margin-top: 0.2rem; font-size: 0.9rem; }
+.lig-move-line.muted { opacity: 0.7; font-style: italic; }
+
+/* Barra de opções de rolagem na ficha */
+.lig-roll-bar { margin: 0.3rem 0; }
+/* Caixa de configuração da rolagem */
+.lig-roll-dialog .lig-rd-row { display: flex; gap: 0.6rem; margin-bottom: 0.4rem; }
+.lig-roll-dialog .lig-rd-row label { flex: 1; display: flex; flex-direction: column; font-size: 0.85rem; }
