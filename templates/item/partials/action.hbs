@@ -240,7 +240,7 @@
       </div>
       <p class="lig-hint">
         O movimento só acontece se a ação tiver sucesso: passa na CD fixa, vence a defesa (rolagem resistida), ambas — ou automaticamente, se nenhuma estiver ativa.
-        {{#if (or (eq act.movement.kind "place") (eq act.movement.kind "teleport"))}} Você clica no destino no mapa (o alcance é mostrado).{{/if}}
+        {{#if (or (eq act.movement.kind "place") (eq act.movement.kind "teleport"))}} Você clica no destino no mapa; o alcance é medido a partir do <strong>conjurador</strong> (mesmo quando quem se move é o alvo).{{/if}}
         {{#if (eq act.movement.who "self")}} Em Empurrar/Puxar/Lateral com "o próprio conjurador", a direção usa o primeiro alvo atingido como referência.{{/if}}
       </p>
       <p class="lig-hint">Para <strong>telecinese sustentada</strong>, combine este movimento com um efeito de condição <em>Telecinese</em> (abaixo): o alvo deixa de se mover sozinho e você o reposiciona reusando esta ação.</p>

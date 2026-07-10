@@ -461,8 +461,14 @@ export async function executeActionMovement({ caster, action, hits = [], actionO
     let dest = null;
 
     if (mv.kind === "teleport" || mv.kind === "place") {
-      dest = await pickPoint(tCenter, metersToPx(mv.distance),
-        `Destino de ${tActor.name}${mv.distance > 0 ? ` (até ${mv.distance}m)` : ""} — botão direito cancela.`);
+      // O alcance é medido a partir do CONJURADOR (é o poder dele que alcança
+      // até ali), não da posição atual do alvo.
+      if (!casterToken) {
+        ui.notifications?.warn("O conjurador precisa de um token na cena para teleportar/mover o alvo.");
+        return "";
+      }
+      dest = await pickPoint(centerOf(casterToken), metersToPx(mv.distance),
+        `Destino de ${tActor.name}${mv.distance > 0 ? ` (até ${mv.distance}m de ${caster.name})` : ""} — botão direito cancela.`);
       if (!dest) continue;
     } else {
       if (!casterToken) {

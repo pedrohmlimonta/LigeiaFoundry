@@ -1351,6 +1351,130 @@
 
 /* Barra de opções de rolagem na ficha */
 .lig-roll-bar { margin: 0.3rem 0; }
-/* Caixa de configuração da rolagem */
-.lig-roll-dialog .lig-rd-row { display: flex; gap: 0.6rem; margin-bottom: 0.4rem; }
-.lig-roll-dialog .lig-rd-row label { flex: 1; display: flex; flex-direction: column; font-size: 0.85rem; }
+
+/* =====================================================
+   Caixa de configuração da rolagem
+   ===================================================== */
+.lig-roll-dialog-window .window-content {
+  background: var(--lig-bg);
+  color: var(--lig-ink);
+}
+
+.lig-roll-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.6rem;
+  font-family: "Signika", sans-serif;
+  color: var(--lig-ink);
+}
+
+.lig-roll-dialog .lig-rd-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+
+.lig-roll-dialog .lig-rd-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.lig-roll-dialog .lig-rd-wide { flex: 1 1 100%; }
+
+.lig-roll-dialog .lig-rd-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--lig-gold-soft);
+}
+
+.lig-roll-dialog .lig-rd-sub {
+  font-size: 0.68rem;
+  color: var(--lig-ink-soft);
+  font-style: italic;
+}
+
+/* Campo numérico com − e + */
+.lig-roll-dialog .lig-rd-stepper {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--lig-border);
+  border-radius: 3px;
+  background: var(--lig-bg-deep);
+  overflow: hidden;
+}
+.lig-roll-dialog .lig-rd-stepper input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--lig-ink);
+  text-align: center;
+  font-weight: 600;
+  padding: 0.25rem 0.2rem;
+}
+.lig-roll-dialog .lig-rd-stepper input:focus { outline: none; }
+.lig-roll-dialog .lig-rd-stepper input::-webkit-outer-spin-button,
+.lig-roll-dialog .lig-rd-stepper input::-webkit-inner-spin-button {
+  -webkit-appearance: none; margin: 0;
+}
+.lig-roll-dialog .lig-rd-stepper input[type="number"] { -moz-appearance: textfield; }
+
+.lig-roll-dialog .lig-rd-step {
+  flex: 0 0 auto;
+  width: 1.9rem;
+  background: var(--lig-bg-raised);
+  color: var(--lig-gold-soft);
+  border: none;
+  border-radius: 0;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.lig-roll-dialog .lig-rd-step:hover {
+  background: var(--lig-gold-dark);
+  color: var(--lig-ink);
+}
+.lig-roll-dialog .lig-rd-step:active { background: var(--lig-gold); }
+
+.lig-roll-dialog input[type="number"]:not(.lig-rd-stepper input),
+.lig-roll-dialog select {
+  background: var(--lig-bg-deep);
+  border: 1px solid var(--lig-border);
+  color: var(--lig-ink);
+  border-radius: 3px;
+  padding: 0.25rem 0.4rem;
+}
+.lig-roll-dialog input:focus,
+.lig-roll-dialog select:focus {
+  border-color: var(--lig-gold-soft);
+  box-shadow: 0 0 4px rgba(212, 166, 73, 0.4);
+  outline: none;
+}
+
+/* Pré-visualização dos dados */
+.lig-roll-dialog .lig-rd-preview {
+  text-align: center;
+  padding: 0.35rem 0.5rem;
+  background: var(--lig-bg-deep);
+  border: 1px solid var(--lig-gold-dark);
+  border-radius: 3px;
+}
+.lig-roll-dialog .lig-rd-dice {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--lig-gold-soft);
+}
+
+.lig-roll-dialog .lig-rd-note {
+  margin: 0;
+  font-size: 0.68rem;
+  color: var(--lig-ink-soft);
+  font-style: italic;
+  text-align: center;
+}

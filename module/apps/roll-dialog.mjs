@@ -63,12 +63,38 @@ function str(form, name, fallback = "") {
   return el ? String(el.value ?? fallback) : fallback;
 }
 
+/**
+ * Descreve o conjunto de dados resultante, para a pré-visualização.
+ * @returns {string} ex.: "3d6 — mantém os 2 maiores"
+ */
+export function describePool(improvement, baseDice) {
+  const extra = Math.abs(improvement || 0);
+  const total = baseDice + extra;
+  if (improvement > 0) return `${total}d6 — mantém os ${baseDice} maiores`;
+  if (improvement < 0) return `${total}d6 — mantém os ${baseDice} menores`;
+  return baseDice === 1 ? "1d6 — dado básico reduzido" : `${total}d6`;
+}
+
+/** Um campo numérico com botões − e +. */
+function stepperField(label, name, value, hint = "") {
+  return `
+    <label class="lig-rd-field">
+      <span class="lig-rd-label">${label}</span>
+      <span class="lig-rd-stepper">
+        <button type="button" class="lig-rd-step" data-step="${name}" data-dir="-1" tabindex="-1">−</button>
+        <input type="number" name="${name}" value="${value}" step="1"/>
+        <button type="button" class="lig-rd-step" data-step="${name}" data-dir="1" tabindex="-1">+</button>
+      </span>
+      ${hint ? `<span class="lig-rd-sub">${hint}</span>` : ""}
+    </label>`;
+}
+
 /** Monta o HTML da caixa. */
 function buildContent({ improvement, targets, defenseAttr, difficulty, allowDefense }) {
   const cfg = CONFIG.LIGEIA || {};
   const impLabel =
-    improvement > 0 ? `+${improvement}D (vantagem)` :
-    improvement < 0 ? `${improvement}D (desvantagem)` : "nenhum";
+    improvement > 0 ? `+${improvement}D vantagem` :
+    improvement < 0 ? `${improvement}D desvantagem` : "sem dados de melhoria";
 
   let defenseBlock = "";
   if (allowDefense && targets.length) {
@@ -78,34 +104,81 @@ function buildContent({ improvement, targets, defenseAttr, difficulty, allowDefe
       .join("");
     defenseBlock = `
       <div class="lig-rd-row">
-        <label>Defesa de ${names}
+        <label class="lig-rd-field lig-rd-wide">
+          <span class="lig-rd-label">Defesa de ${names}</span>
           <select name="defenseAttr">
-            <option value="">— usar a CD abaixo —</option>
+            <option value="">— usar a CD ao lado —</option>
             ${opts}
           </select>
+          <span class="lig-rd-sub">O alvo rola a defesa e o resultado vira a dificuldade.</span>
         </label>
-      </div>
-      <p class="lig-hint">Escolhendo um atributo, o alvo rola a defesa e o resultado vira a dificuldade.</p>`;
+      </div>`;
   }
 
+  const preview = describePool(improvement, 2);
+
   return `
-    <form class="lig-roll-dialog">
+    <form class="lig-roll-dialog" autocomplete="off">
       <div class="lig-rd-row">
-        <label>Bônus / Penalidade
-          <input type="number" name="bonus" value="0" step="1"/>
-        </label>
-        <label>Dados de melhoria (+ / −)
-          <input type="number" name="diceDelta" value="0" step="1"/>
+        ${stepperField("Bônus / Penalidade", "bonus", 0)}
+        ${stepperField("Dados de melhoria", "diceDelta", 0, impLabel)}
+      </div>
+
+      <div class="lig-rd-preview" data-preview>
+        <span class="lig-rd-dice">${preview}</span>
+      </div>
+
+      <div class="lig-rd-row">
+        <label class="lig-rd-field lig-rd-wide">
+          <span class="lig-rd-label">Dificuldade (CD)</span>
+          <input type="number" name="difficulty" value="${difficulty ?? ""}" step="1" placeholder="vazio = sem CD"/>
         </label>
       </div>
-      <p class="lig-hint">Dados de melhoria da rolagem: <strong>${impLabel}</strong>. Remover além do que existe tira dos 2 dados básicos (mínimo 1).</p>
-      <div class="lig-rd-row">
-        <label>Dificuldade (CD) — vazio = sem CD
-          <input type="number" name="difficulty" value="${difficulty ?? ""}" step="1"/>
-        </label>
-      </div>
+
       ${defenseBlock}
+
+      <p class="lig-rd-note">Remover além dos dados de melhoria tira dos 2 dados básicos, até o mínimo de 1.</p>
     </form>`;
+}
+
+/**
+ * Liga os botões − / + e a pré-visualização. Usa um ouvinte delegado no
+ * documento (funciona tanto no DialogV2 quanto no Dialog antigo).
+ * @returns {Function} função de limpeza
+ */
+function wireSteppers(improvement) {
+  const refresh = (form) => {
+    const prev = form?.querySelector?.("[data-preview] .lig-rd-dice");
+    if (!prev) return;
+    const deltaEl = form.querySelector('[name="diceDelta"]');
+    const delta = Number(deltaEl?.value) || 0;
+    const { improvement: imp, baseDice } = applyDiceDelta(improvement, delta);
+    prev.textContent = describePool(imp, baseDice);
+    const bonus = Number(form.querySelector('[name="bonus"]')?.value) || 0;
+    if (bonus) prev.textContent += bonus > 0 ? ` +${bonus}` : ` ${bonus}`;
+  };
+
+  const onClick = (ev) => {
+    const btn = ev.target?.closest?.("form.lig-roll-dialog button[data-step]");
+    if (!btn) return;
+    ev.preventDefault();
+    const form = btn.closest("form.lig-roll-dialog");
+    const input = form?.querySelector(`[name="${btn.dataset.step}"]`);
+    if (!input) return;
+    input.value = String((Number(input.value) || 0) + (Number(btn.dataset.dir) || 0));
+    refresh(form);
+  };
+  const onInput = (ev) => {
+    const form = ev.target?.closest?.("form.lig-roll-dialog");
+    if (form) refresh(form);
+  };
+
+  document.addEventListener("click", onClick, true);
+  document.addEventListener("input", onInput, true);
+  return () => {
+    document.removeEventListener("click", onClick, true);
+    document.removeEventListener("input", onInput, true);
+  };
 }
 
 /**
@@ -139,44 +212,53 @@ export async function promptRollConfig({
     };
   };
 
-  // DialogV2 (V13+); cai para o Dialog antigo se necessário.
-  const DV2 = foundry?.applications?.api?.DialogV2;
-  if (DV2?.wait) {
-    const out = await DV2.wait({
-      window: { title },
-      content,
-      buttons: [
-        {
-          action: "roll",
-          label: "Rolar",
-          default: true,
-          callback: (event, button) => parse(button.form),
-        },
-        { action: "cancel", label: "Cancelar", callback: () => null },
-      ],
-      rejectClose: false,
-      close: () => null,
-    }).catch(() => null);
-    return out && typeof out === "object" ? out : null;
-  }
+  // Liga os botões − / + e a pré-visualização enquanto a caixa estiver aberta.
+  const unwire = wireSteppers(improvement);
 
-  return new Promise((resolve) => {
-    const dlg = new Dialog({
-      title,
-      content,
-      buttons: {
-        roll: {
-          label: "Rolar",
-          callback: (html) => {
-            const form = html?.[0]?.querySelector?.("form") || html?.querySelector?.("form");
-            resolve(parse(form));
+  try {
+    // DialogV2 (V13+); cai para o Dialog antigo se necessário.
+    const DV2 = foundry?.applications?.api?.DialogV2;
+    if (DV2?.wait) {
+      const out = await DV2.wait({
+        window: { title },
+        classes: ["ligeia", "lig-roll-dialog-window"],
+        content,
+        buttons: [
+          {
+            action: "roll",
+            label: "Rolar",
+            icon: "fas fa-dice",
+            default: true,
+            callback: (event, button) => parse(button.form),
           },
+          { action: "cancel", label: "Cancelar", icon: "fas fa-times", callback: () => null },
+        ],
+        rejectClose: false,
+        close: () => null,
+      }).catch(() => null);
+      return out && typeof out === "object" ? out : null;
+    }
+
+    return await new Promise((resolve) => {
+      const dlg = new Dialog({
+        title,
+        content,
+        buttons: {
+          roll: {
+            label: "Rolar",
+            callback: (html) => {
+              const form = html?.[0]?.querySelector?.("form") || html?.querySelector?.("form");
+              resolve(parse(form));
+            },
+          },
+          cancel: { label: "Cancelar", callback: () => resolve(null) },
         },
-        cancel: { label: "Cancelar", callback: () => resolve(null) },
-      },
-      default: "roll",
-      close: () => resolve(null),
+        default: "roll",
+        close: () => resolve(null),
+      }, { classes: ["ligeia", "lig-roll-dialog-window"] });
+      dlg.render(true);
     });
-    dlg.render(true);
-  });
+  } finally {
+    unwire();
+  }
 }
