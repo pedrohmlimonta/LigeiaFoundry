@@ -33,7 +33,8 @@
       Lista de Habilidades concedidas
       {{#if editable}}<button type="button" class="lig-mini-btn" data-action="addListItem">+ habilidade</button>{{/if}}
     </div>
-    <p class="lig-hint">Arraste uma habilidade para cá, ou digite o nome. Habilidades nesta lista têm custo de XP normal; fora da lista, o custo dobra.</p>
+    <p class="lig-hint">Habilidades nesta lista têm custo de XP normal; fora da lista, o custo dobra.</p>
+    {{#if editable}}<div class="lig-def-drop">⇩ Arraste uma <strong>Habilidade</strong> para cá (ou digite o nome abaixo)</div>{{/if}}
     {{#each system.skillList as |skill i|}}
     <div class="lig-skilllist-row">
       <input type="text" name="system.skillList.{{i}}" value="{{skill}}" placeholder="Nome da habilidade"/>
@@ -47,7 +48,8 @@
   {{!-- Traços concedidos automaticamente --}}
   <div class="lig-granttraits-block">
     <div class="lig-section-title">Traços concedidos</div>
-    <p class="lig-hint">Arraste um traço para cá. Esses traços são adicionados automaticamente ao personagem quando esta definição é colocada na ficha.</p>
+    <p class="lig-hint">Esses traços são adicionados automaticamente ao personagem quando esta definição é colocada na ficha.</p>
+    {{#if editable}}<div class="lig-def-drop">⇩ Arraste um <strong>Traço</strong> para cá</div>{{/if}}
     {{#each system.grantedTraits as |trait i|}}
     <div class="lig-granttrait-row">
       <img class="lig-item-icon" src="{{trait.img}}" alt=""/>

@@ -1478,3 +1478,21 @@
   font-style: italic;
   text-align: center;
 }
+
+/* Zonas de soltura das definições (raça, vocação, herança, carreira, organização) */
+.lig-def-drop {
+  border: 1px dashed var(--lig-border);
+  border-radius: 4px;
+  padding: 0.5rem;
+  margin: 0.3rem 0;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--lig-ink-soft);
+  background: var(--lig-bg-deep);
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+.lig-def-drop.dragover {
+  border-color: var(--lig-gold-soft);
+  color: var(--lig-ink);
+  background: rgba(212, 166, 73, 0.1);
+}

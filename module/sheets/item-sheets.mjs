@@ -770,23 +770,43 @@ export class DefinicaoSheet extends LigeiaItemSheetBase {
     return ctx;
   }
 
-  /** @override Liga o DragDrop após renderizar (V13 não faz sozinho). */
+  /**
+   * @override Liga o drag & drop com ouvintes NATIVOS.
+   *
+   * Antes usávamos a classe DragDrop com `dropSelector: null`, contando com o
+   * comportamento "se não houver seletor, liga na raiz". Isso é frágil (e não
+   * funcionava), então agora ligamos `dragover`/`drop` direto no elemento da
+   * ficha. O elemento-raiz persiste entre renders, então usamos uma marca no
+   * dataset para não empilhar ouvintes duplicados.
+   */
   _onRender(context, options) {
     super._onRender(context, options);
     const root = this.element;
     if (!root) return;
-    const DragDropCls =
-      foundry.applications.ux?.DragDrop?.implementation ||
-      foundry.applications.ux?.DragDrop;
-    if (!DragDropCls) return;
-    // Religa a cada render (o elemento muda no re-render do submitOnChange).
-    const dd = new DragDropCls({
-      dragSelector: null,
-      dropSelector: null,
-      permissions: { drop: () => this.isEditable },
-      callbacks: { drop: this._onDropSkill.bind(this) },
+    if (root.dataset.ligDefDropBound === "1") return;
+    root.dataset.ligDefDropBound = "1";
+
+    const zones = () => Array.from(root.querySelectorAll(".lig-def-drop"));
+    const highlight = (on) => zones().forEach((z) => z.classList.toggle("dragover", on));
+
+    root.addEventListener("dragover", (event) => {
+      if (!this.isEditable) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+      highlight(true);
     });
-    dd.bind(root);
+    root.addEventListener("dragleave", (event) => {
+      // Só apaga o destaque ao sair de fato da ficha.
+      if (event.relatedTarget && root.contains(event.relatedTarget)) return;
+      highlight(false);
+    });
+    root.addEventListener("drop", async (event) => {
+      highlight(false);
+      if (!this.isEditable) return;
+      event.preventDefault();
+      event.stopPropagation();
+      await this._onDropSkill(event);
+    });
   }
 
   /**
@@ -797,18 +817,27 @@ export class DefinicaoSheet extends LigeiaItemSheetBase {
    *    serão criados na ficha do personagem ao inserir esta definição).
    */
   async _onDropSkill(event) {
-    let data;
+    // Extrai os dados do arraste pela API do Foundry (com fallback manual).
+    let data = null;
     try {
-      data = JSON.parse(event.dataTransfer.getData("text/plain"));
-    } catch (e) {
+      const TE = foundry.applications?.ux?.TextEditor?.implementation || globalThis.TextEditor;
+      if (TE?.getDragEventData) data = TE.getDragEventData(event);
+    } catch (e) { data = null; }
+    if (!data) {
+      try { data = JSON.parse(event.dataTransfer?.getData("text/plain") || "null"); }
+      catch (e) { data = null; }
+    }
+    if (!data) return;
+    if (data.type !== "Item") {
+      ui.notifications?.warn("Arraste uma Habilidade ou um Traço.");
       return;
     }
-    if (data?.type !== "Item") return;
 
     let dropped;
     try {
       dropped = await Item.implementation.fromDropData(data);
     } catch (e) {
+      console.warn("Ligeia | não foi possível ler o item arrastado:", e);
       return;
     }
     if (!dropped) return;
@@ -843,6 +872,6 @@ export class DefinicaoSheet extends LigeiaItemSheetBase {
       return;
     }
 
-    ui.notifications?.warn("Arraste uma Habilidade ou um Traço.");
+    ui.notifications?.warn(`"${dropped.name}" é do tipo "${dropped.type}". Arraste uma Habilidade ou um Traço.`);
   }
 }
