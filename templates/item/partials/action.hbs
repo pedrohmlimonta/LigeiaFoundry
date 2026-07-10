@@ -426,6 +426,10 @@
             <input type="checkbox" name="system.actions.{{i}}.animEnabled" {{checked act.animEnabled}}/>
             Ativa
           </label>
+          <label class="lig-inline-check" title="Prende o efeito ao token, para que acompanhe o movimento. Ações que movem tokens já fazem isso automaticamente.">
+            <input type="checkbox" name="system.actions.{{i}}.animAttach" {{checked act.animAttach}}/>
+            Acompanhar o token
+          </label>
           {{#if ../seqActive}}
           <button type="button" class="lig-mini-btn" data-action="openAnimDb" title="Procurar efeitos disponíveis">🔎 Procurar</button>
           <button type="button" class="lig-mini-btn" data-action="testAnim" data-action-index="{{i}}" title="Testar com o token selecionado e os alvos atuais">▶ Testar</button>

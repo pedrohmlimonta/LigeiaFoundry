@@ -229,6 +229,9 @@ export function actionEntryField() {
     }),
     animScale: new fields.NumberField({ initial: 1, min: 0.1 }),
     animEnabled: new fields.BooleanField({ initial: true }),
+    // Prende o efeito ao token (acompanha o movimento). Ações que MOVEM
+    // tokens já prendem automaticamente; isto força também nas demais.
+    animAttach: new fields.BooleanField({ initial: false }),
     // Custo da ação ao ser executada (descontado do personagem). 0 = grátis.
     costMp: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
     costHp: new fields.NumberField({ initial: 0, integer: true, min: 0 }),

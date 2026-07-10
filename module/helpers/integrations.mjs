@@ -46,7 +46,7 @@ export function openSequencerDatabase() {
  *   animação configurada ou o Sequencer não está disponível (para permitir
  *   fallback para a animação geral do item via Automated Animations).
  */
-export function playSequencerAnimation({ actor, action, targetActors = [] } = {}) {
+export function playSequencerAnimation({ actor, action, targetActors = [], attach = false } = {}) {
   try {
     if (!action) return false;
     const file = (action.animFile || "").trim();
@@ -66,20 +66,37 @@ export function playSequencerAnimation({ actor, action, targetActors = [] } = {}
 
     const placement = action.animPlacement || "target";
     const scale = Number(action.animScale) || 1;
+    // Prende o efeito ao token (acompanha o movimento) quando pedido pela ação
+    // ou quando a ação move tokens.
+    const doAttach = !!attach || !!action.animAttach;
     const seq = new globalThis.Sequence();
+
+    /** Ancora o efeito num token: preso (segue) ou fixo na posição atual. */
+    const anchor = (fx, token) => {
+      if (doAttach && typeof fx.attachTo === "function") {
+        try { return fx.attachTo(token); }
+        catch (e) { console.warn("Ligeia | attachTo indisponível; usando atLocation:", e); }
+      }
+      return fx.atLocation(token);
+    };
 
     if (placement === "cast" || targets.length === 0) {
       // No conjurador (ou sem alvos, toca na origem).
-      seq.effect().file(file).atLocation(sourceToken).scale(scale);
+      anchor(seq.effect().file(file), sourceToken).scale(scale);
     } else if (placement === "ranged") {
-      // Projétil do conjurador até cada alvo.
+      // Projétil do conjurador até cada alvo. Preso, as duas pontas seguem.
       for (const t of targets) {
-        seq.effect().file(file).atLocation(sourceToken).stretchTo(t).scale(scale);
+        const fx = anchor(seq.effect().file(file), sourceToken);
+        try {
+          fx.stretchTo(t, doAttach ? { attachTo: true } : {}).scale(scale);
+        } catch (e) {
+          fx.stretchTo(t).scale(scale);
+        }
       }
     } else {
       // "target": toca sobre cada alvo.
       for (const t of targets) {
-        seq.effect().file(file).atLocation(t).scale(scale);
+        anchor(seq.effect().file(file), t).scale(scale);
       }
     }
     seq.play();
@@ -95,8 +112,10 @@ export function playSequencerAnimation({ actor, action, targetActors = [] } = {}
  * Sequencer); se a ação não tiver uma, cai para a animação geral do item via
  * Automated Animations.
  */
-export async function playActionAnimation({ actor, item, action = null, targetActors = [] } = {}) {
+export async function playActionAnimation({ actor, item, action = null, targetActors = [], attach = false } = {}) {
   // 1) Animação PUXADA do item para a ação (cópia visual, sem digitar).
+  //    O Automated Animations controla ele mesmo se o efeito segue o token
+  //    (opção de "attach" na configuração dele) — aqui só controlamos QUANDO.
   const cfg = action?.aaConfig;
   const hasPulled =
     action?.aaEnabled !== false &&
@@ -106,7 +125,7 @@ export async function playActionAnimation({ actor, item, action = null, targetAc
     return;
   }
   // 2) Animação própria da ação por caminho (Sequencer, avançado).
-  const played = playSequencerAnimation({ actor, action, targetActors });
+  const played = playSequencerAnimation({ actor, action, targetActors, attach });
   if (played) return;
   // 3) Fallback: animação geral do item (Automated Animations).
   await playAutomatedAnimation({ actor, item, action: null, targetActors });

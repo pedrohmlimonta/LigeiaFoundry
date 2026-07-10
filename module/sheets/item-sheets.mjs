@@ -518,7 +518,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       appliesEffects: [], range: 0, area: 0, costMp: 0, costHp: 0, costHeroic: 0,
       persistArea: false, persistRounds: 1, persistAffectsSelf: false,
       persistRerollAttack: false, persistTrigger: "both",
-      animFile: "", animPlacement: "target", animScale: 1, animEnabled: true,
+      animFile: "", animPlacement: "target", animScale: 1, animEnabled: true, animAttach: false,
       movement: { enabled: false, kind: "push", who: "targets", distance: 0, lateralSide: "right", ignoreWalls: false, snap: true },
     });
   }

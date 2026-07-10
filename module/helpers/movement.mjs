@@ -369,12 +369,16 @@ function directionalDestination(mv, moverC, refC) {
  * conjurador.
  *
  * @param {object}   opts
- * @param {Actor}    opts.caster   quem executa a ação
- * @param {object}   opts.action   a ação
- * @param {Array}    opts.hits     [{ actor, acertou, isSelf }]
+ * @param {Actor}    opts.caster        quem executa a ação
+ * @param {object}   opts.action        a ação
+ * @param {Array}    opts.hits          [{ actor, acertou, isSelf }]
+ * @param {boolean}  opts.actionOk      a ação teve sucesso (CD/defesa)?
+ * @param {Function} [opts.onBeforeMove] chamado UMA vez, logo antes do
+ *   primeiro movimento de fato (após escolher o destino) — usado para tocar a
+ *   animação presa ao token, de modo que ela acompanhe o deslocamento.
  * @returns {Promise<string>} HTML com as linhas para o chat
  */
-export async function executeActionMovement({ caster, action, hits = [], actionOk = true }) {
+export async function executeActionMovement({ caster, action, hits = [], actionOk = true, onBeforeMove = null }) {
   const mv = action?.movement;
   if (!mv?.enabled) return "";
   if (!canvas?.ready) return "";
@@ -391,8 +395,17 @@ export async function executeActionMovement({ caster, action, hits = [], actionO
   // Alvos atingidos que não são o próprio conjurador.
   const hitTargets = hits.filter((h) => h.acertou && !h.isSelf).map((h) => h.actor);
 
+  let animPlayed = false;
+  /** Toca a animação (uma única vez) imediatamente antes do 1º movimento. */
+  const fireAnim = () => {
+    if (animPlayed) return;
+    animPlayed = true;
+    try { onBeforeMove?.(); } catch (e) { console.warn("Ligeia | erro ao tocar animação do movimento:", e); }
+  };
+
   /** Move um token para um centro, tratando paredes e permissão. */
   const doMove = async (tokenDoc, destCenter, nameLabel) => {
+    fireAnim();
     let dest = mv.snap === false ? destCenter : snapCenter(destCenter);
     let blocked = false;
     if (!ignoreWalls) {

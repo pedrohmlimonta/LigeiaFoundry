@@ -938,12 +938,15 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
 
   // Integração de animação: prioriza a animação PRÓPRIA da ação (Sequencer);
   // se não houver, usa a animação geral do item (Automated Animations).
-  playActionAnimation({
-    actor,
-    item,
-    action,
-    targetActors: affected.filter((x) => !x.isSelf).map((x) => x.actor),
-  });
+  //
+  // Quando a ação MOVE tokens, adiamos a animação para o instante do
+  // movimento e a prendemos aos tokens (attachTo), de modo que ela acompanhe
+  // o deslocamento. Ver o bloco de movimento mais abaixo.
+  const animTargets = affected.filter((x) => !x.isSelf).map((x) => x.actor);
+  const movesTokens = !!action.movement?.enabled;
+  if (!movesTokens) {
+    playActionAnimation({ actor, item, action, targetActors: animTargets });
+  }
 
   // Cabeçalho do ataque (atacante) — usado na 1ª mensagem.
   // Mostra o resultado da CD no cabeçalho apenas quando NÃO há alvos
@@ -1119,8 +1122,19 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
       else if (others.length) actionOk = others.some((h) => h.acertou);
       else if (selfEntry) actionOk = selfEntry.acertou;
       else actionOk = atkTotal >= fixedDC;
-      const moveLines = await executeActionMovement({ caster: actor, action, hits, actionOk });
+      const moveLines = await executeActionMovement({
+        caster: actor,
+        action,
+        hits,
+        actionOk,
+        // Toca a animação PRESA aos tokens no instante do movimento, para que
+        // ela acompanhe o deslize / vá junto no teleporte.
+        onBeforeMove: () => playActionAnimation({ actor, item, action, targetActors: animTargets, attach: true }),
+      });
       if (moveLines) lines.push(moveLines);
+      // Se nada se moveu (falhou a CD/defesa, ou o jogador cancelou a escolha
+      // do destino), a animação ainda toca — só que sem prender a ninguém.
+      if (!moveLines) playActionAnimation({ actor, item, action, targetActors: animTargets });
     } catch (e) {
       console.warn("Ligeia | falha no efeito de movimento:", e);
     }
