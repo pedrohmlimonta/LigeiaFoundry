@@ -125,29 +125,29 @@ const FORCED_NOWALLS = "ligeiaForcedNoWalls";
  */
 export function registerForcedMovementActions() {
   const actions = CONFIG?.Token?.movement?.actions;
-  if (!actions) return;
-  const common = {
+  if (!actions || typeof actions !== "object") return;
+  // Cada entrada é um Partial<TokenMovementActionConfig>: o Foundry preenche o
+  // que faltar com os padrões. Definimos apenas o essencial e mantemos os
+  // padrões seguros para o resto (custo = identidade, etc.).
+  const make = (label, walls) => ({
+    label,
+    icon: "fa-solid fa-hand-back-fist",
+    img: null,
     order: 90,
-    teleport: false,   // percorre o caminho (anima), não salta
-    measure: false,    // não consome o deslocamento do alvo
+    teleport: false,        // percorre o caminho (anima), não salta
+    measure: false,         // não consome o deslocamento do alvo
+    walls,                  // "move" barra em paredes; null atravessa
     visualize: true,
-    canSelect: () => false,  // não aparece para o usuário escolher
-    getCostFunction: () => () => 0,
+    // Não é selecionável pelo usuário (uso interno dos efeitos).
+    canSelect: () => false,
+    deriveTerrainDifficulty: null,
+    // Mantém o custo padrão (identidade) — NÃO zera, para não quebrar a medição.
+    getCostFunction: () => (cost) => cost,
     getAnimationOptions: () => ({}),
-  };
+  });
   try {
-    actions[FORCED_WALLS] = {
-      ...common,
-      label: "Movimento forçado",
-      icon: "fa-solid fa-hand-back-fist",
-      walls: "move",   // barrado por paredes
-    };
-    actions[FORCED_NOWALLS] = {
-      ...common,
-      label: "Movimento forçado (atravessa)",
-      icon: "fa-solid fa-hand-sparkles",
-      walls: null,     // atravessa paredes
-    };
+    actions[FORCED_WALLS] = make("Movimento forçado", "move");
+    actions[FORCED_NOWALLS] = make("Movimento forçado (atravessa)", null);
   } catch (e) {
     console.warn("Ligeia | não foi possível registrar as ações de movimento:", e);
   }
@@ -495,12 +495,18 @@ export async function executeActionMovement({ caster, action, hits = [], actionO
  */
 export function registerMovementHooks() {
   Hooks.on("preUpdateToken", (tokenDoc, changed, options) => {
-    if (!("x" in changed) && !("y" in changed)) return;
-    if (options?.ligeiaForced) return;     // movimento forçado pela ação
-    if (game.user.isGM) return;            // o Mestre sempre pode mover
-    const conds = tokenDoc.actor?.system?.conditions || [];
-    if (!conds.includes("telecinese")) return;
-    ui.notifications?.warn(`${tokenDoc.name} está sob Telecinese e não pode se mover sozinho.`);
-    return false;
+    try {
+      if (!("x" in changed) && !("y" in changed)) return;
+      if (options?.ligeiaForced) return;     // movimento forçado pela ação
+      if (game.user?.isGM) return;           // o Mestre sempre pode mover
+      const conds = tokenDoc?.actor?.system?.conditions || [];
+      if (!Array.isArray(conds) || !conds.includes("telecinese")) return;
+      ui.notifications?.warn(`${tokenDoc.name} está sob Telecinese e não pode se mover sozinho.`);
+      return false;
+    } catch (e) {
+      // Em caso de erro, NUNCA bloqueia o movimento normal.
+      console.error("Ligeia | erro no hook de Telecinese (movimento liberado):", e);
+      return;
+    }
   });
 }

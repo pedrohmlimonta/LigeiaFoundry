@@ -58,11 +58,6 @@ Hooks.once("init", function () {
   CONFIG.Item.documentClass = LigeiaItem;
   CONFIG.Combatant.documentClass = LigeiaCombatant;
 
-  // Rastro de movimento colorido pelo Deslocamento (verde/amarelo/vermelho).
-  registerTokenRuler();
-  // Ações de movimento forçado (empurrão/puxão/telecinese) — deslize animado.
-  registerForcedMovementActions();
-
   // DataModels — Actors
   CONFIG.Actor.dataModels = {
     personagem: PersonagemData,
@@ -306,6 +301,21 @@ Hooks.once("init", function () {
     return args.slice(0, -1).some(Boolean);
   });
 
+  // ---- Integrações de canvas (isoladas: nunca podem abortar o init) ----
+  // Rodam por ÚLTIMO e cada uma em seu try/catch, para que uma falha aqui
+  // jamais impeça o registro das fichas/DataModels acima (o que faria a ficha
+  // do jogador "sumir").
+  try {
+    registerTokenRuler();
+  } catch (e) {
+    console.error("Ligeia | falha ao registrar o medidor de movimento (ignorado):", e);
+  }
+  try {
+    registerForcedMovementActions();
+  } catch (e) {
+    console.error("Ligeia | falha ao registrar as ações de movimento (ignorado):", e);
+  }
+
   console.log("Ligeia RPG | Sistema inicializado (Fase 4: listas e XP)");
 });
 
@@ -314,13 +324,18 @@ Hooks.once("init", function () {
 /* ------------------------------------------------------------------ */
 Hooks.once("ready", function () {
   console.log("Ligeia RPG | Pronto");
+  // Cada registro é isolado: uma falha não impede os demais.
+  const safe = (label, fn) => {
+    try { fn(); }
+    catch (e) { console.error(`Ligeia | falha em ${label} (ignorado):`, e); }
+  };
   // Ativa as emanações (áreas/auras persistentes com disparo por turno).
-  registerEmanationHooks();
+  safe("emanações", registerEmanationHooks);
   // Rolagens automáticas de fim de efeito no início do turno.
-  registerTurnEffectHooks();
+  safe("efeitos de turno", registerTurnEffectHooks);
   // Efeitos de movimento: trava da Telecinese e receptor de pedidos ao Mestre.
-  registerMovementHooks();
-  registerMovementSocket();
+  safe("hooks de movimento", registerMovementHooks);
+  safe("socket de movimento", registerMovementSocket);
 });
 
 /* ------------------------------------------------------------------ */
