@@ -31,6 +31,7 @@ const TAB_DEFS = [
   { id: "atributos", label: "Atributos", icon: "fa-solid fa-dice-d20" },
   { id: "equipamentos", label: "Equipamentos", icon: "fa-solid fa-toolbox" },
   { id: "habilidades", label: "Habilidades", icon: "fa-solid fa-hand-fist" },
+  { id: "complicacoes", label: "Complicações", icon: "fa-solid fa-heart-crack" },
   { id: "magias", label: "Magias", icon: "fa-solid fa-wand-magic-sparkles" },
   { id: "tracos", label: "Traços", icon: "fa-solid fa-fingerprint" },
   { id: "efeitos", label: "Efeitos & Condições", icon: "fa-solid fa-bolt" },
@@ -38,7 +39,7 @@ const TAB_DEFS = [
 ];
 
 /** Tipos de item favoritáveis e seus rótulos na aba de favoritos. */
-const FAV_KINDS = { habilidade: "Habilidade", magia: "Magia", equipamento: "Equipamento", traco: "Traço" };
+const FAV_KINDS = { habilidade: "Habilidade", complicacao: "Complicação", magia: "Magia", equipamento: "Equipamento", traco: "Traço" };
 
 /** Lê uma flag do módulo de forma segura (funciona fora do Foundry também). */
 function getFlag(doc, key) {
@@ -117,6 +118,7 @@ class LigeiaFichaElegante extends LigeiaCharacterSheet {
       favoritos: context.favCount,
       equipamentos: (g.equipamento ?? []).length,
       habilidades: (g.habilidade ?? []).length,
+      complicacoes: (g.complicacao ?? []).length,
       magias: (g.magia ?? []).length,
       tracos: (g.traco ?? []).length,
       efeitos: (context.appliedEffects ?? []).length + (context.activeConditionCount ?? 0),

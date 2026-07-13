@@ -688,6 +688,30 @@ export class HabilidadeSheet extends LigeiaItemSheetBase {
 }
 
 /* ================================================================== */
+/*  Complicação                                                        */
+/*  Igual à habilidade, mas CONCEDE XP em vez de custar.               */
+/* ================================================================== */
+export class ComplicacaoSheet extends LigeiaItemSheetBase {
+  static DEFAULT_OPTIONS = foundry.utils.mergeObject(
+    LigeiaItemSheetBase.DEFAULT_OPTIONS,
+    { classes: ["ligeia", "sheet", "item", "complicacao"] },
+    { inplace: false },
+  );
+  static PARTS = {
+    body: { template: "systems/ligeia-rpg/templates/item/complicacao.hbs" },
+  };
+  async _prepareContext(options) {
+    const ctx = await super._prepareContext(options);
+    ctx.enrichedBasic = await foundry.applications.ux.TextEditor.implementation.enrichHTML(ctx.system.descBasic || "", { secrets: this.document.isOwner });
+    ctx.enrichedAdvanced = await foundry.applications.ux.TextEditor.implementation.enrichHTML(ctx.system.descAdvanced || "", { secrets: this.document.isOwner });
+    ctx.enrichedSpecial = await foundry.applications.ux.TextEditor.implementation.enrichHTML(ctx.system.descSpecial || "", { secrets: this.document.isOwner });
+    // Complicações também têm efeitos vinculados a nível (B/A/E)
+    ctx.showEffectLevel = true;
+    return ctx;
+  }
+}
+
+/* ================================================================== */
 /*  Magia                                                             */
 /* ================================================================== */
 export class MagiaSheet extends LigeiaItemSheetBase {

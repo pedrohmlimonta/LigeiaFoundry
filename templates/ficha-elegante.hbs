@@ -213,11 +213,15 @@
           <span class="lig-xp-label">XP gasto em habilidades</span>
           <span class="lig-xp-value">{{xpSpent}}</span>
         </div>
+        <div class="lig-xp-cell gain">
+          <span class="lig-xp-label">XP ganho com complicações</span>
+          <span class="lig-xp-value">+{{xpGained}}</span>
+        </div>
         <div class="lig-xp-cell {{#if (lt xpAvailable 0)}}negative{{/if}}">
           <span class="lig-xp-label">XP disponível</span>
           <span class="lig-xp-value">{{xpAvailable}}</span>
         </div>
-        <div class="lig-xp-hint">Habilidades fora das suas listas de acesso custam o dobro.</div>
+        <div class="lig-xp-hint">Habilidades fora das suas listas de acesso custam o dobro. Complicações concedem XP extra para gastar.</div>
       </div>
 
       {{!-- Atributos primários --}}
@@ -385,6 +389,37 @@
         {{> systems/ligeia-rpg/templates/actor/partials/item-effects-inline.hbs item=item effectTypeLabels=../../effectTypeLabels effectTargetLabels=../../effectTargetLabels editable=../../editable}}
         {{/with}}
         {{else}}<div class="lig-empty">Nenhuma habilidade.</div>{{/each}}
+      </div>
+    </section>
+
+    {{!-- ======================= COMPLICAÇÕES ======================= --}}
+    <section class="lig-tab-panel {{#if (eq activeTab "complicacoes")}}active{{/if}}" data-tab="complicacoes">
+      <div class="lig-item-group">
+        <div class="lig-item-group-head">
+          <span>Complicações</span>
+          {{#if editable}}<button type="button" class="lig-mini-btn" data-action="itemCreate" data-type="complicacao">+ nova</button>{{/if}}
+        </div>
+        <p class="lig-hint">Complicações funcionam como habilidades, mas CONCEDEM XP em vez de custar: o valor de cada uma é somado ao seu XP disponível.</p>
+        {{#each itemGroups.complicacao as |item|}}
+        {{#with (lookup ../complicationXp item.id) as |gain|}}
+        <div class="lig-item-entry" data-item-id="{{item.id}}" draggable="true">
+          <img class="lig-item-icon" src="{{item.img}}" alt=""/>
+          <span class="lig-item-title">{{item.name}}</span>
+          <span class="lig-item-tag">{{item.system.level}}</span>
+          {{#if gain}}
+          <span class="lig-gain-tag" title="Complicação — concede XP para gastar">+{{gain.xp}} XP</span>
+          {{/if}}
+          {{> systems/ligeia-rpg/templates/actor/partials/item-actions.hbs item=item}}
+          {{#if (eq item.system.mode "active")}}
+          <button type="button" class="lig-item-toggle {{#if item.system.active}}on{{/if}}" data-action="itemToggle" title="Ativar/desativar">{{#if item.system.active}}●{{else}}○{{/if}}</button>
+          {{/if}}
+          <button type="button" class="lig-fav-btn {{#if item.isFav}}on{{/if}}" title="{{#if item.isFav}}Remover dos favoritos{{else}}Favoritar{{/if}}">{{#if item.isFav}}★{{else}}☆{{/if}}</button>
+          <button type="button" class="lig-mini-btn" data-action="itemEdit" title="Editar">✎</button>
+          {{#if ../../editable}}<button type="button" class="lig-mini-btn danger" data-action="itemDelete" title="Remover">✕</button>{{/if}}
+        </div>
+        {{> systems/ligeia-rpg/templates/actor/partials/item-effects-inline.hbs item=item effectTypeLabels=../../effectTypeLabels effectTargetLabels=../../effectTargetLabels editable=../../editable}}
+        {{/with}}
+        {{else}}<div class="lig-empty">Nenhuma complicação.</div>{{/each}}
       </div>
     </section>
 

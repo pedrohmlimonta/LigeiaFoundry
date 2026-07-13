@@ -4,6 +4,7 @@
       "Personagem": "Personagem",
       "Npc": "NPC",
       "Habilidade": "Habilidade",
+      "Complicacao": "Complicação",
       "Magia": "Magia",
       "Equipamento": "Equipamento",
       "Traco": "Traço",
@@ -41,6 +42,7 @@
     },
     "Item": {
       "habilidade": "Habilidade",
+      "complicacao": "Complicação",
       "magia": "Magia",
       "equipamento": "Equipamento",
       "traco": "Traço",

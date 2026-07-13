@@ -40,8 +40,8 @@ export function itemIsOn(item) {
 export function effectIsActive(item, effect) {
   if (!effect || effect.enabled === false) return false;
   if (!itemIsOn(item)) return false;
-  // Nível só se aplica a habilidades
-  if (item.type === "habilidade") {
+  // Nível só se aplica a habilidades e complicações
+  if (item.type === "habilidade" || item.type === "complicacao") {
     return levelMeets(item.system?.level || "B", effect.level || "all");
   }
   return true;

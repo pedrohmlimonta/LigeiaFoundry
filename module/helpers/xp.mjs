@@ -104,3 +104,41 @@ export function computeXpSpent(actor) {
   }
   return { spent, perSkill };
 }
+
+/**
+ * XP CONCEDIDO por uma complicação conforme o nível.
+ * Prioriza os valores definidos NO PRÓPRIO item (xpBasic/xpAdvanced/
+ * xpSpecial); se forem 0, cai na tabela padrão do CONFIG.
+ *
+ * @param {Item} compItem  item do tipo "complicacao"
+ * @param {string} level  "B" | "A" | "E"
+ * @returns {number}
+ */
+export function baseComplicationXp(compItem, level) {
+  const table = CONFIG.LIGEIA?.complicationXp || { B: 20, A: 40, E: 80 };
+  const sys = compItem?.system || {};
+  const perItem = { B: sys.xpBasic, A: sys.xpAdvanced, E: sys.xpSpecial };
+  const custom = Number(perItem[level]) || 0;
+  if (custom > 0) return custom;
+  return table[level] ?? 0;
+}
+
+/**
+ * Soma o XP CONCEDIDO por todas as complicações do ator. Complicações são
+ * o inverso das habilidades: em vez de custar XP, cada uma ADICIONA o seu
+ * valor ao total de XP disponível do personagem.
+ *
+ * @param {Actor} actor
+ * @returns {{ gained: number, perComplication: Array }}
+ */
+export function computeXpGained(actor) {
+  let gained = 0;
+  const perComplication = [];
+  for (const item of actor.items) {
+    if (item.type !== "complicacao") continue;
+    const xp = baseComplicationXp(item, item.system?.level || "B");
+    gained += xp;
+    perComplication.push({ id: item.id, name: item.name, xp });
+  }
+  return { gained, perComplication };
+}

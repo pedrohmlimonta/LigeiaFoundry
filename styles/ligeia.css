@@ -773,6 +773,7 @@
 }
 
 .lig-xp-cell.negative .lig-xp-value { color: #e8908a; }
+.lig-xp-cell.gain .lig-xp-value { color: #c9aef5; }
 
 .lig-xp-label {
   font-size: 0.62rem;
@@ -816,6 +817,18 @@
   background: rgba(200,60,60,0.22);
   color: #f0a8a0;
   border: 1px solid rgba(200,60,60,0.5);
+}
+
+/* Etiqueta de XP CONCEDIDO por complicações (violeta, com sinal +) */
+.lig-gain-tag {
+  font-size: 0.62rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 8px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  background: rgba(140,90,220,0.22);
+  color: #c9aef5;
+  border: 1px solid rgba(140,90,220,0.5);
 }
 
 /* =====================================================

@@ -5,7 +5,7 @@ import { rollLigeia, postRollToChat, rollItemAction, resolveAttr, rerollFor, cri
 import { rollSingleEndEffect } from "../helpers/turn-effects.mjs";
 import { promptRollConfig, shouldPromptRoll, currentTargetActors } from "../apps/roll-dialog.mjs";
 import { placeTemplateForAction } from "../helpers/template.mjs";
-import { computeXpSpent } from "../helpers/xp.mjs";
+import { computeXpSpent, computeXpGained } from "../helpers/xp.mjs";
 import { effectIsActive } from "../helpers/effects.mjs";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -131,6 +131,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     // Agrupa itens embutidos por tipo
     const groups = {
       habilidade: [],
+      complicacao: [],
       magia: [],
       equipamento: [],
       traco: [],
@@ -242,11 +243,17 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
 
     // ---- Cálculo de XP gasto (com regra de dobro fora da lista) ----
     const xp = computeXpSpent(actor);
+    // ---- XP concedido pelas complicações (somado ao disponível) ----
+    const gain = computeXpGained(actor);
     context.xpSpent = xp.spent;
-    context.xpAvailable = (sys.details.xp || 0) - xp.spent;
+    context.xpGained = gain.gained;
+    context.xpAvailable = (sys.details.xp || 0) + gain.gained - xp.spent;
     // Mapa id → custo, para anotar cada habilidade no template
     context.skillCosts = {};
     for (const s of xp.perSkill) context.skillCosts[s.id] = s;
+    // Mapa id → XP concedido, para anotar cada complicação no template
+    context.complicationXp = {};
+    for (const c of gain.perComplication) context.complicationXp[c.id] = c;
 
     return context;
   }
@@ -614,6 +621,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     const type = target.dataset.type;
     const names = {
       habilidade: "Nova Habilidade",
+      complicacao: "Nova Complicação",
       magia: "Nova Magia",
       equipamento: "Novo Equipamento",
       traco: "Novo Traço",

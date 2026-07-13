@@ -57,6 +57,45 @@ export class HabilidadeData extends foundry.abstract.TypeDataModel {
 }
 
 /* ================================================================== */
+/*  COMPLICAÇÃO                                                        */
+/*  Funciona como uma habilidade, mas em vez de CUSTAR XP ela CONCEDE  */
+/*  XP ao personagem (somado ao disponível para gastar em habilidades).*/
+/* ================================================================== */
+export class ComplicacaoData extends foundry.abstract.TypeDataModel {
+  static defineSchema() {
+    return {
+      // Nível/severidade da complicação (mesma escala das habilidades)
+      level: new fields.StringField({
+        required: true,
+        initial: "B",
+        choices: ["B", "A", "E"],
+      }),
+      // XP CONCEDIDO por nível (0 = usa a tabela padrão do sistema,
+      // CONFIG.LIGEIA.complicationXp).
+      xpBasic: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+      xpAdvanced: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+      xpSpecial: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+      // Pré-requisito textual (ex: "Mente 4+")
+      prereq: new fields.StringField({ blank: true, initial: "" }),
+      // Listas a que pertence (texto livre separado por vírgula)
+      lists: new fields.StringField({ blank: true, initial: "" }),
+      // Ativação (Ação, Reação, etc.) — se a complicação tiver uso ativo
+      activation: new fields.StringField({ blank: true, initial: "" }),
+      ...slotFields(),
+      // Descrições por nível
+      descBasic: new fields.HTMLField({ blank: true, initial: "" }),
+      descAdvanced: new fields.HTMLField({ blank: true, initial: "" }),
+      descSpecial: new fields.HTMLField({ blank: true, initial: "" }),
+      actions: actionsField(),
+      ...activatableFields(),
+    };
+  }
+  static migrateData(source) {
+    return migrateFlatActionToArray(migrateEffectTargets(super.migrateData(source)));
+  }
+}
+
+/* ================================================================== */
 /*  MAGIA                                                              */
 /* ================================================================== */
 export class MagiaData extends foundry.abstract.TypeDataModel {

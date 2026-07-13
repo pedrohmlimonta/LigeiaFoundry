@@ -34,6 +34,7 @@
     },
     "Item": {
       "habilidade": {},
+      "complicacao": {},
       "magia": {},
       "equipamento": {},
       "traco": {},

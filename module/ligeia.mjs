@@ -15,6 +15,7 @@ import { registerMovementHooks, registerMovementSocket, registerForcedMovementAc
 import { registerTurnEffectHooks } from "./helpers/turn-effects.mjs";
 import {
   HabilidadeSheet,
+  ComplicacaoSheet,
   MagiaSheet,
   EquipamentoSheet,
   TracoSheet,
@@ -23,6 +24,7 @@ import {
 import { PersonagemData, NpcData } from "./data/actor-data.mjs";
 import {
   HabilidadeData,
+  ComplicacaoData,
   MagiaData,
   EquipamentoData,
   TracoData,
@@ -70,6 +72,7 @@ Hooks.once("init", function () {
   // DataModels — Items
   CONFIG.Item.dataModels = {
     habilidade: HabilidadeData,
+    complicacao: ComplicacaoData,
     magia: MagiaData,
     equipamento: EquipamentoData,
     traco: TracoData,
@@ -84,6 +87,9 @@ Hooks.once("init", function () {
   CONFIG.LIGEIA = {
     // Custo de XP por nível de habilidade
     skillCost: { B: 20, A: 40, E: 80 },
+    // XP CONCEDIDO por nível de complicação (o inverso do custo de
+    // habilidade: complicações DÃO XP em vez de gastar)
+    complicationXp: { B: 20, A: 40, E: 80 },
     // Multiplicador quando a habilidade está fora das listas conhecidas
     offListMultiplier: 2,
     // 28 palavras arcanas
@@ -270,6 +276,9 @@ Hooks.once("init", function () {
   // Folhas de Item
   DSC.registerSheet(Item, "ligeia-rpg", HabilidadeSheet, {
     types: ["habilidade"], makeDefault: true, label: "Ligeia — Habilidade",
+  });
+  DSC.registerSheet(Item, "ligeia-rpg", ComplicacaoSheet, {
+    types: ["complicacao"], makeDefault: true, label: "Ligeia — Complicação",
   });
   DSC.registerSheet(Item, "ligeia-rpg", MagiaSheet, {
     types: ["magia"], makeDefault: true, label: "Ligeia — Magia",
