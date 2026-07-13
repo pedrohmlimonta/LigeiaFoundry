@@ -33,6 +33,7 @@ const TAB_DEFS = [
   { id: "habilidades", label: "Habilidades", icon: "fa-solid fa-hand-fist" },
   { id: "magias", label: "Magias", icon: "fa-solid fa-wand-magic-sparkles" },
   { id: "tracos", label: "Traços", icon: "fa-solid fa-fingerprint" },
+  { id: "complicacoes", label: "Complicações", icon: "fa-solid fa-triangle-exclamation" },
   { id: "efeitos", label: "Efeitos & Condições", icon: "fa-solid fa-bolt" },
   { id: "notas", label: "Personalidade & Notas", icon: "fa-solid fa-feather" },
 ];
@@ -119,6 +120,7 @@ class LigeiaFichaElegante extends LigeiaCharacterSheet {
       habilidades: (g.habilidade ?? []).length,
       magias: (g.magia ?? []).length,
       tracos: (g.traco ?? []).length,
+      complicacoes: (g.complicacao ?? []).length,
       efeitos: (context.appliedEffects ?? []).length + (context.activeConditionCount ?? 0),
     };
     context.activeTab = this.#activeTab;

@@ -1504,3 +1504,15 @@
   border: 1px solid rgba(70, 160, 70, 0.5);
 }
 .lig-xp-cell .lig-xp-value { white-space: nowrap; }
+
+/* Tag de XP concedido (complicações) na lista de itens */
+.lig-item-tag.xp,
+.lig-cost-tag.reward {
+  background: rgba(46, 139, 87, 0.2);
+  color: var(--lig-green);
+  border: 1px solid var(--lig-green);
+  border-radius: 3px;
+  padding: 0 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+}

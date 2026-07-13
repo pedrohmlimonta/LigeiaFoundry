@@ -438,6 +438,31 @@
       </div>
     </section>
 
+    {{!-- ==================== COMPLICAÇÕES ==================== --}}
+    <section class="lig-tab-panel {{#if (eq activeTab "complicacoes")}}active{{/if}}" data-tab="complicacoes">
+      <div class="lig-item-group">
+        <div class="lig-item-group-head">
+          <span>Complicações</span>
+          {{#if editable}}<button type="button" class="lig-mini-btn" data-action="itemCreate" data-type="complicacao">+ nova</button>{{/if}}
+        </div>
+        <p class="lig-hint">Complicações são efeitos negativos que concedem XP em vez de consumi-lo.</p>
+        {{#each itemGroups.complicacao as |item|}}
+        <div class="lig-item-entry" data-item-id="{{item.id}}" draggable="true">
+          <img class="lig-item-icon" src="{{item.img}}" alt=""/>
+          <span class="lig-item-title">{{item.name}}</span>
+          {{#if item.system.xpReward}}<span class="lig-item-tag xp">+{{item.system.xpReward}} XP</span>{{/if}}
+          {{> systems/ligeia-rpg/templates/actor/partials/item-actions.hbs item=item}}
+          {{#if (eq item.system.mode "active")}}
+          <button type="button" class="lig-item-toggle {{#if item.system.active}}on{{/if}}" data-action="itemToggle" title="Ativar/desativar">{{#if item.system.active}}●{{else}}○{{/if}}</button>
+          {{/if}}
+          <button type="button" class="lig-mini-btn" data-action="itemEdit" title="Editar">✎</button>
+          {{#if ../editable}}<button type="button" class="lig-mini-btn danger" data-action="itemDelete" title="Remover">✕</button>{{/if}}
+        </div>
+        {{> systems/ligeia-rpg/templates/actor/partials/item-effects-inline.hbs item=item effectTypeLabels=../effectTypeLabels effectTargetLabels=../effectTargetLabels editable=../editable}}
+        {{else}}<div class="lig-empty">Nenhuma complicação.</div>{{/each}}
+      </div>
+    </section>
+
     {{!-- ==================== EFEITOS & CONDIÇÕES ==================== --}}
     <section class="lig-tab-panel {{#if (eq activeTab "efeitos")}}active{{/if}}" data-tab="efeitos">
 
