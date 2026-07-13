@@ -104,3 +104,20 @@ export function computeXpSpent(actor) {
   }
   return { spent, perSkill };
 }
+
+/**
+ * XP concedido pelas COMPLICAÇÕES do personagem. Complicações são o oposto de
+ * um custo: cada uma adiciona ao XP disponível do personagem.
+ * @returns {{reward:number, perComplication:Array}}
+ */
+export function computeXpReward(actor) {
+  let reward = 0;
+  const perComplication = [];
+  for (const item of actor.items) {
+    if (item.type !== "complicacao") continue;
+    const value = Math.max(0, Number(item.system?.xpReward) || 0);
+    reward += value;
+    perComplication.push({ id: item.id, name: item.name, value });
+  }
+  return { reward, perComplication };
+}

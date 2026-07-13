@@ -1496,3 +1496,11 @@
   color: var(--lig-ink);
   background: rgba(212, 166, 73, 0.1);
 }
+
+/* Tag de XP concedido pelas complicações */
+.lig-cost-tag.reward {
+  background: rgba(70, 160, 70, 0.25);
+  color: #7ec87e;
+  border: 1px solid rgba(70, 160, 70, 0.5);
+}
+.lig-xp-cell .lig-xp-value { white-space: nowrap; }

@@ -1,0 +1,26 @@
+<div class="ligeia-item-body complicacao">
+  {{> systems/ligeia-rpg/templates/item/partials/header.hbs}}
+
+  <div class="lig-item-row">
+    <label>Origem
+      <select name="system.source">
+        {{selectOptions sourceChoices selected=system.source}}
+      </select>
+    </label>
+    <label title="Quanto de XP esta complicação concede ao personagem.">XP concedido
+      <input type="number" name="system.xpReward" value="{{system.xpReward}}" min="0" step="1"/>
+    </label>
+  </div>
+
+  <div class="lig-desc-block">
+    <div class="lig-section-title">Descrição</div>
+    {{#if editable}}
+    <textarea name="system.description" rows="4">{{system.description}}</textarea>
+    {{else}}<div class="lig-rendered">{{{enrichedDescription}}}</div>{{/if}}
+  </div>
+
+  {{> systems/ligeia-rpg/templates/item/partials/action.hbs}}
+  {{> systems/ligeia-rpg/templates/item/partials/mode.hbs}}
+  {{> systems/ligeia-rpg/templates/item/partials/effects.hbs}}
+  {{> systems/ligeia-rpg/templates/item/partials/costs.hbs}}
+</div>

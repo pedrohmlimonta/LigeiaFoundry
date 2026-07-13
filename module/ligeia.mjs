@@ -5,7 +5,7 @@
 import { LigeiaActor } from "./documents/actor.mjs";
 import { LigeiaItem } from "./documents/item.mjs";
 import { LigeiaCombatant } from "./documents/combatant.mjs";
-import { LigeiaCharacterSheet } from "./sheets/character-sheet.mjs";
+import { LigeiaCharacterSheet, LigeiaNpcSheet } from "./sheets/character-sheet.mjs";
 // Ficha alternativa "Elegante" (abas + barras + favoritos). Agora parte do
 // sistema: importar aqui faz ela se registrar (init) e pré-carregar partials.
 import "./sheets/ficha-elegante.mjs";
@@ -18,6 +18,7 @@ import {
   MagiaSheet,
   EquipamentoSheet,
   TracoSheet,
+  ComplicacaoSheet,
   DefinicaoSheet,
 } from "./sheets/item-sheets.mjs";
 import { PersonagemData, NpcData } from "./data/actor-data.mjs";
@@ -26,6 +27,7 @@ import {
   MagiaData,
   EquipamentoData,
   TracoData,
+  ComplicacaoData,
   RacaData,
   HerancaData,
   VocacaoData,
@@ -73,6 +75,7 @@ Hooks.once("init", function () {
     magia: MagiaData,
     equipamento: EquipamentoData,
     traco: TracoData,
+    complicacao: ComplicacaoData,
     raca: RacaData,
     heranca: HerancaData,
     vocacao: VocacaoData,
@@ -266,6 +269,11 @@ Hooks.once("init", function () {
     makeDefault: false,
     label: "Ligeia — Ficha de Personagem (clássica)",
   });
+  DSC.registerSheet(Actor, "ligeia-rpg", LigeiaNpcSheet, {
+    types: ["npc"],
+    makeDefault: true,
+    label: "Ligeia — Ficha de NPC",
+  });
 
   // Folhas de Item
   DSC.registerSheet(Item, "ligeia-rpg", HabilidadeSheet, {
@@ -279,6 +287,9 @@ Hooks.once("init", function () {
   });
   DSC.registerSheet(Item, "ligeia-rpg", TracoSheet, {
     types: ["traco"], makeDefault: true, label: "Ligeia — Traço",
+  });
+  DSC.registerSheet(Item, "ligeia-rpg", ComplicacaoSheet, {
+    types: ["complicacao"], makeDefault: true, label: "Ligeia — Complicação",
   });
   DSC.registerSheet(Item, "ligeia-rpg", DefinicaoSheet, {
     types: ["raca", "heranca", "vocacao", "organizacao", "carreira"],

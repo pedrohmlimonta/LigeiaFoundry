@@ -272,39 +272,13 @@ export class NpcData extends foundry.abstract.TypeDataModel {
     return migrateEffectTargets(super.migrateData(source));
   }
   static defineSchema() {
-    return {
-      details: new fields.SchemaField({
-        concept: new fields.StringField({ blank: true, initial: "" }),
-        level: new fields.NumberField({ initial: 1, integer: true, min: 1 }),
-        notes: new fields.HTMLField({ blank: true, initial: "" }),
-      }),
-      conditions: new fields.ArrayField(new fields.StringField({ blank: false }), { initial: [] }),
-      appliedEffects: appliedEffectsField(),
-      attributes: new fields.SchemaField({
-        forca: attrField(2),
-        agilidade: attrField(2),
-        vigor: attrField(2),
-        mente: attrField(2),
-        percepcao: attrField(2),
-      }),
-      resources: new fields.SchemaField({
-        hp: new fields.SchemaField({
-          value: new fields.NumberField({ initial: 0, integer: true }),
-          max: new fields.NumberField({ initial: 0, integer: true }),
-          bonus: new fields.NumberField({ initial: 0, integer: true }),
-          temp: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
-        }),
-        mp: resourceField(),
-        heroic: new fields.SchemaField({
-          value: new fields.NumberField({ initial: 0, integer: true }),
-          max: new fields.NumberField({ initial: 0, integer: true }),
-          bonus: new fields.NumberField({ initial: 0, integer: true }),
-        }),
-      }),
-      rollHidden: new fields.BooleanField({ initial: true }),
-      // Não abrir a caixa de configuração antes das rolagens deste ator.
-      skipRollDialog: new fields.BooleanField({ initial: false }),
-    };
+    // NPCs têm os MESMOS campos do personagem (identidade, atributos,
+    // recursos, magia, etc.) — reutilizamos o schema para nunca divergir. A
+    // ficha de NPC é que oculta o que é ligado a XP. Só mudamos o padrão de
+    // rolagem oculta (NPCs rolam ocultos por padrão).
+    const schema = PersonagemData.defineSchema();
+    schema.rollHidden = new fields.BooleanField({ initial: true });
+    return schema;
   }
 
   prepareDerivedData() {

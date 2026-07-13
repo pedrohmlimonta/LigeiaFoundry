@@ -50,26 +50,36 @@
     <label>Nível
       <input type="number" name="system.details.level" value="{{system.details.level}}" min="1" max="6"/>
     </label>
+    {{#unless isNpc}}
     <label>XP total
       <input type="number" name="system.details.xp" value="{{system.details.xp}}" min="0"/>
     </label>
     <label>Corrupção
       <input type="number" name="system.details.corruption" value="{{system.details.corruption}}"/>
     </label>
+    {{/unless}}
   </div>
 
-  {{!-- Painel de XP (gasto vs disponível) --}}
+  {{!-- Painel de XP (gasto vs disponível) — não se aplica a NPCs --}}
+  {{#unless isNpc}}
   <div class="lig-xp-bar">
     <div class="lig-xp-cell">
       <span class="lig-xp-label">XP gasto em habilidades</span>
       <span class="lig-xp-value">{{xpSpent}}</span>
     </div>
+    {{#if xpReward}}
+    <div class="lig-xp-cell">
+      <span class="lig-xp-label">XP de complicações</span>
+      <span class="lig-xp-value">+{{xpReward}}</span>
+    </div>
+    {{/if}}
     <div class="lig-xp-cell {{#if (lt xpAvailable 0)}}negative{{/if}}">
       <span class="lig-xp-label">XP disponível</span>
       <span class="lig-xp-value">{{xpAvailable}}</span>
     </div>
-    <div class="lig-xp-hint">Habilidades fora das suas listas de acesso custam o dobro.</div>
+    <div class="lig-xp-hint">Habilidades fora das suas listas de acesso custam o dobro. Complicações fornecem XP.</div>
   </div>
+  {{/unless}}
 
   {{!-- ===== Recursos ===== --}}
   <section class="lig-resources">
@@ -296,12 +306,12 @@
         <img class="lig-item-icon" src="{{item.img}}" alt=""/>
         <span class="lig-item-title">{{item.name}}</span>
         <span class="lig-item-tag">{{item.system.level}}</span>
-        {{#if cost}}
+        {{#if cost}}{{#unless ../isNpc}}
         <span class="lig-cost-tag {{#if cost.onList}}on-list{{else}}off-list{{/if}}"
               title="{{#if cost.onList}}Na sua lista de acesso (custo normal){{else}}Fora das suas listas — custo dobrado{{/if}}">
           {{cost.total}} XP{{#unless cost.onList}} ×2{{/unless}}
         </span>
-        {{/if}}
+        {{/unless}}{{/if}}
         {{> systems/ligeia-rpg/templates/actor/partials/item-actions.hbs item=item}}
         {{#if (eq item.system.mode "active")}}
         <button type="button" class="lig-item-toggle {{#if item.system.active}}on{{/if}}" data-action="itemToggle" title="Ativar/desativar">{{#if item.system.active}}●{{else}}○{{/if}}</button>
@@ -378,6 +388,28 @@
       </div>
       {{> systems/ligeia-rpg/templates/actor/partials/item-effects-inline.hbs item=item effectTypeLabels=../effectTypeLabels effectTargetLabels=../effectTargetLabels editable=../editable}}
       {{else}}<div class="lig-empty">Nenhum traço.</div>{{/each}}
+    </div>
+
+    {{!-- Complicações (fornecem XP) --}}
+    <div class="lig-item-group">
+      <div class="lig-item-group-head">
+        <span>Complicações</span>
+        {{#if editable}}<button type="button" class="lig-mini-btn" data-action="itemCreate" data-type="complicacao">+ nova</button>{{/if}}
+      </div>
+      {{#each itemGroups.complicacao as |item|}}
+      <div class="lig-item-entry" data-item-id="{{item.id}}" draggable="true">
+        <img class="lig-item-icon" src="{{item.img}}" alt=""/>
+        <span class="lig-item-title">{{item.name}}</span>
+        {{#if item.system.xpReward}}<span class="lig-cost-tag reward" title="XP concedido por esta complicação">+{{item.system.xpReward}} XP</span>{{/if}}
+        {{> systems/ligeia-rpg/templates/actor/partials/item-actions.hbs item=item}}
+        {{#if (eq item.system.mode "active")}}
+        <button type="button" class="lig-item-toggle {{#if item.system.active}}on{{/if}}" data-action="itemToggle" title="Ativar/desativar">{{#if item.system.active}}●{{else}}○{{/if}}</button>
+        {{/if}}
+        <button type="button" class="lig-mini-btn" data-action="itemEdit" title="Editar">✎</button>
+        {{#if ../editable}}<button type="button" class="lig-mini-btn danger" data-action="itemDelete" title="Remover">✕</button>{{/if}}
+      </div>
+      {{> systems/ligeia-rpg/templates/actor/partials/item-effects-inline.hbs item=item effectTypeLabels=../effectTypeLabels effectTargetLabels=../effectTargetLabels editable=../editable}}
+      {{else}}<div class="lig-empty">Nenhuma complicação.</div>{{/each}}
     </div>
   </section>
 

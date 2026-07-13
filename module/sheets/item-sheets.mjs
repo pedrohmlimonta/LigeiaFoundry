@@ -730,14 +730,14 @@ export class EquipamentoSheet extends LigeiaItemSheetBase {
 /* ================================================================== */
 /*  Traço                                                             */
 /* ================================================================== */
-export class TracoSheet extends LigeiaItemSheetBase {
+export class ComplicacaoSheet extends LigeiaItemSheetBase {
   static DEFAULT_OPTIONS = foundry.utils.mergeObject(
     LigeiaItemSheetBase.DEFAULT_OPTIONS,
-    { classes: ["ligeia", "sheet", "item", "traco"] },
+    { classes: ["ligeia", "sheet", "item", "complicacao"] },
     { inplace: false },
   );
   static PARTS = {
-    body: { template: "systems/ligeia-rpg/templates/item/traco.hbs" },
+    body: { template: "systems/ligeia-rpg/templates/item/complicacao.hbs" },
   };
   async _prepareContext(options) {
     const ctx = await super._prepareContext(options);

@@ -134,6 +134,26 @@ export class TracoData extends foundry.abstract.TypeDataModel {
 }
 
 /* ================================================================== */
+/*  COMPLICAÇÃO                                                        */
+/*  Como um traço, mas em vez de custar XP, FORNECE XP ao personagem.  */
+/* ================================================================== */
+export class ComplicacaoData extends foundry.abstract.TypeDataModel {
+  static defineSchema() {
+    return {
+      source: new fields.StringField({ blank: true, initial: "other" }),
+      description: new fields.HTMLField({ blank: true, initial: "" }),
+      // Quanto de XP esta complicação concede ao personagem.
+      xpReward: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+      actions: actionsField(),
+      ...activatableFields(),
+    };
+  }
+  static migrateData(source) {
+    return migrateFlatActionToArray(migrateEffectTargets(super.migrateData(source)));
+  }
+}
+
+/* ================================================================== */
 /*  DEFINIÇÕES (raça, herança, vocação, organização)                   */
 /*  Cada uma carrega uma lista de habilidades concedidas.              */
 /* ================================================================== */

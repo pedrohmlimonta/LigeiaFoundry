@@ -5,7 +5,7 @@ import { rollLigeia, postRollToChat, rollItemAction, resolveAttr, rerollFor, cri
 import { rollSingleEndEffect } from "../helpers/turn-effects.mjs";
 import { promptRollConfig, shouldPromptRoll, currentTargetActors } from "../apps/roll-dialog.mjs";
 import { placeTemplateForAction } from "../helpers/template.mjs";
-import { computeXpSpent } from "../helpers/xp.mjs";
+import { computeXpSpent, computeXpReward } from "../helpers/xp.mjs";
 import { effectIsActive } from "../helpers/effects.mjs";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -102,6 +102,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
 
     context.actor = actor;
     context.system = sys;
+    context.isNpc = false;
     context.isGM = game.user.isGM;
     context.editable = this.isEditable;
     // Carreira só pode ser adicionada no nível 6.
@@ -134,6 +135,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       magia: [],
       equipamento: [],
       traco: [],
+      complicacao: [],
       raca: [],
       heranca: [],
       vocacao: [],
@@ -243,7 +245,10 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     // ---- Cálculo de XP gasto (com regra de dobro fora da lista) ----
     const xp = computeXpSpent(actor);
     context.xpSpent = xp.spent;
-    context.xpAvailable = (sys.details.xp || 0) - xp.spent;
+    // Complicações concedem XP (somam ao disponível).
+    const xpReward = computeXpReward(actor);
+    context.xpReward = xpReward.reward;
+    context.xpAvailable = (sys.details.xp || 0) + xpReward.reward - xp.spent;
     // Mapa id → custo, para anotar cada habilidade no template
     context.skillCosts = {};
     for (const s of xp.perSkill) context.skillCosts[s.id] = s;
@@ -617,6 +622,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       magia: "Nova Magia",
       equipamento: "Novo Equipamento",
       traco: "Novo Traço",
+      complicacao: "Nova Complicação",
       raca: "Nova Raça",
       heranca: "Nova Herança",
       vocacao: "Nova Vocação",
@@ -752,5 +758,31 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       reroll: rr,
       crit: cr,
     });
+  }
+}
+
+/**
+ * Ficha de NPC.
+ *
+ * É IGUAL à ficha de personagem (herda todos os handlers de rolagem, efeitos,
+ * condições, itens, ativação e drag & drop), mudando apenas:
+ *   - marca `isNpc` no contexto, o que oculta no template tudo ligado a XP
+ *     (XP total, painel de gasto/disponível, custo por habilidade e corrupção);
+ *   - usa a classe CSS "npc".
+ *
+ * Reaproveitar a mesma classe garante que qualquer melhoria futura na ficha do
+ * personagem valha automaticamente para o NPC.
+ */
+export class LigeiaNpcSheet extends LigeiaCharacterSheet {
+  static DEFAULT_OPTIONS = foundry.utils.mergeObject(
+    LigeiaCharacterSheet.DEFAULT_OPTIONS,
+    { classes: ["ligeia", "sheet", "actor", "npc"] },
+    { inplace: false },
+  );
+
+  async _prepareContext(options) {
+    const context = await super._prepareContext(options);
+    context.isNpc = true;
+    return context;
   }
 }
