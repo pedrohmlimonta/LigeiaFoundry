@@ -376,12 +376,12 @@
           <img class="lig-item-icon" src="{{item.img}}" alt=""/>
           <span class="lig-item-title">{{item.name}}</span>
           <span class="lig-item-tag">{{item.system.level}}</span>
-          {{#if cost}}
+          {{#if cost}}{{#unless @root.isNpc}}
           <span class="lig-cost-tag {{#if cost.onList}}on-list{{else}}off-list{{/if}}"
                 title="{{#if cost.onList}}Na sua lista de acesso (custo normal){{else}}Fora das suas listas — custo dobrado{{/if}}">
             {{cost.total}} XP{{#unless cost.onList}} ×2{{/unless}}
           </span>
-          {{/if}}
+          {{/unless}}{{/if}}
           {{> systems/ligeia-rpg/templates/actor/partials/item-actions.hbs item=item}}
           {{#if (eq item.system.mode "active")}}
           <button type="button" class="lig-item-toggle {{#if item.system.active}}on{{/if}}" data-action="itemToggle" title="Ativar/desativar">{{#if item.system.active}}●{{else}}○{{/if}}</button>
@@ -410,9 +410,9 @@
           <img class="lig-item-icon" src="{{item.img}}" alt=""/>
           <span class="lig-item-title">{{item.name}}</span>
           <span class="lig-item-tag">{{item.system.level}}</span>
-          {{#if gain}}
+          {{#if gain}}{{#unless @root.isNpc}}
           <span class="lig-gain-tag" title="Complicação — concede XP para gastar">+{{gain.xp}} XP</span>
-          {{/if}}
+          {{/unless}}{{/if}}
           {{> systems/ligeia-rpg/templates/actor/partials/item-actions.hbs item=item}}
           {{#if (eq item.system.mode "active")}}
           <button type="button" class="lig-item-toggle {{#if item.system.active}}on{{/if}}" data-action="itemToggle" title="Ativar/desativar">{{#if item.system.active}}●{{else}}○{{/if}}</button>
