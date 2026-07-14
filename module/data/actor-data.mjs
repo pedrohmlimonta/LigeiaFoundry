@@ -265,21 +265,39 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
 }
 
 /* ================================================================== */
-/*  NPC (mesma base, simplificado)                                     */
+/*  NPC — mesma ficha do personagem, porém SEM XP                      */
+/*  O schema espelha o do personagem (identidade, atributos, recursos, */
+/*  bônus, magia), apenas sem o campo details.xp: NPCs não gastam nem  */
+/*  ganham XP. prepareDerivedData e migrateData são HERDADOS de        */
+/*  PersonagemData, então vocação/raça, efeitos ativos e secundários   */
+/*  se comportam exatamente como na ficha de jogador.                  */
 /* ================================================================== */
-export class NpcData extends foundry.abstract.TypeDataModel {
-  static migrateData(source) {
-    return migrateEffectTargets(super.migrateData(source));
-  }
+export class NpcData extends PersonagemData {
   static defineSchema() {
     return {
+      // Identidade (igual ao personagem, sem o campo xp)
       details: new fields.SchemaField({
         concept: new fields.StringField({ blank: true, initial: "" }),
+        race: new fields.StringField({ blank: true, initial: "" }),
+        heritage: new fields.StringField({ blank: true, initial: "" }),
+        vocation: new fields.StringField({ blank: true, initial: "" }),
+        careers: new fields.StringField({ blank: true, initial: "" }),
+        nation: new fields.StringField({ blank: true, initial: "" }),
+        organizations: new fields.StringField({ blank: true, initial: "" }),
+        // NPCs podem passar do nível 6 (sem máximo)
         level: new fields.NumberField({ initial: 1, integer: true, min: 1 }),
+        corruption: new fields.NumberField({ initial: 0, integer: true }),
+        personality: new fields.HTMLField({ blank: true, initial: "" }),
         notes: new fields.HTMLField({ blank: true, initial: "" }),
       }),
+
+      // Condições ativas (lista de ids; ver CONFIG.LIGEIA.conditions)
       conditions: new fields.ArrayField(new fields.StringField({ blank: false }), { initial: [] }),
+
+      // Efeitos aplicados diretamente na ficha (buffs/debuffs)
       appliedEffects: appliedEffectsField(),
+
+      // Atributos primários
       attributes: new fields.SchemaField({
         forca: attrField(2),
         agilidade: attrField(2),
@@ -287,6 +305,8 @@ export class NpcData extends foundry.abstract.TypeDataModel {
         mente: attrField(2),
         percepcao: attrField(2),
       }),
+
+      // Recursos
       resources: new fields.SchemaField({
         hp: new fields.SchemaField({
           value: new fields.NumberField({ initial: 0, integer: true }),
@@ -301,66 +321,23 @@ export class NpcData extends foundry.abstract.TypeDataModel {
           bonus: new fields.NumberField({ initial: 0, integer: true }),
         }),
       }),
+
+      // Bônus manuais do GM aplicados a secundários
+      secondaryBonus: new fields.SchemaField({
+        deslocamento: new fields.NumberField({ initial: 0, integer: true }),
+        moveBonusRace: new fields.NumberField({ initial: 0, integer: true }),
+      }),
+
+      // Magia
+      magic: new fields.SchemaField({
+        knownWords: new fields.ArrayField(new fields.StringField({ blank: true })),
+        minorSpells: new fields.HTMLField({ blank: true, initial: "" }),
+      }),
+
+      // NPCs rolam ocultamente por padrão
       rollHidden: new fields.BooleanField({ initial: true }),
       // Não abrir a caixa de configuração antes das rolagens deste ator.
       skipRollDialog: new fields.BooleanField({ initial: false }),
     };
-  }
-
-  prepareDerivedData() {
-    const a = this.attributes;
-    const lvl = this.details.level || 1;
-
-    // Modificadores de efeitos ativos (itens + buffs na ficha)
-    const mods = aggregateEffectModifiers(this.parent);
-    this.rollMods = mods.roll;
-    // Reroll por atributo (primários + secundários) para as rolagens.
-    this.attrReroll = {};
-    this.attrCrit = {};
-    for (const k of [...Object.keys(mods.attr)]) {
-      this.attrReroll[k] = { reroll1: mods.attr[k].reroll1 || 0, reroll6: mods.attr[k].reroll6 || 0 };
-      this.attrCrit[k] = { critBonus: mods.attr[k].critBonus || 0, failBonus: mods.attr[k].failBonus || 0 };
-    }
-    for (const k of ["forca", "agilidade", "vigor", "mente", "percepcao"]) {
-      if (a[k]) {
-        a[k].value = (a[k].value || 0) + (mods.attr[k]?.bonus || 0);
-        a[k].dice = (a[k].dice || 0) + (mods.attr[k]?.dice || 0);
-        if (mods.attr[k]?.set !== null && mods.attr[k]?.set !== undefined) a[k].value = mods.attr[k].set;
-      }
-    }
-
-    this.secondary = {
-      bloqueio: a.forca.value,
-      esquiva: a.agilidade.value,
-      conjuracao: a.mente.value,
-      iniciativa: Math.max(a.agilidade.value, a.percepcao.value),
-      iniciativaDice: Math.max(a.agilidade.dice, a.percepcao.dice),
-      deslocamento: a.agilidade.value,
-    };
-    this.secondary.bloqueio += mods.attr.bloqueio?.bonus || 0;
-    this.secondary.esquiva += mods.attr.esquiva?.bonus || 0;
-    this.secondary.conjuracao += mods.attr.conjuracao?.bonus || 0;
-    this.secondary.iniciativa += mods.attr.iniciativa?.bonus || 0;
-    this.secondary.iniciativaDice += mods.attr.iniciativa?.dice || 0;
-    this.secondary.bloqueioDice = (a.forca.dice || 0) + (mods.attr.bloqueio?.dice || 0);
-    this.secondary.esquivaDice = (a.agilidade.dice || 0) + (mods.attr.esquiva?.dice || 0);
-    this.secondary.conjuracaoDice = (a.mente.dice || 0) + (mods.attr.conjuracao?.dice || 0);
-    this.secondary.deslocamento += mods.stat.deslocamento || 0;
-
-    const npcCond = expandConditions(this.conditions || []);
-    if (npcCond.has("lento")) {
-      this.secondary.deslocamento = Math.floor(this.secondary.deslocamento / 2);
-      this.secondary.slowed = true;
-    }
-    const hpMax = a.vigor.value + (this.resources.hp.bonus || 0) + lvl + (mods.stat.hp || 0);
-    const mpMax = a.mente.value + (this.resources.mp.bonus || 0) + lvl + (mods.stat.mp || 0);
-    const heroicMax = lvl + (this.resources.heroic.bonus || 0) + (mods.stat.heroic || 0);
-    this.resources.hp.max = hpMax;
-    this.resources.mp.max = mpMax;
-    this.resources.heroic.max = heroicMax;
-    this.resources.hp.value = Math.max(0, Math.min(this.resources.hp.value, hpMax));
-    this.resources.mp.value = Math.max(0, Math.min(this.resources.mp.value, mpMax));
-    this.resources.heroic.value = Math.max(0, Math.min(this.resources.heroic.value, heroicMax));
-    this.resources.hp.temp = Math.max(0, this.resources.hp.temp || 0);
   }
 }

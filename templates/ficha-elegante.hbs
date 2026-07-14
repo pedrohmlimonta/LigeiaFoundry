@@ -33,7 +33,7 @@
                placeholder="Conceito (ex: lâmina solitária do norte)"/>
         <div class="lig-id-mini">
           <span class="lig-id-chip"><b>Nível</b> {{system.details.level}}</span>
-          <span class="lig-id-chip {{#if (lt xpAvailable 0)}}neg{{/if}}"><b>XP livre</b> {{xpAvailable}}</span>
+          {{#unless isNpc}}<span class="lig-id-chip {{#if (lt xpAvailable 0)}}neg{{/if}}"><b>XP livre</b> {{xpAvailable}}</span>{{/unless}}
           <span class="lig-id-chip"><b>Corrupção</b> {{system.details.corruption}}</span>
         </div>
       </div>
@@ -197,16 +197,19 @@
           <input type="text" name="system.details.organizations" value="{{system.details.organizations}}"/>
         </label>
         <label>Nível
-          <input type="number" name="system.details.level" value="{{system.details.level}}" min="1" max="6"/>
+          <input type="number" name="system.details.level" value="{{system.details.level}}" min="1"{{#unless isNpc}} max="6"{{/unless}}/>
         </label>
+        {{#unless isNpc}}
         <label>XP total
           <input type="number" name="system.details.xp" value="{{system.details.xp}}" min="0"/>
         </label>
+        {{/unless}}
         <label>Corrupção
           <input type="number" name="system.details.corruption" value="{{system.details.corruption}}"/>
         </label>
       </div>
 
+      {{#unless isNpc}}
       {{!-- Painel de XP --}}
       <div class="lig-xp-bar">
         <div class="lig-xp-cell">
@@ -223,6 +226,7 @@
         </div>
         <div class="lig-xp-hint">Habilidades fora das suas listas de acesso custam o dobro. Complicações concedem XP extra para gastar.</div>
       </div>
+      {{/unless}}
 
       {{!-- Atributos primários --}}
       <section class="lig-attributes">
@@ -399,7 +403,7 @@
           <span>Complicações</span>
           {{#if editable}}<button type="button" class="lig-mini-btn" data-action="itemCreate" data-type="complicacao">+ nova</button>{{/if}}
         </div>
-        <p class="lig-hint">Complicações funcionam como habilidades, mas CONCEDEM XP em vez de custar: o valor de cada uma é somado ao seu XP disponível.</p>
+        {{#unless isNpc}}<p class="lig-hint">Complicações funcionam como habilidades, mas CONCEDEM XP em vez de custar: o valor de cada uma é somado ao seu XP disponível.</p>{{/unless}}
         {{#each itemGroups.complicacao as |item|}}
         {{#with (lookup ../complicationXp item.id) as |gain|}}
         <div class="lig-item-entry" data-item-id="{{item.id}}" draggable="true">

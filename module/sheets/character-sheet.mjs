@@ -104,8 +104,10 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     context.system = sys;
     context.isGM = game.user.isGM;
     context.editable = this.isEditable;
-    // Carreira só pode ser adicionada no nível 6.
-    context.canAddCareer = (Number(sys.details?.level) || 1) >= 6;
+    // NPCs usam exatamente a mesma ficha, mas sem NADA de XP.
+    context.isNpc = actor.type === "npc";
+    // Carreira: personagens só no nível 6; NPCs não têm a restrição.
+    context.canAddCareer = context.isNpc || (Number(sys.details?.level) || 1) >= 6;
 
     // Enriquece campos HTML para exibição
     context.enriched = {
@@ -241,19 +243,29 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       iniciativa: "Iniciativa", percepcao_passiva: "Perc. Passiva",
     };
 
-    // ---- Cálculo de XP gasto (com regra de dobro fora da lista) ----
-    const xp = computeXpSpent(actor);
-    // ---- XP concedido pelas complicações (somado ao disponível) ----
-    const gain = computeXpGained(actor);
-    context.xpSpent = xp.spent;
-    context.xpGained = gain.gained;
-    context.xpAvailable = (sys.details.xp || 0) + gain.gained - xp.spent;
-    // Mapa id → custo, para anotar cada habilidade no template
-    context.skillCosts = {};
-    for (const s of xp.perSkill) context.skillCosts[s.id] = s;
-    // Mapa id → XP concedido, para anotar cada complicação no template
-    context.complicationXp = {};
-    for (const c of gain.perComplication) context.complicationXp[c.id] = c;
+    // ---- XP: só para personagens. NPCs não gastam nem ganham XP, ----
+    // ---- então os mapas ficam vazios (nenhuma etiqueta aparece).  ----
+    if (context.isNpc) {
+      context.xpSpent = 0;
+      context.xpGained = 0;
+      context.xpAvailable = 0;
+      context.skillCosts = {};
+      context.complicationXp = {};
+    } else {
+      // ---- Cálculo de XP gasto (com regra de dobro fora da lista) ----
+      const xp = computeXpSpent(actor);
+      // ---- XP concedido pelas complicações (somado ao disponível) ----
+      const gain = computeXpGained(actor);
+      context.xpSpent = xp.spent;
+      context.xpGained = gain.gained;
+      context.xpAvailable = (sys.details.xp || 0) + gain.gained - xp.spent;
+      // Mapa id → custo, para anotar cada habilidade no template
+      context.skillCosts = {};
+      for (const s of xp.perSkill) context.skillCosts[s.id] = s;
+      // Mapa id → XP concedido, para anotar cada complicação no template
+      context.complicationXp = {};
+      for (const c of gain.perComplication) context.complicationXp[c.id] = c;
+    }
 
     return context;
   }

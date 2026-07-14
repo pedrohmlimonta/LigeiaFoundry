@@ -268,7 +268,7 @@ Hooks.once("init", function () {
   // A ficha básica continua disponível, mas NÃO é mais a padrão: a "Ficha
   // Elegante" (registrada em ./sheets/ficha-elegante.mjs) é a padrão.
   DSC.registerSheet(Actor, "ligeia-rpg", LigeiaCharacterSheet, {
-    types: ["personagem"],
+    types: ["personagem", "npc"],
     makeDefault: false,
     label: "Ligeia — Ficha de Personagem (clássica)",
   });
