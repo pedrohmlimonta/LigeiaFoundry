@@ -1,7 +1,7 @@
 /**
  * Ficha de Personagem do Ligeia — Foundry V13 (ApplicationV2).
  */
-import { rollLigeia, postRollToChat, rollItemAction, resolveAttr, rerollFor, critFor, spendItemCosts } from "../helpers/dice.mjs";
+import { rollLigeia, postRollToChat, rollItemAction, resolveAttr, rerollFor, critFor, spendItemCosts, applyDamageToActor, applyHealingToActor } from "../helpers/dice.mjs";
 import { rollSingleEndEffect } from "../helpers/turn-effects.mjs";
 import { promptRollConfig, shouldPromptRoll, currentTargetActors } from "../apps/roll-dialog.mjs";
 import { placeTemplateForAction } from "../helpers/template.mjs";
@@ -200,17 +200,24 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
         fx0TargetChoices: targetsFor(type0),
         fx0IsReroll: type0 === "reroll1" || type0 === "reroll6",
         fx0NoValue: false,
-        summary: (ae.effects || [])
-          .map((e) => {
-            const sign = (Number(e.value) || 0) >= 0 ? "+" : "";
-            const kind = e.type === "dice" ? "D" : "";
-            if (e.type === "reroll1") return `Rerrola 1 (${e.rerollAll ? "todos" : e.value})`;
-            if (e.type === "reroll6") return `Rerrola 6 (${e.rerollAll ? "todos" : e.value})`;
-            if (e.type === "crit") return `Crítico ≥${12 - (Number(e.value) || 0)}`;
-            if (e.type === "fumble") return `Falha ≤${2 + (Number(e.value) || 0)}`;
-            return `${fxTypeLabels[e.type] || e.type} ${sign}${e.value}${kind} ${e.target || ""}`.trim();
-          })
-          .join(", "),
+        summary: [
+          (ae.effects || [])
+            .map((e) => {
+              const sign = (Number(e.value) || 0) >= 0 ? "+" : "";
+              const kind = e.type === "dice" ? "D" : "";
+              if (e.type === "reroll1") return `Rerrola 1 (${e.rerollAll ? "todos" : e.value})`;
+              if (e.type === "reroll6") return `Rerrola 6 (${e.rerollAll ? "todos" : e.value})`;
+              if (e.type === "crit") return `Crítico ≥${12 - (Number(e.value) || 0)}`;
+              if (e.type === "fumble") return `Falha ≤${2 + (Number(e.value) || 0)}`;
+              return `${fxTypeLabels[e.type] || e.type} ${sign}${e.value}${kind} ${e.target || ""}`.trim();
+            })
+            .join(", "),
+          // Etiquetas extras: barreira (sobrevida vinculada) e regeneração
+          (Number(ae.tempHp) || 0) > 0 ? `Barreira ${ae.tempHp}` : "",
+          (ae.tickHeal?.amount || 0) > 0
+            ? `Regen +${ae.tickHeal.amount} ${({ hp: "PV", mp: "PM", heroic: "PH" })[ae.tickHeal.resource || "hp"]}/rodada`
+            : "",
+        ].filter(Boolean).join(" · "),
         hasDuration: (ae.duration?.rounds || 0) > 0,
       };
     });
@@ -548,6 +555,17 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor: this.document }),
         content: `<div class="ligeia-roll-flavor"><strong>${this.document.name}</strong> — <em>${ae.label}</em>: ${tick.amount} de dano${typeLabel ? " " + typeLabel : ""}${applied.applied ? ` (${resLabel}: ${applied.newValue}/${applied.newMax})` : ""}</div>`,
+      });
+    }
+
+    // Regeneração por rodada (contraparte do dano contínuo)
+    const th = ae.tickHeal || {};
+    if ((th.amount || 0) > 0) {
+      const healed = await applyHealingToActor(this.document, th.amount, th.resource || "hp");
+      const hLabel = { hp: "PV", mp: "PM", heroic: "PH" }[th.resource || "hp"];
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: this.document }),
+        content: `<div class="ligeia-roll-flavor"><strong>${this.document.name}</strong> — <em>${ae.label}</em>: <span class="lig-atk-heal">regenera <strong>${th.amount}</strong> ${hLabel}</span>${healed.applied ? ` (${hLabel}: ${healed.newValue}/${healed.newMax})` : ""}</div>`,
       });
     }
 

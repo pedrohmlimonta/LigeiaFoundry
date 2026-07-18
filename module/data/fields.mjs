@@ -207,7 +207,7 @@ export function actionEntryField() {
         // Tipo do modificador (mesma lista dos efeitos de itens + condição)
         fxType: new fields.StringField({
           initial: "bonus",
-          choices: ["bonus", "dice", "stat", "set", "damage", "rd", "reroll1", "reroll6", "crit", "fumble", "condition"],
+          choices: ["bonus", "dice", "stat", "set", "damage", "rd", "reroll1", "reroll6", "crit", "fumble", "restore", "condition"],
         }),
         // Alvo do modificador — depende do tipo (atributo, recurso, tipo de
         // dano ou id de condição). Sempre escolhido por select.
@@ -231,6 +231,15 @@ export function actionEntryField() {
         tickAmount: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
         tickType: new fields.StringField({ blank: true, initial: "" }),
         tickResource: new fields.StringField({ initial: "hp", choices: ["hp", "mp", "heroic"] }),
+        // REGENERAÇÃO por rodada (0 = nenhuma): recupera o recurso no início
+        // dos turnos do portador enquanto o efeito durar (contraparte do
+        // dano contínuo acima).
+        tickHealAmount: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+        tickHealResource: new fields.StringField({ initial: "hp", choices: ["hp", "mp", "heroic"] }),
+        // SOBREVIDA VINCULADA (barreira): concede N de sobrevida ao aplicar.
+        // O efeito e a sobrevida vivem e morrem juntos: sobrevida zerou →
+        // o efeito termina; efeito terminou → a sobrevida some.
+        grantTempHp: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
       }),
       { initial: [] },
     ),

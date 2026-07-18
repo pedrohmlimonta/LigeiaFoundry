@@ -13,6 +13,7 @@ import { registerEmanationHooks } from "./helpers/emanation.mjs";
 import { registerTokenRuler } from "./helpers/token-ruler.mjs";
 import { registerMovementHooks, registerMovementSocket, registerForcedMovementActions } from "./helpers/movement.mjs";
 import { registerTurnEffectHooks } from "./helpers/turn-effects.mjs";
+import { registerBarrierHooks } from "./helpers/barrier.mjs";
 import { applyTempHpToActor } from "./helpers/dice.mjs";
 import { activeEffectsOf } from "./helpers/effects.mjs";
 import {
@@ -318,6 +319,7 @@ Hooks.once("ready", function () {
   registerEmanationHooks();
   // Rolagens automáticas de fim de efeito no início do turno.
   registerTurnEffectHooks();
+  registerBarrierHooks();
   // Efeitos de movimento: trava da Telecinese e receptor de pedidos ao Mestre.
   registerMovementHooks();
   registerMovementSocket();

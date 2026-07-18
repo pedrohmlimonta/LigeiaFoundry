@@ -319,6 +319,7 @@
               <option value="crit" {{#if (eq fx.fxType "crit")}}selected{{/if}}>Crítico aprimorado</option>
               <option value="fumble" {{#if (eq fx.fxType "fumble")}}selected{{/if}}>Falha crítica piorada</option>
               <option value="condition" {{#if (eq fx.fxType "condition")}}selected{{/if}}>Condição</option>
+              <option value="restore" {{#if (eq fx.fxType "restore")}}selected{{/if}}>Recuperar recurso (ao aplicar)</option>
             </select>
           </label>
           <label>Alvo
@@ -338,6 +339,7 @@
           </label>
           {{/if}}
         </div>
+        {{#unless (eq fx.fxType "restore")}}
         <div class="lig-item-row">
           <label>Duração
             <select name="system.actions.{{i}}.appliesEffects.{{fi}}.durationMode">
@@ -404,6 +406,22 @@
             </select>
           </label>
         </div>
+        <div class="lig-item-row">
+          <label title="Concede sobrevida ao aplicar. Vidas ligadas: se a sobrevida zerar, o efeito termina; se o efeito terminar, a sobrevida some.">Sobrevida vinculada
+            <input type="number" name="system.actions.{{i}}.appliesEffects.{{fi}}.grantTempHp" value="{{fx.grantTempHp}}" min="0"/>
+          </label>
+          <label>Regeneração/rodada
+            <input type="number" name="system.actions.{{i}}.appliesEffects.{{fi}}.tickHealAmount" value="{{fx.tickHealAmount}}" min="0"/>
+          </label>
+          <label>Recurso regenerado
+            <select name="system.actions.{{i}}.appliesEffects.{{fi}}.tickHealResource">
+              <option value="hp" {{#if (eq fx.tickHealResource "hp")}}selected{{/if}}>PV</option>
+              <option value="mp" {{#if (eq fx.tickHealResource "mp")}}selected{{/if}}>PM</option>
+              <option value="heroic" {{#if (eq fx.tickHealResource "heroic")}}selected{{/if}}>PH</option>
+            </select>
+          </label>
+        </div>
+        {{/unless}}
       </div>
       {{/each}}
     </div>

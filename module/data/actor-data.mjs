@@ -72,6 +72,17 @@ function appliedEffectsField() {
         type: new fields.StringField({ blank: true, initial: "" }),
         resource: new fields.StringField({ initial: "hp", choices: ["hp", "mp", "heroic"] }),
       }),
+      // Regeneração contínua por rodada (contraparte do dano contínuo).
+      tickHeal: new fields.SchemaField({
+        amount: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+        resource: new fields.StringField({ initial: "hp", choices: ["hp", "mp", "heroic"] }),
+      }),
+      // Sobrevida VINCULADA concedida por este efeito (0 = nenhuma).
+      // Vidas ligadas: sobrevida zerou → o efeito termina; efeito terminou →
+      // a sobrevida concedida some (ver helpers/barrier.mjs).
+      tempHp: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+      // Id único para rastrear remoções (barreiras) entre atualizações.
+      fxId: new fields.StringField({ blank: true, initial: "" }),
       source: new fields.StringField({ blank: true, initial: "" }),
     }),
     { initial: [] },

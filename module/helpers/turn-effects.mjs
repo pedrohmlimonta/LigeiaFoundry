@@ -11,7 +11,7 @@
  * rolagens/remoções duplicadas em mesa com vários jogadores.
  */
 
-import { rollLigeia, resolveAttr, rerollFor, critFor } from "./dice.mjs";
+import { rollLigeia, resolveAttr, rerollFor, critFor, applyHealingToActor } from "./dice.mjs";
 
 /** Detecta se ESTE cliente deve processar (apenas um GM ativo). */
 function isResponsibleClient() {
@@ -93,6 +93,28 @@ async function rollEndForEffect(actor, ae) {
 }
 
 /**
+ * REGENERAÇÃO no início do turno: efeitos aplicados com tickHeal recuperam
+ * o recurso do portador enquanto durarem (contraparte do dano contínuo).
+ * Efeitos desligados (disabled) não regeneram.
+ */
+export async function processRegenAtTurnStart(actor) {
+  if (!actor) return;
+  for (const ae of actor.system?.appliedEffects || []) {
+    if (ae?.disabled) continue;
+    const th = ae?.tickHeal || {};
+    const amount = Number(th.amount) || 0;
+    if (amount <= 0) continue;
+    const resource = th.resource || "hp";
+    const applied = await applyHealingToActor(actor, amount, resource);
+    const resLabel = { hp: "PV", mp: "PM", heroic: "PH" }[resource];
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: `<div class="ligeia-roll-flavor"><strong>${actor.name}</strong> — <em>${ae.label}</em>: <span class="lig-atk-heal">regenera <strong>${amount}</strong> ${resLabel}</span>${applied.applied ? ` (${resLabel}: ${applied.newValue}/${applied.newMax})` : ""}</div>`,
+    });
+  }
+}
+
+/**
  * Processa TODAS as rolagens de fim de efeito de um ator (as que estão
  * habilitadas e não desativadas). Remove os efeitos que encerrarem, junto das
  * condições associadas. Faz uma única atualização ao final.
@@ -159,6 +181,9 @@ export function registerTurnEffectHooks() {
     if (!turnChanged) return;
     const actor = combat.combatant?.actor;
     if (!actor) return;
+    // Regeneração primeiro: o efeito ainda está ativo no início do turno,
+    // mesmo que uma rolagem de fim o encerre logo em seguida.
+    await processRegenAtTurnStart(actor);
     await processEndRollsAtTurnStart(actor);
   });
 }

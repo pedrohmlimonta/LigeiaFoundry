@@ -276,6 +276,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         case "damage":
         case "rd": return dmgChoices;
         case "condition": return condChoices;
+        case "restore": return { hp: "Vida (PV)", mp: "Mana (PM)", heroic: "Pontos Heroicos" };
         default: return TARGETS.roll;
       }
     };

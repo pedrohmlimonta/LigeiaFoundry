@@ -612,6 +612,15 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       const condsBefore = conds.length;
       const names = [];
       for (const ae of fxList) {
+        // "restore": recuperação INSTANTÂNEA de recurso ao aplicar — sobe o
+        // recurso na hora (como a cura faz) e NÃO gera efeito duradouro.
+        if (ae.fxType === "restore") {
+          const rRes = ["hp", "mp", "heroic"].includes(ae.fxTarget) ? ae.fxTarget : "mp";
+          const rApplied = await applyHealingToActor(tActor, Number(ae.fxValue) || 0, rRes);
+          const rShort = { hp: "PV", mp: "PM", heroic: "PH" }[rRes];
+          names.push(`${ae.label || "Recuperação"} (+${rApplied.gained ?? 0} ${rShort})`);
+          continue;
+        }
         const isCondition = ae.fxType === "condition";
         const condId = isCondition ? (ae.fxTarget || "") : "";
         // Tipos que viram modificador no array effects
@@ -649,14 +658,29 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
             attackerAttr: ae.resistReroll ? (action.rollAttr || "forca") : "",
           },
           tickDamage: { amount: ae.tickAmount || 0, type: ae.tickType || "", resource: ae.tickResource || "hp" },
+          // Regeneração por rodada (contraparte do dano contínuo)
+          tickHeal: { amount: ae.tickHealAmount || 0, resource: ae.tickHealResource || "hp" },
+          // Sobrevida VINCULADA (barreira): o efeito e a sobrevida vivem e
+          // morrem juntos (ciclo de vida em helpers/barrier.mjs).
+          tempHp: Number(ae.grantTempHp) || 0,
+          fxId: foundry.utils.randomID(),
           source: caster?.name || "",
         });
         names.push(ae.label || (isCondition ? condLabel : "Efeito"));
       }
       const update = { "system.appliedEffects": cur };
       if (conds.length !== condsBefore) update["system.conditions"] = conds;
+      // Sobrevida vinculada das barreiras recém-aplicadas: concedida na MESMA
+      // atualização, pela regra padrão (fica o maior valor; não acumula).
+      let barrierNote = "";
+      const maxBarrier = fxList.reduce((m, ae) => Math.max(m, ae.fxType === "restore" ? 0 : Number(ae.grantTempHp) || 0), 0);
+      if (maxBarrier > 0) {
+        const curTemp = tActor.system?.resources?.hp?.temp || 0;
+        if (maxBarrier > curTemp) update["system.resources.hp.temp"] = maxBarrier;
+        barrierNote = `<div class="lig-heal-applied">Sobrevida vinculada: ${Math.max(maxBarrier, curTemp)}${maxBarrier <= curTemp ? ' <span class="lig-cond-note">(manteve a atual, maior)</span>' : ""}</div>`;
+      }
       await tActor.update(update);
-      fxText = `<div class="lig-atk-fx">Efeitos aplicados: <strong>${names.join(", ")}</strong></div>`;
+      fxText = `<div class="lig-atk-fx">Efeitos aplicados: <strong>${names.join(", ")}</strong></div>${barrierNote}`;
     } else {
       fxText = `<div class="lig-atk-fx muted">Efeitos a aplicar: ${fxList.map((e) => e.label || "Efeito").join(", ")} (peça ao Mestre)</div>`;
     }
