@@ -232,7 +232,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     // sem precisar abrir a edição do item).
     context.effectTypeLabels = {
       dice: "Dados", bonus: "Bônus", stat: "Modifica", set: "Define",
-      damage: "Dano", rd: "Red. Dano", info: "Condição",
+      damage: "Dano", rd: "Red. Dano", tempHp: "Sobrevida", info: "Condição",
     };
     context.effectTargetLabels = {
       all: "todas", forca: "Força", agilidade: "Agilidade", vigor: "Vigor",

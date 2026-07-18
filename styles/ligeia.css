@@ -1164,6 +1164,15 @@
   color: #c8b88a;
 }
 .lig-dmg-applied.muted { color: #8a7a55; font-style: italic; }
+
+/* Linhas de CURA no chat (verde) */
+.lig-atk-heal { font-size: 0.85rem; margin-top: 0.15rem; color: #9fd8a0; }
+.lig-atk-heal strong { color: #b8f0b8; }
+.lig-heal-applied {
+  font-size: 0.8rem;
+  margin-top: 0.1rem;
+  color: #8fc491;
+}
 .lig-downed { color: #f0a0a0; font-weight: 700; }
 
 /* =========================================================================

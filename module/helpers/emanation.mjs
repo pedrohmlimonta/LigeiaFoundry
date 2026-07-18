@@ -13,7 +13,7 @@
  * duplicadas em mesa com vários jogadores.
  */
 
-import { rollItemAction } from "./dice.mjs";
+import { rollItemAction, passesAreaFilter } from "./dice.mjs";
 
 const FLAG_SCOPE = "ligeia-rpg";
 const FLAG_KEY = "emanation";
@@ -77,6 +77,10 @@ async function triggerEmanationOn(ema, targetActor) {
   const resolved = await resolveEmanationAction(ema);
   if (!resolved) return;
   const { actor, item, action } = resolved;
+
+  // Respeita o filtro de alvos da área (todos/aliados/inimigos): quem não
+  // passa no filtro simplesmente não é afetado pela emanação.
+  if (!passesAreaFilter(actor, targetActor, action.areaFilter)) return;
 
   // Não reaplica os custos/macro da fonte a cada turno: clona a ação sem
   // custos e sem macro (a emanação é o efeito recorrente, não um novo conjuro).

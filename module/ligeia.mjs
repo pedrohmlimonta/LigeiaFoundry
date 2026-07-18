@@ -13,6 +13,8 @@ import { registerEmanationHooks } from "./helpers/emanation.mjs";
 import { registerTokenRuler } from "./helpers/token-ruler.mjs";
 import { registerMovementHooks, registerMovementSocket, registerForcedMovementActions } from "./helpers/movement.mjs";
 import { registerTurnEffectHooks } from "./helpers/turn-effects.mjs";
+import { applyTempHpToActor } from "./helpers/dice.mjs";
+import { activeEffectsOf } from "./helpers/effects.mjs";
 import {
   HabilidadeSheet,
   ComplicacaoSheet,
@@ -407,6 +409,38 @@ async function promptReplaceUniqueDefinition(actor, item, data, existing, label)
 /* ------------------------------------------------------------------ */
 /*  Preload de templates parciais                                      */
 /* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------ */
+/*  Sobrevida ao ativar (efeitos "tempHp")                             */
+/*  Quando um item ativável é LIGADO, os efeitos "tempHp" válidos       */
+/*  (habilitados e dentro do nível B/A/E) concedem sobrevida ao dono.   */
+/*  Regra: sobrevida não acumula — fica o maior valor.                  */
+/* ------------------------------------------------------------------ */
+Hooks.on("preUpdateItem", function (item, changes, options) {
+  const will = foundry.utils.getProperty(changes, "system.active");
+  if (will === true && item.system?.active === false) options.ligeiaJustActivated = true;
+});
+
+Hooks.on("updateItem", async function (item, changes, options, userId) {
+  if (!options.ligeiaJustActivated) return;
+  if (game.user.id !== userId) return; // só quem fez a mudança aplica
+  const actor = item.parent;
+  if (actor?.documentName !== "Actor") return;
+
+  let total = 0;
+  for (const e of activeEffectsOf(item)) {
+    if (e.type === "tempHp") total += Number(e.value) || 0;
+  }
+  if (total <= 0) return;
+
+  const res = await applyTempHpToActor(actor, total, { stack: false });
+  if (!res.applied) return;
+  const keptNote = res.kept ? ' <span class="lig-cond-note">(manteve a atual, maior)</span>' : "";
+  await ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    flavor: `<div class="ligeia-roll-flavor"><strong>${item.name}</strong> ativada — <span class="lig-atk-heal">Sobrevida: <strong>${total}</strong></span><div class="lig-heal-applied">Sobrevida atual: ${res.newTemp}${keptNote}</div></div>`,
+  });
+});
+
 Hooks.once("setup", async function () {
   const partials = [
     "systems/ligeia-rpg/templates/item/partials/header.hbs",

@@ -425,6 +425,49 @@ export async function applyDamageToActor(actor, amount, resource = "hp") {
 }
 
 /**
+ * Aplica CURA a um ator, somando ao recurso e limitando ao máximo da ficha.
+ * Cura não interage com PV temporário, RD nem multiplicadores de condição.
+ * @returns {{applied:boolean, heal:number, gained:number, newValue?:number,
+ *            newMax?:number, resource:string, noPermission?:boolean}}
+ */
+export async function applyHealingToActor(actor, amount, resource = "hp") {
+  const heal = Math.max(0, Math.floor(amount));
+  const res = actor.system?.resources?.[resource];
+  if (!res || heal <= 0) {
+    return { applied: false, heal, gained: 0, resource };
+  }
+  if (!actor.isOwner) {
+    return { applied: false, heal, gained: 0, resource, noPermission: true };
+  }
+  const max = res.max || 0;
+  const newValue = Math.min(max, (res.value || 0) + heal);
+  const gained = newValue - (res.value || 0);
+  await actor.update({ [`system.resources.${resource}.value`]: newValue });
+  return { applied: true, heal, gained, newValue, newMax: max, resource };
+}
+
+/**
+ * Concede SOBREVIDA (PV temporário) a um ator.
+ * Regra padrão: sobrevida NÃO acumula — fica o MAIOR valor entre a atual e
+ * a concedida. Com stack=true, soma à atual (para efeitos que "adicionam").
+ * @returns {{applied:boolean, gain:number, kept?:boolean, newTemp?:number,
+ *            noPermission?:boolean}}
+ */
+export async function applyTempHpToActor(actor, amount, { stack = false } = {}) {
+  const gain = Math.max(0, Math.floor(amount));
+  const hp = actor.system?.resources?.hp;
+  if (!hp || gain <= 0) return { applied: false, gain };
+  if (!actor.isOwner) return { applied: false, gain, noPermission: true };
+  const cur = hp.temp || 0;
+  const newTemp = stack ? cur + gain : Math.max(cur, gain);
+  if (newTemp !== cur) {
+    await actor.update({ "system.resources.hp.temp": newTemp });
+  }
+  // kept = a sobrevida atual era maior e foi mantida (nada mudou).
+  return { applied: true, gain, kept: newTemp === cur, newTemp };
+}
+
+/**
  * Adiciona condições (ids) à ficha de um ator, sem duplicar. Só funciona se
  * o usuário tiver permissão sobre o alvo.
  * @returns {string[]} rótulos das condições efetivamente adicionadas
@@ -445,7 +488,7 @@ export async function applyConditionsToActor(actor, ids = []) {
  * personagem (self/area/aura com includeSelf). `acertou` indica se a defesa
  * falhou (ou se não houve defesa, em self/auto).
  */
-async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls = [], atkTotal, defTotal, acertou, cfg, attackerMods, caster }) {
+async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls = [], healRoll = null, atkTotal, defTotal, dcTotal = null, acertou, cfg, attackerMods, caster }) {
   let dmgText = "";
 
   const hasExtra = Array.isArray(extraDamageRolls) && extraDamageRolls.length > 0;
@@ -513,6 +556,52 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
     dmgText = lines.join("");
   }
 
+  // ---- CURA (recuperação de vida/recurso) ----
+  // Aplicada quando a ação "acerta" (ou automaticamente em self/sem teste).
+  // Cura não sofre RD nem os multiplicadores de condição de dano.
+  let healText = "";
+  if (acertou && healRoll) {
+    // Escalonamento da cura: +1 por 2 pontos pelos quais a rolagem superou o
+    // teste mais exigente que se aplicou (defesa do alvo e/ou CD efetiva).
+    let healScale = 0;
+    if (action.scalingHeal) {
+      let threshold = null;
+      if (Number.isFinite(defTotal)) threshold = defTotal;
+      if (dcTotal != null) threshold = threshold == null ? dcTotal : Math.max(threshold, dcTotal);
+      if (threshold != null) {
+        healScale = Math.floor((atkTotal - threshold) / 2);
+        if (healScale < 0) healScale = 0;
+      }
+    }
+    const hResource = action.healResource || "hp";
+    const amount = Math.max(0, Math.floor(healRoll.total + healScale));
+    const scaleNote = healScale ? ` <span class="lig-scale">(+${healScale} escalonado)</span>` : "";
+    let applyNote = "";
+    if (hResource === "hpTemp") {
+      // SOBREVIDA: PV temporário. Padrão: mantém o maior valor entre a
+      // sobrevida atual e a concedida; com tempStack, soma.
+      const applied = await applyTempHpToActor(tActor, amount, { stack: !!action.tempStack });
+      if (applied.applied) {
+        const keptNote = applied.kept ? ` <span class="lig-cond-note">(manteve a atual, maior)</span>` : "";
+        applyNote = `<div class="lig-heal-applied">Sobrevida atual: ${applied.newTemp}${keptNote}</div>`;
+      } else if (applied.noPermission) {
+        applyNote = `<div class="lig-dmg-applied muted">Sem permissão para alterar a ficha do alvo (peça ao Mestre).</div>`;
+      }
+      healText = `<div class="lig-atk-heal">Sobrevida: <strong>${amount}</strong>${scaleNote}</div>${applyNote}`;
+    } else {
+      const resWord = { hp: "Cura", mp: "Mana recuperada", heroic: "Heroico recuperado" }[hResource];
+      const resShort = { hp: "PV", mp: "PM", heroic: "PH" }[hResource];
+      const applied = await applyHealingToActor(tActor, amount, hResource);
+      if (applied.applied) {
+        const overNote = applied.gained < applied.heal ? ` <span class="lig-cond-note">(+${applied.heal - applied.gained} acima do máximo)</span>` : "";
+        applyNote = `<div class="lig-heal-applied">${resShort}: ${applied.newValue}/${applied.newMax}${overNote}</div>`;
+      } else if (applied.noPermission) {
+        applyNote = `<div class="lig-dmg-applied muted">Sem permissão para alterar a ficha do alvo (peça ao Mestre).</div>`;
+      }
+      healText = `<div class="lig-atk-heal">${resWord}: <strong>${amount}</strong>${scaleNote}</div>${applyNote}`;
+    }
+  }
+
   // Aplica EFEITOS (buffs/debuffs/condições) ao alvo quando acerta.
   let fxText = "";
   const fxList = action.appliesEffects || [];
@@ -573,7 +662,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
     }
   }
 
-  return dmgText + fxText;
+  return dmgText + healText + fxText;
 }
 
 /**
@@ -720,6 +809,27 @@ function measureTokenDistance(tokenA, tokenB) {
 function activeTokenOfActor(actor) {
   if (!actor?.getActiveTokens) return null;
   return actor.getActiveTokens(true)?.[0] || actor.getActiveTokens()?.[0] || null;
+}
+
+/**
+ * Testa o filtro de alvos de área/aura (todos/aliados/inimigos) comparando a
+ * DISPOSIÇÃO dos tokens (amistoso/neutro/hostil) do conjurador e do alvo.
+ *  - "allies": mesma disposição do conjurador (o próprio sempre passa).
+ *  - "enemies": disposição oposta (amistoso ↔ hostil). Conjurador neutro
+ *    trata qualquer não-neutro como inimigo. O próprio NUNCA é inimigo.
+ * Sem tokens na cena para comparar, não bloqueia (retorna true).
+ */
+export function passesAreaFilter(casterActor, targetActor, filter) {
+  const f = filter || "all";
+  if (f === "all") return true;
+  if (targetActor === casterActor) return f === "allies";
+  const cTok = activeTokenOfActor(casterActor);
+  const tTok = activeTokenOfActor(targetActor);
+  const cDisp = cTok?.document?.disposition;
+  const tDisp = tTok?.document?.disposition;
+  if (cDisp == null || tDisp == null) return true;
+  if (f === "allies") return tDisp === cDisp;
+  return cDisp === 0 ? tDisp !== 0 : tDisp === -cDisp;
 }
 
 /** +1D no ataque quando TODOS os alvos diretos estão Surpresos. */
@@ -869,11 +979,20 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     } catch (e) { /* fórmula inválida — ignora esta parcela */ }
   }
 
+  // Rola a CURA (uma vez; aplicada a cada afetado quando a ação acerta)
+  let healRoll = null;
+  if (action.heal && String(action.heal).trim()) {
+    try { healRoll = new Roll(String(action.heal)); await healRoll.evaluate(); atkRolls.push(healRoll); }
+    catch (e) { healRoll = null; }
+  }
+
   // Resumo de alcance/área
   const meta = [];
   if (action.range) meta.push(`Alcance ${action.range}m`);
   if (mode === "area" || mode === "aura") {
     meta.push(`${mode === "aura" ? "Aura" : "Área"} ${action.area || 0}m`);
+    const fLabel = { allies: "só aliados", enemies: "só inimigos" }[action.areaFilter];
+    if (fLabel) meta.push(fLabel);
   }
   const metaText = meta.length ? `<span class="lig-act-meta">${meta.join(" · ")}</span>` : "";
 
@@ -891,18 +1010,26 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
   } else if (mode === "target") {
     for (const a of targeted) affected.push({ actor: a, isSelf: a === actor });
   } else if (mode === "area") {
-    // ÁREA: afeta exatamente quem está na área (vindo do targeting). O próprio
-    // é incluído naturalmente SE o token dele estiver dentro do círculo.
-    for (const a of targeted) affected.push({ actor: a, isSelf: a === actor });
-    // Override opcional: forçar incluir o próprio mesmo se estiver fora.
-    if (action.includeSelf && !affected.some((x) => x.actor === actor)) {
+    // ÁREA: afeta exatamente quem está na área (vindo do targeting), passando
+    // pelo filtro de alvos (todos/aliados/inimigos). O próprio é incluído
+    // naturalmente SE estiver dentro do círculo (e o filtro deixar).
+    for (const a of targeted) {
+      if (!passesAreaFilter(actor, a, action.areaFilter)) continue;
+      affected.push({ actor: a, isSelf: a === actor });
+    }
+    // Override opcional: forçar incluir o próprio mesmo se estiver fora —
+    // exceto se o filtro for "só inimigos" (você nunca é seu inimigo).
+    if (action.includeSelf && passesAreaFilter(actor, actor, action.areaFilter) &&
+        !affected.some((x) => x.actor === actor)) {
       affected.push({ actor, isSelf: true });
     }
   } else if (mode === "aura") {
     // AURA: nunca afeta o próprio personagem, mesmo que ele esteja dentro do
-    // círculo — a menos que includeSelf esteja explicitamente marcado.
+    // círculo — a menos que includeSelf esteja explicitamente marcado (e o
+    // filtro de alvos permita).
     for (const a of targeted) {
       if (a === actor && !action.includeSelf) continue;
+      if (!passesAreaFilter(actor, a, action.areaFilter)) continue;
       affected.push({ actor: a, isSelf: a === actor });
     }
   }
@@ -1086,13 +1213,13 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
         defInfo = isSelf ? ' <span class="lig-outcome self">(em si)</span>' : ' <span class="lig-outcome ok">(automático)</span>';
       }
 
-      const detail = await resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls, atkTotal, defTotal, acertou, cfg, attackerMods: atkCond, caster: actor });
+      const detail = await resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls, healRoll, atkTotal, defTotal, dcTotal: effectiveDCFor(tActor), acertou, cfg, attackerMods: atkCond, caster: actor });
       hits.push({ actor: tActor, acertou, isSelf });
       lines.push(`<div class="lig-atk-target"><div class="lig-atk-line"><strong>${tActor.name}</strong>${defInfo}</div>${detail}</div>`);
     }
   } else if (mode === "target") {
     lines.push(`<div class="lig-atk-hint">Selecione um ou mais alvos (target) para resolver a ação.</div>`);
-  } else if (mode === "none" && (damageRoll || (extraDamageRolls && extraDamageRolls.length))) {
+  } else if (mode === "none" && (damageRoll || (extraDamageRolls && extraDamageRolls.length) || healRoll)) {
     const dmgLine = (total, type, resource) => {
       const resWord = { hp: "Dano", mp: "Mana drenada", heroic: "Heroico drenado" }[resource];
       const typeLabel = dmgTypeLabel(type);
@@ -1102,6 +1229,11 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     if (damageRoll) lines.push(dmgLine(damageRoll.total, action.damageType || "", action.damageResource || "hp"));
     for (const ex of (extraDamageRolls || [])) {
       lines.push(dmgLine(ex.roll.total, ex.type || "", ex.resource || "hp") + ' <span class="lig-extra-tag">extra</span>');
+    }
+    if (healRoll) {
+      const hRes = action.healResource || "hp";
+      const hWord = { hp: "Cura", mp: "Mana recuperada", heroic: "Heroico recuperado", hpTemp: "Sobrevida" }[hRes];
+      lines.push(`<div class="lig-atk-heal">${hWord}: <strong>${healRoll.total}</strong></div>`);
     }
   }
 

@@ -201,6 +201,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       reroll6: "Rerrolar dados que caem 6",
       crit: "Crítico aprimorado",
       fumble: "Falha crítica piorada",
+      tempHp: "Sobrevida ao ativar",
       info: "Condição / Texto",
     };
     context.costResources = {
@@ -312,6 +313,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       reroll6: "roll",
       crit: "roll",
       fumble: "roll",
+      tempHp: "none",
       info: "none",
     };
 

@@ -7,7 +7,8 @@ const fields = foundry.data.fields;
 /**
  * Um efeito mecânico que um item pode conceder quando ativo.
  * Tipos: dice (+dados melhoria), bonus (+rolagem), stat (modifica valor),
- *        set (define valor fixo), damage, rd (redução de dano), info (condição).
+ *        set (define valor fixo), damage, rd (redução de dano), tempHp
+ *        (sobrevida concedida ao ativar o item), info (condição).
  */
 export function effectField() {
   return new fields.ArrayField(
@@ -15,7 +16,7 @@ export function effectField() {
       type: new fields.StringField({
         required: true,
         initial: "bonus",
-        choices: ["dice", "bonus", "stat", "set", "damage", "rd", "reroll1", "reroll6", "crit", "fumble", "info"],
+        choices: ["dice", "bonus", "stat", "set", "damage", "rd", "reroll1", "reroll6", "crit", "fumble", "tempHp", "info"],
       }),
       target: new fields.StringField({ required: true, initial: "all" }),
       value: new fields.NumberField({ required: true, initial: 0, integer: true }),
@@ -124,6 +125,15 @@ export function actionEntryField() {
       choices: ["none", "self", "target", "area", "aura"],
     }),
     includeSelf: new fields.BooleanField({ initial: false }),
+    // Filtro de alvos para ÁREA/AURA: todos, só aliados ou só inimigos.
+    // Aliado = token com a MESMA disposição do conjurador; inimigo =
+    // disposição oposta (amistoso ↔ hostil; conjurador neutro trata
+    // não-neutros como inimigos). O próprio conjurador conta como aliado.
+    areaFilter: new fields.StringField({
+      required: false,
+      initial: "all",
+      choices: ["all", "allies", "enemies"],
+    }),
     defenseAttr: new fields.StringField({ blank: true, initial: "esquiva" }),
     defenseAttr2: new fields.StringField({ blank: true, initial: "" }),
     damage: new fields.StringField({ blank: true, initial: "" }),
@@ -134,6 +144,25 @@ export function actionEntryField() {
       choices: ["hp", "mp", "heroic"],
     }),
     scalingDamage: new fields.BooleanField({ initial: false }),
+    // --- CURA (recuperação de vida/recurso) ---
+    // Fórmula de cura aplicada a cada afetado quando a ação "acerta" (em
+    // self/aliados sem teste, aplica automaticamente). Recupera o recurso
+    // escolhido, limitado ao máximo da ficha. Cura ignora RD e os
+    // multiplicadores de condição de dano.
+    heal: new fields.StringField({ blank: true, initial: "" }),
+    healResource: new fields.StringField({
+      required: false,
+      initial: "hp",
+      choices: ["hp", "mp", "heroic", "hpTemp"],
+    }),
+    // Cura ESCALONADA: como o dano escalonado, soma +1 por 2 pontos pelos
+    // quais a rolagem superou o teste que se aplicou (defesa do alvo e/ou
+    // CD efetiva — o mais alto entre eles).
+    scalingHeal: new fields.BooleanField({ initial: false }),
+    // Quando a cura vai para SOBREVIDA (healResource "hpTemp"): se true,
+    // SOMA à sobrevida atual; se false (padrão), fica apenas o MAIOR valor
+    // entre a atual e a concedida (sobrevida não acumula).
+    tempStack: new fields.BooleanField({ initial: false }),
     // Não abrir a caixa de rolagem ao executar esta ação. Ligado por padrão:
     // nas ações a rolagem já vem planejada.
     skipRollDialog: new fields.BooleanField({ initial: true }),

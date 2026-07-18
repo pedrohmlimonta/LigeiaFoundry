@@ -18,7 +18,7 @@
       <span class="lig-fx-type">{{lookup ../effectTypeLabels eff.type}}</span>
       {{#if (ne eff.type "info")}}
         <span class="lig-fx-val">{{eff.value}}</span>
-        {{#unless (or (eq eff.type "damage") (eq eff.type "rd"))}}
+        {{#unless (or (or (eq eff.type "damage") (eq eff.type "rd")) (eq eff.type "tempHp"))}}
           <span class="lig-fx-target">{{lookup ../effectTargetLabels eff.target}}</span>
         {{/unless}}
       {{/if}}

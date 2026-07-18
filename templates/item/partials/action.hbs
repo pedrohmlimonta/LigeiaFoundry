@@ -75,6 +75,14 @@
       {{#if (eq act.targetMode "aura")}}Exceção: incluir você também na aura{{else}}Exceção: incluir você mesmo se estiver fora da área{{/if}}
     </label>
 
+    <label>Afeta na {{#if (eq act.targetMode "aura")}}aura{{else}}área{{/if}}
+      <select name="system.actions.{{i}}.areaFilter">
+        <option value="all" {{#if (eq act.areaFilter "all")}}selected{{/if}}>Todos os tokens</option>
+        <option value="allies" {{#if (eq act.areaFilter "allies")}}selected{{/if}}>Só aliados (mesma disposição do seu token)</option>
+        <option value="enemies" {{#if (eq act.areaFilter "enemies")}}selected{{/if}}>Só inimigos (disposição oposta)</option>
+      </select>
+    </label>
+
     {{!-- Emanação: área/aura persistente com disparo por turno --}}
     <div class="lig-emanation-box">
       <label class="lig-inline-check">
@@ -149,6 +157,33 @@
     <label class="lig-inline-check">
       <input type="checkbox" name="system.actions.{{i}}.scalingDamage" {{checked act.scalingDamage}}/>
       Dano escalonado (+1 por 2 pontos acima da defesa)
+    </label>
+
+    {{!-- CURA: recuperação de vida/recurso aplicada a quem a ação alcançar --}}
+    <div class="lig-item-row">
+      <label>Cura (ex: 1d6+2)
+        <input type="text" name="system.actions.{{i}}.heal" value="{{act.heal}}" placeholder="vazio = sem cura"/>
+      </label>
+      <label>Recurso recuperado
+        <select name="system.actions.{{i}}.healResource">
+          <option value="hp" {{#if (eq act.healResource "hp")}}selected{{/if}}>Vida (PV)</option>
+          <option value="mp" {{#if (eq act.healResource "mp")}}selected{{/if}}>Mana (PM)</option>
+          <option value="heroic" {{#if (eq act.healResource "heroic")}}selected{{/if}}>Pontos Heroicos</option>
+          <option value="hpTemp" {{#if (eq act.healResource "hpTemp")}}selected{{/if}}>Sobrevida (PV temporário)</option>
+        </select>
+      </label>
+    </div>
+
+    {{#if (eq act.healResource "hpTemp")}}
+    <label class="lig-inline-check" title="Por padrão a sobrevida NÃO acumula: fica o maior valor entre a atual e a concedida.">
+      <input type="checkbox" name="system.actions.{{i}}.tempStack" {{checked act.tempStack}}/>
+      Acumular sobrevida (somar à atual em vez de manter a maior)
+    </label>
+    {{/if}}
+
+    <label class="lig-inline-check">
+      <input type="checkbox" name="system.actions.{{i}}.scalingHeal" {{checked act.scalingHeal}}/>
+      Cura escalonada (+1 por 2 pontos acima da defesa/CD)
     </label>
 
     <label class="lig-inline-check" title="Quando ligado, executar esta ação não abre a caixa de configuração da rolagem.">
