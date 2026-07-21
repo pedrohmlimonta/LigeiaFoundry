@@ -202,6 +202,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       crit: "Crítico aprimorado",
       fumble: "Falha crítica piorada",
       tempHp: "Sobrevida ao ativar",
+      areaFilter: "Filtro de área (força só aliados/inimigos)",
       info: "Condição / Texto",
     };
     context.costResources = {
@@ -254,6 +255,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         bloqueio: "Bloqueio", esquiva: "Esquiva", conjuracao: "Conjuração", iniciativa: "Iniciativa",
         deslocamento: "Deslocamento", percepcao_passiva: "Percepção Passiva",
       },
+      areaFilter: { enemies: "Só inimigos", allies: "Só aliados" },
       none: { all: "—" },
     };
     context.targetOptions = TARGETS;
@@ -315,6 +317,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       crit: "roll",
       fumble: "roll",
       tempHp: "none",
+      areaFilter: "areaFilter",
       info: "none",
     };
 

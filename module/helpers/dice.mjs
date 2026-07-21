@@ -35,6 +35,7 @@ async function waitForDiceAnimation(fallbackMs = 1100) {
 import { conditionModifiers, attributeConditionDice, actorHasCondition } from "./conditions.mjs";
 import { playActionAnimation } from "./integrations.mjs";
 import { executeActionMovement } from "./movement.mjs";
+import { areaFilterOverrideFor } from "./effects.mjs";
 import { promptRollConfig, shouldPromptRoll } from "../apps/roll-dialog.mjs";
 
 /**
@@ -1015,8 +1016,9 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
   if (action.range) meta.push(`Alcance ${action.range}m`);
   if (mode === "area" || mode === "aura") {
     meta.push(`${mode === "aura" ? "Aura" : "Área"} ${action.area || 0}m`);
-    const fLabel = { allies: "só aliados", enemies: "só inimigos" }[action.areaFilter];
-    if (fLabel) meta.push(fLabel);
+    const ovFilter = areaFilterOverrideFor(actor);
+    const fLabel = { allies: "só aliados", enemies: "só inimigos" }[ovFilter || action.areaFilter];
+    if (fLabel) meta.push(fLabel + (ovFilter ? " (por efeito)" : ""));
   }
   const metaText = meta.length ? `<span class="lig-act-meta">${meta.join(" · ")}</span>` : "";
 
@@ -1035,25 +1037,28 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     for (const a of targeted) affected.push({ actor: a, isSelf: a === actor });
   } else if (mode === "area") {
     // ÁREA: afeta exatamente quem está na área (vindo do targeting), passando
-    // pelo filtro de alvos (todos/aliados/inimigos). O próprio é incluído
-    // naturalmente SE estiver dentro do círculo (e o filtro deixar).
+    // pelo filtro de alvos (todos/aliados/inimigos). Um efeito ativo do tipo
+    // "areaFilter" sobrepõe o filtro configurado na ação. O próprio é
+    // incluído naturalmente SE estiver dentro do círculo (e o filtro deixar).
+    const areaF = areaFilterOverrideFor(actor) || action.areaFilter;
     for (const a of targeted) {
-      if (!passesAreaFilter(actor, a, action.areaFilter)) continue;
+      if (!passesAreaFilter(actor, a, areaF)) continue;
       affected.push({ actor: a, isSelf: a === actor });
     }
     // Override opcional: forçar incluir o próprio mesmo se estiver fora —
     // exceto se o filtro for "só inimigos" (você nunca é seu inimigo).
-    if (action.includeSelf && passesAreaFilter(actor, actor, action.areaFilter) &&
+    if (action.includeSelf && passesAreaFilter(actor, actor, areaF) &&
         !affected.some((x) => x.actor === actor)) {
       affected.push({ actor, isSelf: true });
     }
   } else if (mode === "aura") {
     // AURA: nunca afeta o próprio personagem, mesmo que ele esteja dentro do
     // círculo — a menos que includeSelf esteja explicitamente marcado (e o
-    // filtro de alvos permita).
+    // filtro de alvos permita). O override de efeito também vale aqui.
+    const areaF = areaFilterOverrideFor(actor) || action.areaFilter;
     for (const a of targeted) {
       if (a === actor && !action.includeSelf) continue;
-      if (!passesAreaFilter(actor, a, action.areaFilter)) continue;
+      if (!passesAreaFilter(actor, a, areaF)) continue;
       affected.push({ actor: a, isSelf: a === actor });
     }
   }

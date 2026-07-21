@@ -209,6 +209,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
               if (e.type === "reroll6") return `Rerrola 6 (${e.rerollAll ? "todos" : e.value})`;
               if (e.type === "crit") return `Crítico ≥${12 - (Number(e.value) || 0)}`;
               if (e.type === "fumble") return `Falha ≤${2 + (Number(e.value) || 0)}`;
+              if (e.type === "areaFilter") return `Áreas: ${e.target === "allies" ? "só aliados" : "só inimigos"}`;
               return `${fxTypeLabels[e.type] || e.type} ${sign}${e.value}${kind} ${e.target || ""}`.trim();
             })
             .join(", "),
@@ -239,7 +240,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     // sem precisar abrir a edição do item).
     context.effectTypeLabels = {
       dice: "Dados", bonus: "Bônus", stat: "Modifica", set: "Define",
-      damage: "Dano", rd: "Red. Dano", tempHp: "Sobrevida", info: "Condição",
+      damage: "Dano", rd: "Red. Dano", tempHp: "Sobrevida", areaFilter: "Filtro de área", info: "Condição",
     };
     context.effectTargetLabels = {
       all: "todas", forca: "Força", agilidade: "Agilidade", vigor: "Vigor",
@@ -248,6 +249,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       max_hp: "PV máx", max_mp: "PM máx", max_heroic: "PH máx",
       deslocamento: "Deslocamento", bloqueio: "Bloqueio", esquiva: "Esquiva",
       iniciativa: "Iniciativa", percepcao_passiva: "Perc. Passiva",
+      allies: "só aliados", enemies: "só inimigos",
     };
 
     // ---- Cálculo de XP gasto (com regra de dobro fora da lista) ----

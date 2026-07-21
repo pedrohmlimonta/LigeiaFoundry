@@ -20,7 +20,9 @@
       <option value="all" selected>—</option>
     </select>
     {{/if}}
+    {{#unless (eq eff.type "areaFilter")}}
     <input type="number" name="system.effects.{{i}}.value" value="{{eff.value}}" class="lig-narrow" min="0" title="{{#if eff.isReroll}}Quantos dados rerrolar (0+){{else}}Valor (negativo reduz){{/if}}"/>
+    {{/unless}}
     {{#if eff.isReroll}}
     <label class="lig-inline-check" title="Rerrolar TODOS os dados que caírem nesse valor">
       <input type="checkbox" name="system.effects.{{i}}.rerollAll" {{checked eff.rerollAll}}/> todos

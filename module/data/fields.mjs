@@ -8,7 +8,8 @@ const fields = foundry.data.fields;
  * Um efeito mecânico que um item pode conceder quando ativo.
  * Tipos: dice (+dados melhoria), bonus (+rolagem), stat (modifica valor),
  *        set (define valor fixo), damage, rd (redução de dano), tempHp
- *        (sobrevida concedida ao ativar o item), info (condição).
+ *        (sobrevida concedida ao ativar o item), areaFilter (força as áreas
+ *        do personagem a afetar só aliados/só inimigos), info (condição).
  */
 export function effectField() {
   return new fields.ArrayField(
@@ -16,7 +17,7 @@ export function effectField() {
       type: new fields.StringField({
         required: true,
         initial: "bonus",
-        choices: ["dice", "bonus", "stat", "set", "damage", "rd", "reroll1", "reroll6", "crit", "fumble", "tempHp", "info"],
+        choices: ["dice", "bonus", "stat", "set", "damage", "rd", "reroll1", "reroll6", "crit", "fumble", "tempHp", "areaFilter", "info"],
       }),
       target: new fields.StringField({ required: true, initial: "all" }),
       value: new fields.NumberField({ required: true, initial: 0, integer: true }),

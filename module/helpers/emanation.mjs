@@ -14,6 +14,7 @@
  */
 
 import { rollItemAction, passesAreaFilter } from "./dice.mjs";
+import { areaFilterOverrideFor } from "./effects.mjs";
 
 const FLAG_SCOPE = "ligeia-rpg";
 const FLAG_KEY = "emanation";
@@ -79,8 +80,9 @@ async function triggerEmanationOn(ema, targetActor) {
   const { actor, item, action } = resolved;
 
   // Respeita o filtro de alvos da área (todos/aliados/inimigos): quem não
-  // passa no filtro simplesmente não é afetado pela emanação.
-  if (!passesAreaFilter(actor, targetActor, action.areaFilter)) return;
+  // passa no filtro simplesmente não é afetado pela emanação. Um efeito
+  // ativo do tipo "areaFilter" no conjurador sobrepõe o filtro da ação.
+  if (!passesAreaFilter(actor, targetActor, areaFilterOverrideFor(actor) || action.areaFilter)) return;
 
   // Não reaplica os custos/macro da fonte a cada turno: clona a ação sem
   // custos e sem macro (a emanação é o efeito recorrente, não um novo conjuro).

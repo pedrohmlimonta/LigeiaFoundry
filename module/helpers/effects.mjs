@@ -176,3 +176,33 @@ export function aggregateEffectModifiers(actor) {
 
   return mods;
 }
+
+/** Alvos válidos do efeito "areaFilter" (filtro de área forçado). */
+const AREA_FILTER_TARGETS = ["allies", "enemies"];
+
+/**
+ * Override do filtro de área: se o ator tiver QUALQUER efeito ativo do tipo
+ * "areaFilter" — em itens ligados (respeitando nível B/A/E) ou em efeitos
+ * aplicados não desligados — TODAS as ações de área/aura dele passam a
+ * afetar só aliados ou só inimigos, sobrepondo o filtro configurado em cada
+ * ação. Havendo mais de um ativo, vale o PRIMEIRO encontrado (itens na ordem
+ * da ficha primeiro, depois efeitos aplicados).
+ *
+ * @param {Actor} actor
+ * @returns {"allies"|"enemies"|null}
+ */
+export function areaFilterOverrideFor(actor) {
+  for (const item of actor?.items || []) {
+    for (const e of activeEffectsOf(item)) {
+      if (e.type === "areaFilter" && AREA_FILTER_TARGETS.includes(e.target)) return e.target;
+    }
+  }
+  for (const ae of actor?.system?.appliedEffects || []) {
+    if (ae?.disabled) continue;
+    for (const e of ae.effects || []) {
+      if (e?.enabled === false) continue;
+      if (e?.type === "areaFilter" && AREA_FILTER_TARGETS.includes(e.target)) return e.target;
+    }
+  }
+  return null;
+}
