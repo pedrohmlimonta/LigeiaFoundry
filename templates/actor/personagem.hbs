@@ -485,6 +485,12 @@
       <input type="checkbox" name="system.rollHidden" {{#if system.rollHidden}}checked{{/if}}/>
       🕶 Rolar ocultamente (resultado vai só para o Narrador)
     </label>
+    {{#if isNpc}}
+    <label class="lig-gm-toggle" title="Este NPC conta como INIMIGO nos filtros de área 'só aliados/só inimigos' (desmarcado = aliado do grupo), independente da disposição do token.">
+      <input type="checkbox" name="system.isEnemy" {{#if system.isEnemy}}checked{{/if}}/>
+      ⚔ Inimigo (para filtros de área)
+    </label>
+    {{/if}}
   </section>
   {{/if}}
 

@@ -837,21 +837,32 @@ function activeTokenOfActor(actor) {
 }
 
 /**
+ * Disposição EFETIVA de um ator para o filtro de área.
+ *  - NPC: definida pela checkbox "Inimigo" da ficha (marcada = hostil,
+ *    desmarcada = amistoso), IGNORANDO a disposição do token — assim o
+ *    filtro funciona até para NPCs sem token na cena.
+ *  - Personagem: disposição do token na cena (sem token, assume amistoso).
+ */
+function effectiveDisposition(actor) {
+  if (!actor) return null;
+  if (actor.type === "npc") return actor.system?.isEnemy ? -1 : 1;
+  const tok = activeTokenOfActor(actor);
+  return tok?.document?.disposition ?? 1;
+}
+
+/**
  * Testa o filtro de alvos de área/aura (todos/aliados/inimigos) comparando a
- * DISPOSIÇÃO dos tokens (amistoso/neutro/hostil) do conjurador e do alvo.
+ * disposição EFETIVA do conjurador e do alvo (ver effectiveDisposition):
  *  - "allies": mesma disposição do conjurador (o próprio sempre passa).
  *  - "enemies": disposição oposta (amistoso ↔ hostil). Conjurador neutro
  *    trata qualquer não-neutro como inimigo. O próprio NUNCA é inimigo.
- * Sem tokens na cena para comparar, não bloqueia (retorna true).
  */
 export function passesAreaFilter(casterActor, targetActor, filter) {
   const f = filter || "all";
   if (f === "all") return true;
   if (targetActor === casterActor) return f === "allies";
-  const cTok = activeTokenOfActor(casterActor);
-  const tTok = activeTokenOfActor(targetActor);
-  const cDisp = cTok?.document?.disposition;
-  const tDisp = tTok?.document?.disposition;
+  const cDisp = effectiveDisposition(casterActor);
+  const tDisp = effectiveDisposition(targetActor);
   if (cDisp == null || tDisp == null) return true;
   if (f === "allies") return tDisp === cDisp;
   return cDisp === 0 ? tDisp !== 0 : tDisp === -cDisp;
