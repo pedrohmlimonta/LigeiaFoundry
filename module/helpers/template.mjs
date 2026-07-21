@@ -7,6 +7,9 @@
  *
  * Após posicionar, os tokens cujo centro está dentro do círculo são mirados
  * automaticamente (viram alvos de game.user), para a ação resolver sobre eles.
+ * O filtro de alvos da ação (só aliados/só inimigos — incluindo o override
+ * por efeito e a checkbox "Inimigo" dos NPCs) é aplicado JÁ NA MIRA VISUAL,
+ * para os marcadores no mapa espelharem exatamente quem será afetado.
  *
  * Toda a interação com o canvas é embrulhada em try/catch pelo chamador, de
  * modo que, se a API divergir nesta build, a rolagem ainda acontece.
@@ -18,6 +21,8 @@
  */
 
 import { measuredTemplatesAvailable } from "./compat.mjs";
+import { passesAreaFilter } from "./dice.mjs";
+import { areaFilterOverrideFor } from "./effects.mjs";
 
 function MTObjectClass() {
   return (
@@ -28,17 +33,25 @@ function MTObjectClass() {
 
 /**
  * Mira automaticamente os tokens dentro de um círculo (centro em pixels,
- * raio em metros/unidades do grid).
- * @returns {number} quantos tokens foram mirados
+ * raio em metros/unidades do grid). Se `filterFn(actor)` for fornecido,
+ * apenas os tokens que passam no filtro são mirados (e devolvidos).
+ * @returns {Actor[]} os atores dos tokens mirados
  */
-export function targetTokensInCircle(cx, cy, radiusUnits) {
+export function targetTokensInCircle(cx, cy, radiusUnits, filterFn = null) {
   try {
     const grid = canvas.grid;
     const radiusPx = (radiusUnits / grid.distance) * grid.size;
-    const inside = [];
+    let inside = [];
     for (const tk of canvas.tokens.placeables) {
       const c = tk.center;
       if (Math.hypot(c.x - cx, c.y - cy) <= radiusPx) inside.push(tk);
+    }
+    // Filtro de alvos (só aliados/só inimigos): aplicado ANTES da mira
+    // visual, para que os marcadores no mapa espelhem exatamente quem a
+    // ação vai afetar. NPCs contam como inimigos/aliados pela checkbox
+    // "Inimigo" da ficha (via passesAreaFilter, no chamador).
+    if (typeof filterFn === "function") {
+      inside = inside.filter((tk) => tk.actor && filterFn(tk.actor));
     }
     // Mira visualmente (highlight) os tokens dentro do círculo. Usamos
     // Token#setTarget porque game.user.updateTokenTargets não existe em
@@ -118,7 +131,7 @@ function buildEmanationFlags(actor, item, action) {
  * AURA: cria um círculo centrado no token do ator (sem posicionamento).
  * @returns {MeasuredTemplateDocument|null}
  */
-export async function placeAuraTemplate(actor, radius, persistFlags = null) {
+export async function placeAuraTemplate(actor, radius, persistFlags = null, filterFn = null) {
   const token = actor.getActiveTokens?.(true)?.[0] || actor.getActiveTokens?.()?.[0];
   if (!token) {
     ui.notifications?.warn("O personagem precisa de um token na cena para a aura.");
@@ -126,8 +139,8 @@ export async function placeAuraTemplate(actor, radius, persistFlags = null) {
   }
   const data = circleData(radius, token.center.x, token.center.y, persistFlags);
   const created = await canvas.scene.createEmbeddedDocuments("MeasuredTemplate", [data]);
-  // Mira e devolve os atores dentro da aura
-  const actors = targetTokensInCircle(token.center.x, token.center.y, radius);
+  // Mira e devolve os atores dentro da aura (já passando pelo filtro)
+  const actors = targetTokensInCircle(token.center.x, token.center.y, radius, filterFn);
   return { actors, templateId: created?.[0]?.id || null };
 }
 
@@ -136,7 +149,7 @@ export async function placeAuraTemplate(actor, radius, persistFlags = null) {
  * criado, ou null se cancelado.
  * @returns {Promise<MeasuredTemplateDocument|null>}
  */
-export async function placeAreaTemplate(actor, radius, persistFlags = null) {
+export async function placeAreaTemplate(actor, radius, persistFlags = null, filterFn = null) {
   const Base = MTObjectClass();
   if (!Base) return null;
 
@@ -209,7 +222,7 @@ export async function placeAreaTemplate(actor, radius, persistFlags = null) {
       cleanup();
       try {
         const created = await canvas.scene.createEmbeddedDocuments("MeasuredTemplate", [finalData]);
-        const actors = targetTokensInCircle(finalData.x, finalData.y, radius);
+        const actors = targetTokensInCircle(finalData.x, finalData.y, radius, filterFn);
         resolve({ ok: true, actors, templateId: created?.[0]?.id || null });
       } catch (e) {
         console.warn("Ligeia | falha ao criar template de área:", e);
@@ -246,6 +259,13 @@ export async function placeTemplateForAction(actor, item, action) {
   if (radius <= 0) return { proceed: true, actors: null };
   if (!canvas?.scene) return { proceed: true, actors: null };
 
+  // Filtro de alvos EFETIVO (todos/só aliados/só inimigos): um efeito ativo
+  // do tipo "Filtro de área" no conjurador sobrepõe o filtro configurado na
+  // ação. Aliado/inimigo é decidido por passesAreaFilter — para NPCs, pela
+  // checkbox "Inimigo" da ficha (marcada = inimigo; desmarcada = aliado).
+  const effFilter = areaFilterOverrideFor(actor) || action.areaFilter || "all";
+  const filterFn = effFilter === "all" ? null : (tActor) => passesAreaFilter(actor, tActor, effFilter);
+
   // --- Compatibilidade V14: sem Measured Templates ---
   // Não há como desenhar o círculo (o documento foi removido). Degradamos:
   //  - aura: mira quem está no raio ao redor do token do lançador;
@@ -257,14 +277,15 @@ export async function placeTemplateForAction(actor, item, action) {
     if (mode === "aura") {
       const token = actor.getActiveTokens?.(true)?.[0] || actor.getActiveTokens?.()?.[0];
       if (token?.center) {
-        const actors = targetTokensInCircle(token.center.x, token.center.y, radius);
+        const actors = targetTokensInCircle(token.center.x, token.center.y, radius, filterFn);
         ui.notifications?.info(`Aura de ${radius}m resolvida ao redor de ${actor.name} (sem círculo visual no V14).`);
         return { proceed: true, actors, templateId: null };
       }
       return { proceed: true, actors: [], templateId: null };
     }
-    // área: usa os alvos mirados
-    const targeted = Array.from(game.user?.targets ?? []).map((t) => t.actor).filter(Boolean);
+    // área: usa os alvos mirados (aplicando o filtro de alvos)
+    let targeted = Array.from(game.user?.targets ?? []).map((t) => t.actor).filter(Boolean);
+    if (filterFn) targeted = targeted.filter(filterFn);
     ui.notifications?.info(`Área de ${radius}m: usando os alvos mirados (sem círculo visual no V14). Mire os alvos atingidos.`);
     return { proceed: true, actors: targeted, templateId: null };
   }
@@ -275,10 +296,10 @@ export async function placeTemplateForAction(actor, item, action) {
 
   try {
     if (mode === "aura") {
-      const res = await placeAuraTemplate(actor, radius, persistFlags);
+      const res = await placeAuraTemplate(actor, radius, persistFlags, filterFn);
       return { proceed: true, actors: (res?.actors) || [], templateId: res?.templateId || null };
     } else {
-      const res = await placeAreaTemplate(actor, radius, persistFlags);
+      const res = await placeAreaTemplate(actor, radius, persistFlags, filterFn);
       return { proceed: res.ok, actors: res.actors || [], templateId: res?.templateId || null };
     }
   } catch (e) {
