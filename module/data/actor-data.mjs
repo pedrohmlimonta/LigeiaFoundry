@@ -345,10 +345,10 @@ export class NpcData extends PersonagemData {
         minorSpells: new fields.HTMLField({ blank: true, initial: "" }),
       }),
 
-      // Este NPC é um INIMIGO? (padrão: sim). Fonte da verdade dos filtros
-      // de área "só aliados/só inimigos": NPC marcado conta como inimigo do
-      // grupo; desmarcado conta como aliado — independente da disposição do
-      // token. Personagens continuam usando a disposição do token.
+      // Este NPC é um INIMIGO? (padrão: sim). Fonte da verdade ABSOLUTA dos
+      // filtros de área "só aliados/só inimigos": marcado = lado inimigo;
+      // desmarcado = lado aliado — independente de quem conjura e da
+      // disposição do token. Personagens contam sempre como aliados.
       isEnemy: new fields.BooleanField({ initial: true }),
 
       // NPCs rolam ocultamente por padrão

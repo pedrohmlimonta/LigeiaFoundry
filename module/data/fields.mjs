@@ -135,9 +135,9 @@ export function actionEntryField() {
     }),
     includeSelf: new fields.BooleanField({ initial: false }),
     // Filtro de alvos para ÁREA/AURA: todos, só aliados ou só inimigos.
-    // Aliado = token com a MESMA disposição do conjurador; inimigo =
-    // disposição oposta (amistoso ↔ hostil; conjurador neutro trata
-    // não-neutros como inimigos). O próprio conjurador conta como aliado.
+    // Os lados são ABSOLUTOS: "inimigos" = NPCs com a checkbox "Inimigo"
+    // marcada; "aliados" = personagens e NPCs desmarcados. Não depende de
+    // quem conjura nem da disposição dos tokens.
     areaFilter: new fields.StringField({
       required: false,
       initial: "all",

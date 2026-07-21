@@ -837,35 +837,34 @@ function activeTokenOfActor(actor) {
 }
 
 /**
- * Disposição EFETIVA de um ator para o filtro de área.
- *  - NPC: definida pela checkbox "Inimigo" da ficha (marcada = hostil,
- *    desmarcada = amistoso), IGNORANDO a disposição do token — assim o
- *    filtro funciona até para NPCs sem token na cena.
- *  - Personagem: disposição do token na cena (sem token, assume amistoso).
+ * LADO de um ator para os filtros de área — ABSOLUTO, definido pela checkbox
+ * "Inimigo" da ficha de NPC: marcada = lado INIMIGO; desmarcada = lado
+ * ALIADO. Personagens contam SEMPRE como aliados (o lado do grupo). Não
+ * depende de quem conjura nem da disposição dos tokens — e funciona até
+ * para atores sem token na cena.
  */
-function effectiveDisposition(actor) {
+function actorSide(actor) {
   if (!actor) return null;
-  if (actor.type === "npc") return actor.system?.isEnemy ? -1 : 1;
-  const tok = activeTokenOfActor(actor);
-  return tok?.document?.disposition ?? 1;
+  if (actor.type === "npc") return actor.system?.isEnemy ? "enemy" : "ally";
+  return "ally";
 }
 
 /**
- * Testa o filtro de alvos de área/aura (todos/aliados/inimigos) comparando a
- * disposição EFETIVA do conjurador e do alvo (ver effectiveDisposition):
- *  - "allies": mesma disposição do conjurador (o próprio sempre passa).
- *  - "enemies": disposição oposta (amistoso ↔ hostil). Conjurador neutro
- *    trata qualquer não-neutro como inimigo. O próprio NUNCA é inimigo.
+ * Testa o filtro de alvos de área/aura (todos/aliados/inimigos) pelo LADO
+ * ABSOLUTO do alvo (ver actorSide):
+ *  - "enemies": afeta só quem tem a checkbox "Inimigo" marcada (NPCs).
+ *  - "allies": afeta personagens e NPCs com a checkbox desmarcada.
+ * O conjurador NÃO entra na conta: um NPC inimigo lançando "só inimigos"
+ * afeta o lado inimigo (os NPCs marcados, inclusive ele mesmo se estiver
+ * dentro), e "só aliados" afeta o lado do grupo — sempre pelos mesmos
+ * critérios, não importa quem conjura.
  */
 export function passesAreaFilter(casterActor, targetActor, filter) {
   const f = filter || "all";
   if (f === "all") return true;
-  if (targetActor === casterActor) return f === "allies";
-  const cDisp = effectiveDisposition(casterActor);
-  const tDisp = effectiveDisposition(targetActor);
-  if (cDisp == null || tDisp == null) return true;
-  if (f === "allies") return tDisp === cDisp;
-  return cDisp === 0 ? tDisp !== 0 : tDisp === -cDisp;
+  const side = actorSide(targetActor);
+  if (side == null) return true; // sem como classificar, não bloqueia
+  return f === "enemies" ? side === "enemy" : side === "ally";
 }
 
 /** +1D no ataque quando TODOS os alvos diretos estão Surpresos. */

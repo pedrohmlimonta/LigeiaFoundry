@@ -138,7 +138,14 @@ export async function placeAuraTemplate(actor, radius, persistFlags = null, filt
     return null;
   }
   const data = circleData(radius, token.center.x, token.center.y, persistFlags);
-  const created = await canvas.scene.createEmbeddedDocuments("MeasuredTemplate", [data]);
+  let created = null;
+  try {
+    created = await canvas.scene.createEmbeddedDocuments("MeasuredTemplate", [data]);
+  } catch (e) {
+    // No V14 os MeasuredTemplates são um shim sobre Regions e a criação pode
+    // falhar/avisar. Mesmo sem o círculo visual, a aura é resolvida.
+    console.warn("Ligeia | falha ao criar template de aura (seguindo sem o círculo):", e);
+  }
   // Mira e devolve os atores dentro da aura (já passando pelo filtro)
   const actors = targetTokensInCircle(token.center.x, token.center.y, radius, filterFn);
   return { actors, templateId: created?.[0]?.id || null };
@@ -225,8 +232,12 @@ export async function placeAreaTemplate(actor, radius, persistFlags = null, filt
         const actors = targetTokensInCircle(finalData.x, finalData.y, radius, filterFn);
         resolve({ ok: true, actors, templateId: created?.[0]?.id || null });
       } catch (e) {
-        console.warn("Ligeia | falha ao criar template de área:", e);
-        resolve({ ok: true, actors: [], templateId: null });
+        // No V14 os MeasuredTemplates são um shim sobre Regions e a criação
+        // pode falhar/avisar. Mesmo sem o círculo visual, a área é resolvida
+        // nos tokens do local escolhido.
+        console.warn("Ligeia | falha ao criar template de área (seguindo sem o círculo):", e);
+        const actors = targetTokensInCircle(finalData.x, finalData.y, radius, filterFn);
+        resolve({ ok: true, actors, templateId: null });
       }
     };
 
