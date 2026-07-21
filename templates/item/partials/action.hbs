@@ -55,8 +55,12 @@
           <option value="none" {{#if (eq act.targetMode "none")}}selected{{/if}}>Nenhum</option>
           <option value="self" {{#if (eq act.targetMode "self")}}selected{{/if}}>O próprio personagem</option>
           <option value="target" {{#if (eq act.targetMode "target")}}selected{{/if}}>Alvo(s) mirado(s)</option>
-          <option value="area" {{#if (eq act.targetMode "area")}}selected{{/if}}>Área (afeta quem está nela)</option>
-          <option value="aura" {{#if (eq act.targetMode "aura")}}selected{{/if}}>Aura (afeta os outros, não você)</option>
+          <option value="area:all" {{#if (eq act.targetMode "area")}}{{#unless (or (eq act.areaFilter "allies") (eq act.areaFilter "enemies"))}}selected{{/unless}}{{/if}}>Área (afeta quem está nela)</option>
+          <option value="area:allies" {{#if (eq act.targetMode "area")}}{{#if (eq act.areaFilter "allies")}}selected{{/if}}{{/if}}>Área — só aliados</option>
+          <option value="area:enemies" {{#if (eq act.targetMode "area")}}{{#if (eq act.areaFilter "enemies")}}selected{{/if}}{{/if}}>Área — só inimigos</option>
+          <option value="aura:all" {{#if (eq act.targetMode "aura")}}{{#unless (or (eq act.areaFilter "allies") (eq act.areaFilter "enemies"))}}selected{{/unless}}{{/if}}>Aura (afeta os outros, não você)</option>
+          <option value="aura:allies" {{#if (eq act.targetMode "aura")}}{{#if (eq act.areaFilter "allies")}}selected{{/if}}{{/if}}>Aura — só aliados</option>
+          <option value="aura:enemies" {{#if (eq act.targetMode "aura")}}{{#if (eq act.areaFilter "enemies")}}selected{{/if}}{{/if}}>Aura — só inimigos</option>
         </select>
       </label>
       <label>Alcance (m)
@@ -73,14 +77,6 @@
     <label class="lig-inline-check">
       <input type="checkbox" name="system.actions.{{i}}.includeSelf" {{checked act.includeSelf}}/>
       {{#if (eq act.targetMode "aura")}}Exceção: incluir você também na aura{{else}}Exceção: incluir você mesmo se estiver fora da área{{/if}}
-    </label>
-
-    <label>Afeta na {{#if (eq act.targetMode "aura")}}aura{{else}}área{{/if}}
-      <select name="system.actions.{{i}}.areaFilter">
-        <option value="all" {{#if (eq act.areaFilter "all")}}selected{{/if}}>Todos os tokens</option>
-        <option value="allies" {{#if (eq act.areaFilter "allies")}}selected{{/if}}>Só aliados (mesma disposição do seu token)</option>
-        <option value="enemies" {{#if (eq act.areaFilter "enemies")}}selected{{/if}}>Só inimigos (disposição oposta)</option>
-      </select>
     </label>
 
     {{!-- Emanação: área/aura persistente com disparo por turno --}}

@@ -100,6 +100,9 @@ export function activatableFields() {
  *    "target" — afeta o(s) alvo(s) mirados (com defesa, se canRoll)
  *    "area"   — área centrada no personagem; inclui ele por padrão (includeSelf)
  *    "aura"   — aura centrada no personagem; NÃO o inclui por padrão
+ *    Modos COMPOSTOS ("area:all|allies|enemies", "aura:...") vêm do seletor
+ *    da UI e são divididos na leitura em targetMode + areaFilter (ver
+ *    normalizeCompositeTargetModes) — o resto do sistema só vê os simples.
  *
  *  includeSelf: força incluir/excluir o próprio personagem em area/aura.
  *  range/area: alcance e raio em metros (informativo + usado no resumo).
@@ -123,7 +126,12 @@ export function actionEntryField() {
     targetMode: new fields.StringField({
       required: true,
       initial: "target",
-      choices: ["none", "self", "target", "area", "aura"],
+      choices: [
+        "none", "self", "target", "area", "aura",
+        // Compostos vindos do seletor da UI (divididos pelo migrateData):
+        "area:all", "area:allies", "area:enemies",
+        "aura:all", "aura:allies", "aura:enemies",
+      ],
     }),
     includeSelf: new fields.BooleanField({ initial: false }),
     // Filtro de alvos para ÁREA/AURA: todos, só aliados ou só inimigos.
@@ -338,7 +346,9 @@ export function migrateEffectTargets(source) {
  */
 export function migrateFlatActionToArray(source) {
   if (!source || typeof source !== "object") return source;
-  if (Array.isArray(source.actions) && source.actions.length) return source;
+  if (Array.isArray(source.actions) && source.actions.length) {
+    return normalizeCompositeTargetModes(source);
+  }
   const hasLegacy =
     "canRoll" in source || "rollAttr" in source || "hasTarget" in source ||
     "damage" in source;
@@ -363,5 +373,24 @@ export function migrateFlatActionToArray(source) {
     range: 0,
     area: 0,
   }];
+  return normalizeCompositeTargetModes(source);
+}
+
+/**
+ * Divide modos de alvo COMPOSTOS ("area:enemies", "aura:allies", "area:all")
+ * vindos do seletor da UI nos dois campos que o resto do sistema entende:
+ * targetMode ("area"/"aura") + areaFilter ("all"/"allies"/"enemies").
+ * Escolher a opção simples ("area:all") também RESETA o filtro para "all",
+ * garantindo que o seletor sempre reflita o estado salvo.
+ */
+export function normalizeCompositeTargetModes(source) {
+  if (!source || !Array.isArray(source.actions)) return source;
+  for (const a of source.actions) {
+    if (typeof a?.targetMode === "string" && a.targetMode.includes(":")) {
+      const [m, f] = a.targetMode.split(":");
+      a.targetMode = m;
+      if (f === "all" || f === "allies" || f === "enemies") a.areaFilter = f;
+    }
+  }
   return source;
 }
