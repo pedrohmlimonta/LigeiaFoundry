@@ -394,8 +394,10 @@
   height: 16px;
   padding: 0 4px;
   border-radius: 999px;
-  background: var(--fe-rubi);
-  color: #fff;
+  /* Fundo transparente e texto no mesmo dourado dos textos das abas. */
+  background: transparent;
+  color: var(--fe-gold-soft);
+  font-weight: 600;
   display: inline-flex;
   align-items: center;
   justify-content: center;
