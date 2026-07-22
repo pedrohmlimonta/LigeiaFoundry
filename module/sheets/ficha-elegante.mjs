@@ -68,7 +68,9 @@ class LigeiaFichaElegante extends LigeiaCharacterSheet {
 
   /** Troca o template do corpo pela versão em abas (mesma part "body"). */
   static PARTS = {
-    body: { template: `systems/ligeia-rpg/templates/ficha-elegante.hbs` },
+    // scrollable [""] preserva a rolagem do corpo; as listas internas são
+    // preservadas pelos hooks herdados de LigeiaCharacterSheet.
+    body: { template: `systems/ligeia-rpg/templates/ficha-elegante.hbs`, scrollable: [""] },
   };
 
   /** @override Acrescenta barras, abas e favoritos ao contexto herdado. */

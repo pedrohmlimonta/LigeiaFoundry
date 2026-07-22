@@ -46,8 +46,38 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
   static PARTS = {
     body: {
       template: "systems/ligeia-rpg/templates/actor/personagem.hbs",
+      // Preserva a rolagem do CORPO da ficha entre re-renders ("" = raiz).
+      scrollable: [""],
     },
   };
+
+  /** Seletores internos cuja rolagem também deve sobreviver ao re-render.
+   *  O `scrollable` nativo só preserva o PRIMEIRO elemento de cada seletor,
+   *  então listas repetidas (grupos de itens) são tratadas por índice. */
+  static #INNER_SCROLL_SELECTORS = [".lig-item-group", ".lig-defs-grid", ".lig-tab-panel", ".lig-rendered"];
+
+  /** @override Captura a rolagem das listas internas antes do re-render. */
+  _preSyncPartState(partId, newElement, priorElement, state) {
+    super._preSyncPartState(partId, newElement, priorElement, state);
+    state.ligScroll = [];
+    for (const sel of LigeiaCharacterSheet.#INNER_SCROLL_SELECTORS) {
+      priorElement.querySelectorAll(sel).forEach((el, i) => {
+        if (el.scrollTop || el.scrollLeft) state.ligScroll.push([sel, i, el.scrollTop, el.scrollLeft]);
+      });
+    }
+  }
+
+  /** @override Restaura a rolagem das listas internas após o re-render. */
+  _syncPartState(partId, newElement, priorElement, state) {
+    super._syncPartState(partId, newElement, priorElement, state);
+    for (const [sel, i, top, left] of state.ligScroll ?? []) {
+      const el = newElement.querySelectorAll(sel)[i];
+      if (el) {
+        el.scrollTop = top;
+        el.scrollLeft = left;
+      }
+    }
+  }
 
   // Evita corrida: durante add/remove programático de appliedEffects, não
   // reconstrói o array a partir do form.

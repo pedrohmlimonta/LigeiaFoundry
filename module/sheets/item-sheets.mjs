@@ -10,6 +10,32 @@ const { ItemSheetV2 } = foundry.applications.sheets;
 /*  Base                                                              */
 /* ================================================================== */
 class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
+  /** @override Preserva a rolagem (corpo + caixas de texto) entre re-renders
+   *  — o submitOnChange re-renderiza a cada campo editado. */
+  _preSyncPartState(partId, newElement, priorElement, state) {
+    super._preSyncPartState(partId, newElement, priorElement, state);
+    state.ligScroll = { root: [priorElement.scrollTop || 0, priorElement.scrollLeft || 0], inner: [] };
+    priorElement.querySelectorAll(".lig-rendered").forEach((el, i) => {
+      if (el.scrollTop || el.scrollLeft) state.ligScroll.inner.push([i, el.scrollTop, el.scrollLeft]);
+    });
+  }
+
+  /** @override */
+  _syncPartState(partId, newElement, priorElement, state) {
+    super._syncPartState(partId, newElement, priorElement, state);
+    const saved = state.ligScroll;
+    if (!saved) return;
+    newElement.scrollTop = saved.root[0];
+    newElement.scrollLeft = saved.root[1];
+    const boxes = newElement.querySelectorAll(".lig-rendered");
+    for (const [i, top, left] of saved.inner) {
+      if (boxes[i]) {
+        boxes[i].scrollTop = top;
+        boxes[i].scrollLeft = left;
+      }
+    }
+  }
+
   static DEFAULT_OPTIONS = {
     classes: ["ligeia", "sheet", "item"],
     position: { width: 560, height: 620 },
