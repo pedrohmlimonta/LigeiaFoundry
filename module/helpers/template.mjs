@@ -156,7 +156,7 @@ export async function placeAuraTemplate(actor, radius, persistFlags = null, filt
  * criado, ou null se cancelado.
  * @returns {Promise<MeasuredTemplateDocument|null>}
  */
-export async function placeAreaTemplate(actor, radius, persistFlags = null, filterFn = null) {
+export async function placeAreaTemplate(actor, radius, persistFlags = null, filterFn = null, maxRange = 0) {
   const Base = MTObjectClass();
   if (!Base) return null;
 
@@ -172,9 +172,13 @@ export async function placeAreaTemplate(actor, radius, persistFlags = null, filt
   preview.layer.activate();
   preview.layer.preview.addChild(preview);
 
+  // Cor original da borda (o feedback de alcance restaura ao voltar).
+  const origBorder = doc.borderColor || "#ffffff";
+
   return new Promise((resolve) => {
     let finished = false;
     let lastMove = 0;
+    let lastInRange = true;
 
     const getPoint = (event) => {
       // Compatibilidade entre versões de PIXI/Foundry
@@ -199,6 +203,13 @@ export async function placeAreaTemplate(actor, radius, persistFlags = null, filt
       }
     };
 
+    // Distância (em metros do grid) do centro do token do conjurador até um
+    // ponto do canvas — mesma conversão usada pela mira da área.
+    const distFromCaster = (pt) => {
+      const grid = canvas.grid;
+      return Math.hypot(pt.x - token.center.x, pt.y - token.center.y) / grid.size * grid.distance;
+    };
+
     const onMove = (event) => {
       if (finished) return;
       event.stopPropagation?.();
@@ -207,6 +218,16 @@ export async function placeAreaTemplate(actor, radius, persistFlags = null, filt
       lastMove = now;
       const pt = snap(getPoint(event));
       doc.updateSource({ x: pt.x, y: pt.y });
+      // Feedback de ALCANCE: borda vermelha quando o centro passa do limite.
+      if (maxRange > 0 && token?.center) {
+        try {
+          const inRange = distFromCaster(pt) <= maxRange + 0.001;
+          if (inRange !== lastInRange) {
+            lastInRange = inRange;
+            doc.updateSource({ borderColor: inRange ? origBorder : "#ff4444" });
+          }
+        } catch (e) { /* cosmético — ignora */ }
+      }
       preview.refresh();
     };
 
@@ -223,6 +244,21 @@ export async function placeAreaTemplate(actor, radius, persistFlags = null, filt
       if (finished) return;
       event.stopPropagation?.();
       const pt = snap(getPoint(event));
+      // ---- Checagem de ALCANCE do centro da área ----
+      // O centro precisa estar a até maxRange metros do token do conjurador
+      // (0 = ilimitado). Fora disso, a ação NÃO acontece — mesma regra do
+      // alvo mirado fora de alcance.
+      if (maxRange > 0 && token?.center) {
+        const distM = distFromCaster(pt);
+        if (distM > maxRange + 0.001) {
+          cleanup();
+          ui.notifications?.warn(
+            `Fora de alcance: o centro da área está a ${distM.toFixed(1)}m — alcance máximo ${maxRange}m. A ação não foi executada.`,
+          );
+          resolve({ ok: false, actors: [] });
+          return;
+        }
+      }
       const finalData = doc.toObject();
       finalData.x = pt.x;
       finalData.y = pt.y;
@@ -251,7 +287,11 @@ export async function placeAreaTemplate(actor, radius, persistFlags = null, filt
     canvas.stage.on("mousemove", onMove);
     canvas.stage.on("mousedown", onConfirm);
     if (canvas.app?.view) canvas.app.view.oncontextmenu = onCancel;
-    ui.notifications?.info("Clique para posicionar a área (botão direito cancela).");
+    ui.notifications?.info(
+      maxRange > 0
+        ? `Clique para posicionar a área — alcance máximo ${maxRange}m (botão direito cancela).`
+        : "Clique para posicionar a área (botão direito cancela).",
+    );
   });
 }
 
@@ -276,6 +316,10 @@ export async function placeTemplateForAction(actor, item, action) {
   // checkbox "Inimigo" da ficha (marcada = inimigo; desmarcada = aliado).
   const effFilter = areaFilterOverrideFor(actor) || action.areaFilter || "all";
   const filterFn = effFilter === "all" ? null : (tActor) => passesAreaFilter(actor, tActor, effFilter);
+
+  // Alcance da ação (fórmula resolvida com o conjurador): em ÁREA, limita a
+  // distância máxima do CENTRO do círculo até o token (0 = ilimitado).
+  const maxRange = resolveEffectValue(action.range, actor);
 
   // --- Compatibilidade V14: sem Measured Templates ---
   // Não há como desenhar o círculo (o documento foi removido). Degradamos:
@@ -310,7 +354,7 @@ export async function placeTemplateForAction(actor, item, action) {
       const res = await placeAuraTemplate(actor, radius, persistFlags, filterFn);
       return { proceed: true, actors: (res?.actors) || [], templateId: res?.templateId || null };
     } else {
-      const res = await placeAreaTemplate(actor, radius, persistFlags, filterFn);
+      const res = await placeAreaTemplate(actor, radius, persistFlags, filterFn, maxRange);
       return { proceed: res.ok, actors: res.actors || [], templateId: res?.templateId || null };
     }
   } catch (e) {
