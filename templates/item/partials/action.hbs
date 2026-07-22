@@ -129,7 +129,7 @@
 
     <div class="lig-item-row">
       <label>Dano (ex: 1d6+2)
-        <input type="text" name="system.actions.{{i}}.damage" value="{{act.damage}}" placeholder="vazio = sem dano"/>
+        <input type="text" name="system.actions.{{i}}.damage" value="{{act.damage}}" placeholder="vazio = sem dano" title="Aceita variáveis do personagem: @forca, @nivel, @conjuracao... ex.: 1d6+floor(@nivel/2). O botão ƒx na ficha lista todas."/>
       </label>
       <label>Recurso afetado
         <select name="system.actions.{{i}}.damageResource">
@@ -158,7 +158,7 @@
     {{!-- CURA: recuperação de vida/recurso aplicada a quem a ação alcançar --}}
     <div class="lig-item-row">
       <label>Cura (ex: 1d6+2)
-        <input type="text" name="system.actions.{{i}}.heal" value="{{act.heal}}" placeholder="vazio = sem cura"/>
+        <input type="text" name="system.actions.{{i}}.heal" value="{{act.heal}}" placeholder="vazio = sem cura" title="Aceita variáveis do personagem: @forca, @nivel, @conjuracao... ex.: 1d6+floor(@nivel/2). O botão ƒx na ficha lista todas."/>
       </label>
       <label>Recurso recuperado
         <select name="system.actions.{{i}}.healResource">
@@ -193,7 +193,7 @@
       {{#each act.extraDamage as |xd di|}}
       <div class="lig-item-row lig-xd-row">
         <label style="flex:1.4">Fórmula
-          <input type="text" name="system.actions.{{../i}}.extraDamage.{{di}}.formula" value="{{xd.formula}}" placeholder="ex.: 1d6"/>
+          <input type="text" name="system.actions.{{../i}}.extraDamage.{{di}}.formula" value="{{xd.formula}}" placeholder="ex.: 1d6" title="Aceita variáveis do personagem: @forca, @nivel... ex.: floor(@nivel/2)"/>
         </label>
         <label>Recurso
           <select name="system.actions.{{../i}}.extraDamage.{{di}}.resource">

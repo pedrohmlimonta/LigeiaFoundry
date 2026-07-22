@@ -1,7 +1,7 @@
 /**
  * Ficha de Personagem do Ligeia — Foundry V13 (ApplicationV2).
  */
-import { rollLigeia, postRollToChat, rollItemAction, resolveAttr, rerollFor, critFor, spendItemCosts, applyDamageToActor, applyHealingToActor } from "../helpers/dice.mjs";
+import { rollLigeia, postRollToChat, rollItemAction, resolveAttr, rerollFor, critFor, spendItemCosts, applyDamageToActor, applyHealingToActor, actorRollData } from "../helpers/dice.mjs";
 import { rollSingleEndEffect } from "../helpers/turn-effects.mjs";
 import { promptRollConfig, shouldPromptRoll, currentTargetActors } from "../apps/roll-dialog.mjs";
 import { placeTemplateForAction } from "../helpers/template.mjs";
@@ -33,6 +33,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       itemRoll: LigeiaCharacterSheet.#onItemRoll,
       editImage: LigeiaCharacterSheet.#onEditImage,
       itemCreate: LigeiaCharacterSheet.#onItemCreate,
+      showRollVars: LigeiaCharacterSheet.#onShowRollVars,
     },
     form: {
       submitOnChange: true,
@@ -641,6 +642,68 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     if (!effects[index]) return;
     effects[index].enabled = !effects[index].enabled;
     await item.update({ "system.effects": effects });
+  }
+
+  /**
+   * Diálogo com as @variáveis do personagem (valores atuais) para usar nas
+   * fórmulas de dano, dano extra e cura — com clique-para-copiar.
+   */
+  static async #onShowRollVars() {
+    const data = actorRollData(this.document);
+    const rows = [
+      ["@forca", "Força"],
+      ["@agilidade", "Agilidade"],
+      ["@vigor", "Vigor"],
+      ["@mente", "Mente"],
+      ["@percepcao", "Percepção"],
+      ["@bloqueio", "Bloqueio"],
+      ["@esquiva", "Esquiva"],
+      ["@conjuracao", "Conjuração"],
+      ["@iniciativa", "Iniciativa"],
+      ["@deslocamento", "Deslocamento"],
+      ["@nivel", "Nível"],
+      ["@pv", "Pontos de Vida (atuais)"],
+      ["@pvmax", "Pontos de Vida (máximo)"],
+      ["@pm", "Pontos de Mana (atuais)"],
+      ["@pmmax", "Pontos de Mana (máximo)"],
+      ["@ph", "Pontos Heroicos (atuais)"],
+      ["@phmax", "Pontos Heroicos (máximo)"],
+      ["@sobrevida", "Sobrevida (PV temporários)"],
+    ];
+    const body = rows
+      .map(([ref, label]) => {
+        const key = ref.slice(1);
+        return `<tr><td><code class="lig-var-copy" data-ref="${ref}" title="Clique para copiar">${ref}</code></td><td>${label}</td><td class="lig-var-val">${data[key] ?? 0}</td></tr>`;
+      })
+      .join("");
+    const content = `
+      <p class="lig-hint">Use estas variáveis nas fórmulas de <strong>dano</strong>, <strong>dano extra</strong> e <strong>cura</strong> das ações (e em rolagens inline como <code>[[1d6+@forca]]</code>). Clique na variável para copiar.</p>
+      <table class="lig-vars-table">
+        <thead><tr><th>Variável</th><th>O que é</th><th>Valor atual</th></tr></thead>
+        <tbody>${body}</tbody>
+      </table>
+      <p class="lig-hint">Exemplos: <code>@nivel</code> (o nível) · <code>floor(@nivel/2)</code> (metade do nível, arredondada para baixo) · <code>ceil(@nivel/2)</code> (metade para cima) · <code>1d6+@forca</code> · <code>2d6+@conjuracao</code>. Em subtrações, use espaços: <code>@pvmax - @pv</code> (sem espaços o Foundry não resolve).</p>`;
+    await foundry.applications.api.DialogV2.wait({
+      window: { title: `Variáveis de ${this.document.name}` },
+      position: { width: 460 },
+      content,
+      buttons: [{ action: "ok", label: "Fechar", default: true }],
+      rejectClose: false,
+      render: (event, dialog) => {
+        const root = dialog?.element ?? dialog;
+        if (!root?.querySelectorAll) return;
+        root.querySelectorAll(".lig-var-copy").forEach((el) => {
+          el.addEventListener("click", async () => {
+            try {
+              await navigator.clipboard.writeText(el.dataset.ref);
+              ui.notifications?.info(`${el.dataset.ref} copiado!`);
+            } catch (e) {
+              ui.notifications?.warn("Não foi possível copiar — selecione o texto manualmente.");
+            }
+          });
+        });
+      },
+    });
   }
 
   static async #onItemCreate(event, target) {

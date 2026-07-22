@@ -2,6 +2,7 @@
  * DataModels dos Actors do sistema Ligeia.
  */
 import { expandConditions } from "../helpers/conditions.mjs";
+import { actorRollData } from "../helpers/dice.mjs";
 import { aggregateEffectModifiers } from "../helpers/effects.mjs";
 import { effectField } from "./fields.mjs";
 import { migrateEffectTargets } from "./fields.mjs";
@@ -272,6 +273,18 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
     this.resources.mp.value = Math.max(0, Math.min(this.resources.mp.value, mpMax));
     this.resources.heroic.value = Math.max(0, Math.min(this.resources.heroic.value, heroicMax));
     this.resources.hp.temp = Math.max(0, this.resources.hp.temp || 0);
+  }
+
+  /**
+   * @variáveis amigáveis para fórmulas e rolagens inline no chat — ex.:
+   * @forca, @nivel, @conjuracao, @pv (ver actorRollData). Mantém também os
+   * campos completos do sistema (attributes, resources...) por
+   * compatibilidade com caminhos longos. Herdado pelo NPC.
+   */
+  getRollData() {
+    let base = {};
+    try { base = this.toObject(false); } catch (e) { base = {}; }
+    return { ...base, ...actorRollData(this.parent) };
   }
 }
 

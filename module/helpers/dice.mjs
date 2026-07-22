@@ -469,6 +469,41 @@ export async function applyTempHpToActor(actor, amount, { stack = false } = {}) 
 }
 
 /**
+ * Dados de rolagem (@variáveis) de um ator, para uso nas fórmulas de dano,
+ * dano extra e cura das ações — ex.: "1d6+@forca", "floor(@nivel/2)",
+ * "2d6+@conjuracao". Chaves sem acento (a sintaxe @ do Foundry só aceita
+ * ASCII). Vale para personagens e NPCs (mesma ficha).
+ */
+export function actorRollData(actor) {
+  const sys = actor?.system || {};
+  const attrs = sys.attributes || {};
+  const sec = sys.secondary || {};
+  const res = sys.resources || {};
+  const num = (v) => Number(v) || 0;
+  return {
+    // Atributos
+    forca: num(attrs.forca?.value),
+    agilidade: num(attrs.agilidade?.value),
+    vigor: num(attrs.vigor?.value),
+    mente: num(attrs.mente?.value),
+    percepcao: num(attrs.percepcao?.value),
+    // Secundários (derivados)
+    bloqueio: num(sec.bloqueio),
+    esquiva: num(sec.esquiva),
+    conjuracao: num(sec.conjuracao),
+    iniciativa: num(sec.iniciativa),
+    deslocamento: num(sec.deslocamento),
+    // Progressão
+    nivel: num(sys.details?.level) || 1,
+    // Recursos (atual e máximo) + sobrevida
+    pv: num(res.hp?.value), pvmax: num(res.hp?.max),
+    pm: num(res.mp?.value), pmmax: num(res.mp?.max),
+    ph: num(res.heroic?.value), phmax: num(res.heroic?.max),
+    sobrevida: num(res.hp?.temp),
+  };
+}
+
+/**
  * Adiciona condições (ids) à ficha de um ator, sem duplicar. Só funciona se
  * o usuário tiver permissão sobre o alvo.
  * @returns {string[]} rótulos das condições efetivamente adicionadas
@@ -997,7 +1032,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
   // Rola dano (uma vez; aplicado a cada alvo afetado)
   let damageRoll = null;
   if (action.damage && String(action.damage).trim()) {
-    try { damageRoll = new Roll(String(action.damage)); await damageRoll.evaluate(); atkRolls.push(damageRoll); }
+    try { damageRoll = new Roll(String(action.damage), actorRollData(actor)); await damageRoll.evaluate(); atkRolls.push(damageRoll); }
     catch (e) { damageRoll = null; }
   }
 
@@ -1007,7 +1042,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     const f = String(ex?.formula || "").trim();
     if (!f) continue;
     try {
-      const r = new Roll(f);
+      const r = new Roll(f, actorRollData(actor));
       await r.evaluate();
       atkRolls.push(r);
       extraDamageRolls.push({ roll: r, type: ex.type || "", resource: ex.resource || "hp", scaling: !!ex.scaling });
@@ -1017,7 +1052,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
   // Rola a CURA (uma vez; aplicada a cada afetado quando a ação acerta)
   let healRoll = null;
   if (action.heal && String(action.heal).trim()) {
-    try { healRoll = new Roll(String(action.heal)); await healRoll.evaluate(); atkRolls.push(healRoll); }
+    try { healRoll = new Roll(String(action.heal), actorRollData(actor)); await healRoll.evaluate(); atkRolls.push(healRoll); }
     catch (e) { healRoll = null; }
   }
 
