@@ -64,11 +64,11 @@
         </select>
       </label>
       <label>Alcance (m)
-        <input type="number" name="system.actions.{{i}}.range" value="{{act.range}}" min="0" step="0.5"/>
+        <input type="text" name="system.actions.{{i}}.range" value="{{act.range}}" placeholder="ex.: 9 ou @nivel" title="Número ou fórmula com @variáveis: @nivel, 3+floor(@nivel/2)... (sem dados como 1d6)"/>
       </label>
       {{#if (or (eq act.targetMode "area") (eq act.targetMode "aura"))}}
       <label>Raio da área (m)
-        <input type="number" name="system.actions.{{i}}.area" value="{{act.area}}" min="0" step="0.5"/>
+        <input type="text" name="system.actions.{{i}}.area" value="{{act.area}}" placeholder="ex.: 3 ou @nivel" title="Número ou fórmula com @variáveis: @nivel, floor(@nivel/2)... (sem dados como 1d6)"/>
       </label>
       {{/if}}
     </div>
@@ -325,7 +325,7 @@
           </label>
           {{#unless (eq fx.fxType "condition")}}
           <label>{{#if (or (eq fx.fxType "reroll1") (eq fx.fxType "reroll6"))}}Qtd. dados{{else}}Valor{{/if}}
-            <input type="number" name="system.actions.{{i}}.appliesEffects.{{fi}}.fxValue" value="{{fx.fxValue}}"/>
+            <input type="text" name="system.actions.{{i}}.appliesEffects.{{fi}}.fxValue" value="{{fx.fxValue}}" placeholder="ex.: 2 ou floor(@nivel/2)" title="Número ou fórmula com as SUAS @variáveis, resolvida na hora de aplicar (sem dados como 1d6)"/>
           </label>
           {{/unless}}
           {{#if (or (eq fx.fxType "reroll1") (eq fx.fxType "reroll6"))}}

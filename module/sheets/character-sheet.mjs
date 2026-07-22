@@ -682,7 +682,8 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
         <thead><tr><th>Variável</th><th>O que é</th><th>Valor atual</th></tr></thead>
         <tbody>${body}</tbody>
       </table>
-      <p class="lig-hint">Exemplos: <code>@nivel</code> (o nível) · <code>floor(@nivel/2)</code> (metade do nível, arredondada para baixo) · <code>ceil(@nivel/2)</code> (metade para cima) · <code>1d6+@forca</code> · <code>2d6+@conjuracao</code>. Em subtrações, use espaços: <code>@pvmax - @pv</code> (sem espaços o Foundry não resolve).</p>`;
+      <p class="lig-hint">Exemplos: <code>@nivel</code> (o nível) · <code>floor(@nivel/2)</code> (metade do nível, arredondada para baixo) · <code>ceil(@nivel/2)</code> (metade para cima) · <code>1d6+@forca</code> · <code>2d6+@conjuracao</code>. Em subtrações, use espaços: <code>@pvmax - @pv</code> (sem espaços o Foundry não resolve).</p>
+      <p class="lig-hint">As fórmulas também valem em <strong>Alcance</strong>, <strong>Raio da área</strong> e nos <strong>valores de efeitos</strong> — nesses campos, sem dados (1d6). Em valores de efeitos de item, os secundários (@bloqueio, @esquiva, @conjuracao, @iniciativa, @deslocamento) podem valer 0 no momento do cálculo; prefira atributos e @nivel.</p>`;
     await foundry.applications.api.DialogV2.wait({
       window: { title: `Variáveis de ${this.document.name}` },
       position: { width: 460 },

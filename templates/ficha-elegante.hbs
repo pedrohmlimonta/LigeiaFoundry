@@ -536,7 +536,7 @@
               {{/if}}
             </label>
             <label>{{#if ae.fx0IsReroll}}Qtd. dados{{else}}Valor{{/if}}
-              <input type="number" name="system.appliedEffects.{{ae.index}}.effects.0.value" value="{{ae.fx0.value}}"/>
+              <input type="text" name="system.appliedEffects.{{ae.index}}.effects.0.value" value="{{ae.fx0.value}}" title="Número ou fórmula: @nivel, floor(@nivel/2)... (sem dados como 1d6)"/>
             </label>
             {{#if ae.fx0IsReroll}}
             <label class="lig-inline-check" title="Rerrolar TODOS os dados que caírem nesse valor">

@@ -22,7 +22,7 @@
 
 import { measuredTemplatesAvailable } from "./compat.mjs";
 import { passesAreaFilter } from "./dice.mjs";
-import { areaFilterOverrideFor } from "./effects.mjs";
+import { areaFilterOverrideFor, resolveEffectValue } from "./effects.mjs";
 
 function MTObjectClass() {
   return (
@@ -114,7 +114,7 @@ function buildEmanationFlags(actor, item, action) {
     rerollAttack: !!action.persistRerollAttack,
     // Gatilho: "turn" (início do turno dentro), "enter" (ao entrar) ou "both".
     trigger: action.persistTrigger || "both",
-    radius: Number(action.area) || 0,
+    radius: resolveEffectValue(action.area, actor),
     // Total do ataque rolado na CRIAÇÃO (congelado). Preenchido logo após a
     // primeira rolagem; usado como CD das defesas por turno. null = ainda não
     // rolado (ou ação sem ataque).
@@ -265,7 +265,7 @@ export async function placeAreaTemplate(actor, radius, persistFlags = null, filt
  */
 export async function placeTemplateForAction(actor, item, action) {
   const mode = action.targetMode;
-  const radius = Number(action.area) || 0;
+  const radius = resolveEffectValue(action.area, actor);
   if (mode !== "area" && mode !== "aura") return { proceed: true, actors: null };
   if (radius <= 0) return { proceed: true, actors: null };
   if (!canvas?.scene) return { proceed: true, actors: null };

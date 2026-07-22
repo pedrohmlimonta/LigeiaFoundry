@@ -15,7 +15,7 @@ import { registerMovementHooks, registerMovementSocket, registerForcedMovementAc
 import { registerTurnEffectHooks } from "./helpers/turn-effects.mjs";
 import { registerBarrierHooks } from "./helpers/barrier.mjs";
 import { applyTempHpToActor } from "./helpers/dice.mjs";
-import { activeEffectsOf } from "./helpers/effects.mjs";
+import { activeEffectsOf, resolveEffectValue } from "./helpers/effects.mjs";
 import {
   HabilidadeSheet,
   ComplicacaoSheet,
@@ -430,7 +430,7 @@ Hooks.on("updateItem", async function (item, changes, options, userId) {
 
   let total = 0;
   for (const e of activeEffectsOf(item)) {
-    if (e.type === "tempHp") total += Number(e.value) || 0;
+    if (e.type === "tempHp") total += resolveEffectValue(e.value, actor);
   }
   if (total <= 0) return;
 

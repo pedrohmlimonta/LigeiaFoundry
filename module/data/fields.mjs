@@ -20,7 +20,9 @@ export function effectField() {
         choices: ["dice", "bonus", "stat", "set", "damage", "rd", "reroll1", "reroll6", "crit", "fumble", "tempHp", "areaFilter", "info"],
       }),
       target: new fields.StringField({ required: true, initial: "all" }),
-      value: new fields.NumberField({ required: true, initial: 0, integer: true }),
+      // Número OU fórmula determinística com @variáveis do dono — ex.:
+      // "floor(@nivel/2)". Dados (1d6) NÃO valem; ver resolveEffectValue.
+      value: new fields.StringField({ required: true, blank: true, initial: "0" }),
       // Para reroll1/reroll6: se true, rerrola TODOS os dados que caírem no
       // valor alvo (ignora "value"). Senão, rerrola até "value" dados.
       rerollAll: new fields.BooleanField({ required: false, initial: false }),
@@ -221,7 +223,9 @@ export function actionEntryField() {
         // Alvo do modificador — depende do tipo (atributo, recurso, tipo de
         // dano ou id de condição). Sempre escolhido por select.
         fxTarget: new fields.StringField({ blank: true, initial: "all" }),
-        fxValue: new fields.NumberField({ initial: 0, integer: true }),
+        // Número OU fórmula com @variáveis do CONJURADOR, resolvida na hora
+        // de aplicar — ex.: "floor(@nivel/2)".
+        fxValue: new fields.StringField({ blank: true, initial: "0" }),
         // Para reroll: se true, rerrola TODOS os dados no valor alvo.
         fxAll: new fields.BooleanField({ initial: false }),
         // Duração: "rounds" (em rodadas) ou "scene" (até o fim da cena)
@@ -252,8 +256,10 @@ export function actionEntryField() {
       }),
       { initial: [] },
     ),
-    range: new fields.NumberField({ initial: 0, integer: false, min: 0 }),
-    area: new fields.NumberField({ initial: 0, integer: false, min: 0 }),
+    // Alcance e raio da área em metros: número OU fórmula com @variáveis do
+    // personagem (ex.: "@nivel", "3+floor(@nivel/2)"), resolvida ao usar.
+    range: new fields.StringField({ blank: true, initial: "" }),
+    area: new fields.StringField({ blank: true, initial: "" }),
     // Macro executada ao rodar a ação (arrastada para o editor). Pode ser
     // ligada/desligada sem remover. Guarda também o nome para exibição.
     macroUuid: new fields.StringField({ blank: true, initial: "" }),

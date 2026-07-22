@@ -35,7 +35,9 @@ async function waitForDiceAnimation(fallbackMs = 1100) {
 import { conditionModifiers, attributeConditionDice, actorHasCondition } from "./conditions.mjs";
 import { playActionAnimation } from "./integrations.mjs";
 import { executeActionMovement } from "./movement.mjs";
-import { areaFilterOverrideFor } from "./effects.mjs";
+import { areaFilterOverrideFor, actorRollData, resolveEffectValue } from "./effects.mjs";
+// Re-export: outros módulos importam estas funções daqui.
+export { actorRollData, resolveEffectValue };
 import { promptRollConfig, shouldPromptRoll } from "../apps/roll-dialog.mjs";
 
 /**
@@ -469,41 +471,6 @@ export async function applyTempHpToActor(actor, amount, { stack = false } = {}) 
 }
 
 /**
- * Dados de rolagem (@variáveis) de um ator, para uso nas fórmulas de dano,
- * dano extra e cura das ações — ex.: "1d6+@forca", "floor(@nivel/2)",
- * "2d6+@conjuracao". Chaves sem acento (a sintaxe @ do Foundry só aceita
- * ASCII). Vale para personagens e NPCs (mesma ficha).
- */
-export function actorRollData(actor) {
-  const sys = actor?.system || {};
-  const attrs = sys.attributes || {};
-  const sec = sys.secondary || {};
-  const res = sys.resources || {};
-  const num = (v) => Number(v) || 0;
-  return {
-    // Atributos
-    forca: num(attrs.forca?.value),
-    agilidade: num(attrs.agilidade?.value),
-    vigor: num(attrs.vigor?.value),
-    mente: num(attrs.mente?.value),
-    percepcao: num(attrs.percepcao?.value),
-    // Secundários (derivados)
-    bloqueio: num(sec.bloqueio),
-    esquiva: num(sec.esquiva),
-    conjuracao: num(sec.conjuracao),
-    iniciativa: num(sec.iniciativa),
-    deslocamento: num(sec.deslocamento),
-    // Progressão
-    nivel: num(sys.details?.level) || 1,
-    // Recursos (atual e máximo) + sobrevida
-    pv: num(res.hp?.value), pvmax: num(res.hp?.max),
-    pm: num(res.mp?.value), pmmax: num(res.mp?.max),
-    ph: num(res.heroic?.value), phmax: num(res.heroic?.max),
-    sobrevida: num(res.hp?.temp),
-  };
-}
-
-/**
  * Adiciona condições (ids) à ficha de um ator, sem duplicar. Só funciona se
  * o usuário tiver permissão sobre o alvo.
  * @returns {string[]} rótulos das condições efetivamente adicionadas
@@ -652,7 +619,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
         // recurso na hora (como a cura faz) e NÃO gera efeito duradouro.
         if (ae.fxType === "restore") {
           const rRes = ["hp", "mp", "heroic"].includes(ae.fxTarget) ? ae.fxTarget : "mp";
-          const rApplied = await applyHealingToActor(tActor, Number(ae.fxValue) || 0, rRes);
+          const rApplied = await applyHealingToActor(tActor, resolveEffectValue(ae.fxValue, caster), rRes);
           const rShort = { hp: "PV", mp: "PM", heroic: "PH" }[rRes];
           names.push(`${ae.label || "Recuperação"} (+${rApplied.gained ?? 0} ${rShort})`);
           continue;
@@ -661,8 +628,11 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
         const condId = isCondition ? (ae.fxTarget || "") : "";
         // Tipos que viram modificador no array effects
         let effects = [];
-        if (!isCondition && ((Number(ae.fxValue) || 0) !== 0 || ae.fxAll)) {
-          const eff = { type: ae.fxType || "bonus", target: ae.fxTarget || "all", value: Number(ae.fxValue) || 0, enabled: true };
+        // Valor do efeito: número ou fórmula resolvida com as @variáveis do
+        // CONJURADOR no momento de aplicar (fica gravado já como número).
+        const fxVal = resolveEffectValue(ae.fxValue, caster);
+        if (!isCondition && (fxVal !== 0 || ae.fxAll)) {
+          const eff = { type: ae.fxType || "bonus", target: ae.fxTarget || "all", value: fxVal, enabled: true };
           // Para dano/RD, o "alvo" é o tipo de dano.
           if (ae.fxType === "damage" || ae.fxType === "rd") eff.damageType = ae.fxTarget || "";
           // Para reroll, propaga a flag "todos".
@@ -1056,11 +1026,12 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     catch (e) { healRoll = null; }
   }
 
-  // Resumo de alcance/área
+  // Resumo de alcance/área (fórmulas resolvidas com o conjurador)
   const meta = [];
-  if (action.range) meta.push(`Alcance ${action.range}m`);
+  const rangeShown = resolveEffectValue(action.range, actor);
+  if (rangeShown > 0) meta.push(`Alcance ${rangeShown}m`);
   if (mode === "area" || mode === "aura") {
-    meta.push(`${mode === "aura" ? "Aura" : "Área"} ${action.area || 0}m`);
+    meta.push(`${mode === "aura" ? "Aura" : "Área"} ${resolveEffectValue(action.area, actor)}m`);
     const ovFilter = areaFilterOverrideFor(actor);
     const fLabel = { allies: "só aliados", enemies: "só inimigos" }[ovFilter || action.areaFilter];
     if (fLabel) meta.push(fLabel + (ovFilter ? " (por efeito)" : ""));
@@ -1114,7 +1085,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
   // até cada alvo. Alvos além do alcance são marcados como fora de alcance
   // (não são atingidos) e geram um aviso. Só se aplica ao modo "target" —
   // em área/aura os alvos já vêm de dentro do template.
-  const rangeM = Number(action.range) || 0;
+  const rangeM = resolveEffectValue(action.range, actor);
   const rangeOutMsgs = [];
   if (rangeM > 0 && mode === "target") {
     const srcToken = activeTokenOfActor(actor);

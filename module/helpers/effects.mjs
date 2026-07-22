@@ -74,6 +74,69 @@ export function collectActorEffects(actor) {
 }
 
 /* ======================================================================== */
+/*  Variáveis (@) e resolução de valores com fórmula                        */
+/* ======================================================================== */
+
+/**
+ * Dados de rolagem (@variáveis) de um ator, para fórmulas de dano, cura,
+ * alcance, área e valores de efeito — ex.: "1d6+@forca", "floor(@nivel/2)".
+ * Chaves sem acento (a sintaxe @ do Foundry só aceita ASCII). Vale para
+ * personagens e NPCs (mesma ficha).
+ */
+export function actorRollData(actor) {
+  const sys = actor?.system || {};
+  const attrs = sys.attributes || {};
+  const sec = sys.secondary || {};
+  const res = sys.resources || {};
+  const num = (v) => Number(v) || 0;
+  return {
+    // Atributos
+    forca: num(attrs.forca?.value),
+    agilidade: num(attrs.agilidade?.value),
+    vigor: num(attrs.vigor?.value),
+    mente: num(attrs.mente?.value),
+    percepcao: num(attrs.percepcao?.value),
+    // Secundários (derivados)
+    bloqueio: num(sec.bloqueio),
+    esquiva: num(sec.esquiva),
+    conjuracao: num(sec.conjuracao),
+    iniciativa: num(sec.iniciativa),
+    deslocamento: num(sec.deslocamento),
+    // Progressão
+    nivel: num(sys.details?.level) || 1,
+    // Recursos (atual e máximo) + sobrevida
+    pv: num(res.hp?.value), pvmax: num(res.hp?.max),
+    pm: num(res.mp?.value), pmmax: num(res.mp?.max),
+    ph: num(res.heroic?.value), phmax: num(res.heroic?.max),
+    sobrevida: num(res.hp?.temp),
+  };
+}
+
+/**
+ * Resolve um VALOR que pode ser número ou fórmula DETERMINÍSTICA do Foundry
+ * com @variáveis do ator — ex.: "floor(@nivel/2)", "@forca+1". Dados (1d6)
+ * NÃO valem aqui; fórmulas inválidas e variáveis desconhecidas resolvem 0.
+ *
+ * Atenção: valores de efeitos de ITEM são agregados durante o
+ * prepareDerivedData, ANTES dos secundários serem recalculados — nessas
+ * fórmulas, @bloqueio/@esquiva/@conjuracao/@iniciativa/@deslocamento podem
+ * valer 0 (ou o valor do preparo anterior). Prefira atributos e @nivel.
+ */
+export function resolveEffectValue(raw, actor) {
+  if (raw === null || raw === undefined || raw === "") return 0;
+  const direct = Number(raw);
+  if (Number.isFinite(direct)) return direct;
+  try {
+    const R = globalThis.Roll;
+    const expr = R.replaceFormulaData(String(raw), actorRollData(actor), { missing: "0", warn: false });
+    const v = R.safeEval(expr);
+    return Number.isFinite(v) ? v : 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+/* ======================================================================== */
 /*  Agregação e aplicação de modificadores                                  */
 /* ======================================================================== */
 
@@ -118,9 +181,10 @@ function combineReroll(a, b) {
  *  - reroll1: rerrola dados que caem 1 (valor = quantos, ou "all").
  *  - reroll6: rerrola dados que caem 6 (valor = quantos, ou "all").
  */
-function applyEffectToMods(mods, effect) {
+function applyEffectToMods(mods, effect, actor) {
   const t = effect.target || "all";
-  const v = Number(effect.value) || 0;
+  // Valor: número ou fórmula com as @variáveis do dono do efeito.
+  const v = resolveEffectValue(effect.value, actor);
 
   if (effect.type === "bonus") {
     if (mods.attr[t]) mods.attr[t].bonus += v;
@@ -133,11 +197,11 @@ function applyEffectToMods(mods, effect) {
   } else if (effect.type === "set") {
     if (mods.attr[t]) mods.attr[t].set = v; // último a definir vence
   } else if (effect.type === "reroll1") {
-    const val = effect.rerollAll ? "all" : (Number(effect.value) || 0);
+    const val = effect.rerollAll ? "all" : v;
     if (mods.attr[t]) mods.attr[t].reroll1 = combineReroll(mods.attr[t].reroll1, val);
     else if (mods.roll[t]) mods.roll[t].reroll1 = combineReroll(mods.roll[t].reroll1, val);
   } else if (effect.type === "reroll6") {
-    const val = effect.rerollAll ? "all" : (Number(effect.value) || 0);
+    const val = effect.rerollAll ? "all" : v;
     if (mods.attr[t]) mods.attr[t].reroll6 = combineReroll(mods.attr[t].reroll6, val);
     else if (mods.roll[t]) mods.roll[t].reroll6 = combineReroll(mods.roll[t].reroll6, val);
   } else if (effect.type === "crit") {
@@ -162,7 +226,7 @@ export function aggregateEffectModifiers(actor) {
 
   // Efeitos vindos dos itens
   for (const { effect } of collectActorEffects(actor)) {
-    applyEffectToMods(mods, effect);
+    applyEffectToMods(mods, effect, actor);
   }
 
   // Efeitos aplicados diretamente na ficha (buffs/debuffs com duração)
@@ -170,7 +234,7 @@ export function aggregateEffectModifiers(actor) {
     if (ae.disabled) continue;
     for (const effect of ae.effects || []) {
       if (effect.enabled === false) continue;
-      applyEffectToMods(mods, effect);
+      applyEffectToMods(mods, effect, actor);
     }
   }
 
