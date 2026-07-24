@@ -388,22 +388,6 @@
   border-radius: 2px 2px 0 0;
 }
 .ligeia-fe .lig-tab.active i { opacity: 1; }
-.ligeia-fe .lig-tab-count {
-  font-size: 10px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 999px;
-  /* Fundo transparente e texto no mesmo dourado dos textos das abas. */
-  background: transparent;
-  color: var(--fe-gold-soft);
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-}
-
 /* ============================ PAINÉIS =========================== */
 .ligeia-fe .lig-tab-panels {
   border-top: 1px solid var(--fe-border);
