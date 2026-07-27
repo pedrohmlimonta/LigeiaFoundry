@@ -1,10 +1,11 @@
 {{!-- Botões de rolagem por AÇÃO de um item, na ficha do personagem.
-      Espera: item. Renderiza um 🎲 por ação (com o rótulo da ação no title). --}}
-{{#if item.system.actions.length}}
+      Espera: item (com _actionsView, já filtrado pelo nível adquirido).
+      Renderiza um 🎲 por ação disponível, usando o índice ORIGINAL. --}}
+{{#if item._actionsView.length}}
 <span class="lig-action-buttons">
-  {{#each item.system.actions as |act ai|}}
-  <button type="button" class="lig-roll-btn" data-action="itemRoll" data-action-index="{{ai}}"
-          title="{{#if act.label}}{{act.label}}{{else}}Ação {{ai}}{{/if}}">🎲<span class="lig-roll-lbl">{{act.label}}</span></button>
+  {{#each item._actionsView as |act|}}
+  <button type="button" class="lig-roll-btn" data-action="itemRoll" data-action-index="{{act.index}}"
+          title="{{#if act.label}}{{act.label}}{{else}}Ação {{act.index}}{{/if}}">🎲<span class="lig-roll-lbl">{{act.label}}</span></button>
   {{/each}}
 </span>
 {{/if}}

@@ -112,6 +112,15 @@ export function activatableFields() {
 export function actionEntryField() {
   return new fields.SchemaField({
     label: new fields.StringField({ blank: true, initial: "Ação" }),
+    // Nível em que a ação passa a existir (SÓ habilidades/complicações usam):
+    //   "all" = sempre; "B" = a partir de Básico; "A" = a partir de
+    //   Avançado; "E" = só no Épico/Especial. Ações de nível não atingido
+    //   não aparecem na ficha nem podem ser executadas.
+    level: new fields.StringField({
+      required: false,
+      initial: "all",
+      choices: ["all", "B", "A", "E"],
+    }),
     canRoll: new fields.BooleanField({ initial: true }),
     rollAttr: new fields.StringField({ blank: true, initial: "forca" }),
     rollBonus: new fields.NumberField({ initial: 0, integer: true }),

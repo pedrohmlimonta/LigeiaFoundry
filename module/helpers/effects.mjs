@@ -270,3 +270,38 @@ export function areaFilterOverrideFor(actor) {
   }
   return null;
 }
+
+/* ======================================================================== */
+/*  Nível das AÇÕES (mesma regra dos efeitos)                               */
+/* ======================================================================== */
+
+/**
+ * A ação está disponível no nível atual do item?
+ * Só habilidades e complicações têm nível; nos demais tipos, sempre true.
+ * Diferente dos efeitos, NÃO exige que o item esteja ligado: ações são
+ * executáveis mesmo em item ativável desligado (é o uso que o liga).
+ * @param {Item} item
+ * @param {object} action  entrada de system.actions
+ */
+export function actionIsAvailable(item, action) {
+  if (!action) return false;
+  if (item?.type === "habilidade" || item?.type === "complicacao") {
+    return levelMeets(item.system?.level || "B", action.level || "all");
+  }
+  return true;
+}
+
+/**
+ * Ações disponíveis de um item, preservando o ÍNDICE original de cada uma
+ * (a execução na ficha e as emanações referenciam ações por índice).
+ * @param {Item} item
+ * @returns {Array<{action: object, index: number}>}
+ */
+export function availableActionsOf(item) {
+  const list = item?.system?.actions || [];
+  const out = [];
+  list.forEach((action, index) => {
+    if (actionIsAvailable(item, action)) out.push({ action, index });
+  });
+  return out;
+}

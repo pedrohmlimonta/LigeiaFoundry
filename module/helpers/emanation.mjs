@@ -14,7 +14,7 @@
  */
 
 import { rollItemAction, passesAreaFilter } from "./dice.mjs";
-import { areaFilterOverrideFor } from "./effects.mjs";
+import { areaFilterOverrideFor, actionIsAvailable } from "./effects.mjs";
 
 const FLAG_SCOPE = "ligeia-rpg";
 const FLAG_KEY = "emanation";
@@ -67,6 +67,9 @@ async function resolveEmanationAction(ema) {
     if (!actor) actor = item.parent || null;
   }
   if (!actor || !action) return null;
+  // O nível do item pode ter mudado depois da emanação ser criada: se a ação
+  // não está mais disponível, a emanação deixa de reagir.
+  if (item && !actionIsAvailable(item, action)) return null;
   return { actor, item, action };
 }
 

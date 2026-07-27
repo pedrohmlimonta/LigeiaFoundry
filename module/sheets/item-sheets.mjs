@@ -57,6 +57,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       removeListItem: LigeiaItemSheetBase._onRemoveListItem,
       removeTrait: LigeiaItemSheetBase._onRemoveTrait,
       addAction: LigeiaItemSheetBase._onAddAction,
+      duplicateAction: LigeiaItemSheetBase._onDuplicateAction,
       removeAction: LigeiaItemSheetBase._onRemoveAction,
       addAppliesEffect: LigeiaItemSheetBase._onAddAppliesEffect,
       removeAppliesEffect: LigeiaItemSheetBase._onRemoveAppliesEffect,
@@ -556,6 +557,21 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
   }
   static async _onRemoveAction(event, target) {
     await this._removeFromArray("system.actions", Number(target.dataset.index));
+  }
+
+  /**
+   * Duplica uma ação: cópia completa (efeitos aplicados, danos extras,
+   * custos, movimento, macro, animação...) inserida logo DEPOIS da original,
+   * com "(cópia)" no nome para diferenciar.
+   */
+  static async _onDuplicateAction(event, target) {
+    const i = Number(target.dataset.index);
+    const actions = foundry.utils.deepClone(this.document.system.actions || []);
+    if (!actions[i]) return;
+    const copy = foundry.utils.deepClone(actions[i]);
+    copy.label = `${copy.label || "Ação"} (cópia)`;
+    actions.splice(i + 1, 0, copy);
+    await this._replaceActions(actions);
   }
 
   /** Reescreve o array inteiro de ações (preservando contra a corrida). */

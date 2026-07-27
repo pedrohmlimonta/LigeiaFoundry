@@ -12,6 +12,15 @@
   <div class="lig-action-block">
     <div class="lig-action-head">
       <input type="text" name="system.actions.{{i}}.label" value="{{act.label}}" placeholder="Nome da ação" class="lig-action-label"/>
+      {{#if ../showEffectLevel}}
+      <select name="system.actions.{{i}}.level" class="lig-fx-level" title="A partir de qual nível da habilidade esta ação existe">
+        <option value="all" {{#if (eq act.level "all")}}selected{{/if}}>Sempre</option>
+        <option value="B" {{#if (eq act.level "B")}}selected{{/if}}>Básico+</option>
+        <option value="A" {{#if (eq act.level "A")}}selected{{/if}}>Avançado+</option>
+        <option value="E" {{#if (eq act.level "E")}}selected{{/if}}>Épico</option>
+      </select>
+      {{/if}}
+      <button type="button" class="lig-mini-btn" data-action="duplicateAction" data-index="{{i}}" title="Duplicar esta ação (cria uma cópia logo abaixo)">⧉</button>
       <button type="button" class="lig-mini-btn danger" data-action="removeAction" data-index="{{i}}" title="Remover ação">✕</button>
     </div>
 

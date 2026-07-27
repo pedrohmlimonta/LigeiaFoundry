@@ -35,7 +35,7 @@ async function waitForDiceAnimation(fallbackMs = 1100) {
 import { conditionModifiers, attributeConditionDice, actorHasCondition } from "./conditions.mjs";
 import { playActionAnimation } from "./integrations.mjs";
 import { executeActionMovement } from "./movement.mjs";
-import { areaFilterOverrideFor, actorRollData, resolveEffectValue } from "./effects.mjs";
+import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvailable } from "./effects.mjs";
 // Re-export: outros módulos importam estas funções daqui.
 export { actorRollData, resolveEffectValue };
 import { promptRollConfig, shouldPromptRoll } from "../apps/roll-dialog.mjs";
@@ -889,6 +889,14 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
   if (!action) action = (item.system.actions || [])[0];
   if (!action) {
     ui.notifications?.warn("Este item não tem nenhuma ação configurada.");
+    return;
+  }
+  // A ação exige um nível que o item ainda não alcançou?
+  if (!actionIsAvailable(item, action)) {
+    const nivel = { B: "Básico", A: "Avançado", E: "Épico/Especial" }[action.level] || action.level;
+    ui.notifications?.warn(
+      `"${action.label || "Ação"}" só está disponível a partir do nível ${nivel} de ${item.name}.`,
+    );
     return;
   }
 
