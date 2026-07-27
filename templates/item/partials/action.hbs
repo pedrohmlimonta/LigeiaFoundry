@@ -10,8 +10,10 @@
 
   {{#each actions as |act i|}}
   <div class="lig-action-block">
-    <div class="lig-action-head">
+    <div>
       <input type="text" name="system.actions.{{i}}.label" value="{{act.label}}" placeholder="Nome da ação" class="lig-action-label"/>
+    </div>
+    <div class="lig-action-head">
       {{#if ../showEffectLevel}}
       <select name="system.actions.{{i}}.level" class="lig-fx-level" title="A partir de qual nível da habilidade esta ação existe">
         <option value="all" {{#if (eq act.level "all")}}selected{{/if}}>Sempre</option>
