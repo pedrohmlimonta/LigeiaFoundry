@@ -6,7 +6,7 @@ import { rollSingleEndEffect } from "../helpers/turn-effects.mjs";
 import { promptRollConfig, shouldPromptRoll, currentTargetActors } from "../apps/roll-dialog.mjs";
 import { placeTemplateForAction } from "../helpers/template.mjs";
 import { computeXpSpent, computeXpGained } from "../helpers/xp.mjs";
-import { effectIsActive } from "../helpers/effects.mjs";
+import { effectIsActive, availableActionsOf } from "../helpers/effects.mjs";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ActorSheetV2 } = foundry.applications.sheets;
@@ -263,6 +263,12 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
         item._fxView = effects.map((e) => ({
           ...e,
           _active: effectIsActive(item, e),
+        }));
+        // Ações disponíveis no nível atual (mantendo o índice original, que
+        // é o que a execução usa).
+        item._actionsView = availableActionsOf(item).map(({ action, index }) => ({
+          label: action.label,
+          index,
         }));
       }
     }
