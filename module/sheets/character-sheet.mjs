@@ -195,7 +195,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     // Cada efeito recebe os alvos contextuais (como nos efeitos de habilidade).
     const fxTypeLabels = {
       dice: "Dados", bonus: "Bônus", stat: "Modificar", set: "Definir",
-      damage: "Dano", rd: "Red. Dano", reroll1: "Rerrola 1", reroll6: "Rerrola 6",
+      damage: "Dano", rd: "Red. Dano", vuln: "Vulnerab.", reroll1: "Rerrola 1", reroll6: "Rerrola 6",
       crit: "Crít. apr.", fumble: "Falha pior.", info: "Info",
     };
     const rollTargets = {
@@ -216,7 +216,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
         case "bonus": case "dice": case "reroll1": case "reroll6": case "crit": case "fumble": return rollTargets;
         case "stat": return statTargets;
         case "set": return setTargets;
-        case "damage": case "rd": return dmgTargets;
+        case "damage": case "rd": case "vuln": return dmgTargets;
         default: return rollTargets;
       }
     };
@@ -277,7 +277,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     // sem precisar abrir a edição do item).
     context.effectTypeLabels = {
       dice: "Dados", bonus: "Bônus", stat: "Modifica", set: "Define",
-      damage: "Dano", rd: "Red. Dano", tempHp: "Sobrevida", areaFilter: "Filtro de área", info: "Condição",
+      damage: "Dano", rd: "Red. Dano", vuln: "Vulnerab.", tempHp: "Sobrevida", areaFilter: "Filtro de área", info: "Condição",
     };
     context.effectTargetLabels = {
       all: "todas", forca: "Força", agilidade: "Agilidade", vigor: "Vigor",

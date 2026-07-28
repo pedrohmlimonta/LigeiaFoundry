@@ -224,6 +224,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       set: "Definir Valor",
       damage: "Bônus de Dano",
       rd: "Redução de Dano",
+      vuln: "Vulnerabilidade a Dano",
       reroll1: "Rerrolar dados que caem 1",
       reroll6: "Rerrolar dados que caem 6",
       crit: "Crítico aprimorado",
@@ -303,7 +304,8 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         case "stat": return TARGETS.stat;
         case "set": return TARGETS.set;
         case "damage":
-        case "rd": return dmgChoices;
+        case "rd":
+        case "vuln": return dmgChoices;
         case "condition": return condChoices;
         case "restore": return { hp: "Vida (PV)", mp: "Mana (PM)", heroic: "Pontos Heroicos" };
         default: return TARGETS.roll;
@@ -339,6 +341,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       set: "set",
       damage: "none",
       rd: "none",
+      vuln: "none",
       reroll1: "roll",
       reroll6: "roll",
       crit: "roll",
@@ -365,8 +368,10 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         targetSet: setKey,
         targetChoices: choices,
         targetApplies: setKey !== "none",
-        // damage e rd podem ter tipo de dano associado
-        isDamageType: e.type === "damage" || e.type === "rd",
+        // damage, rd e vuln têm tipo de dano associado
+        isDamageType: e.type === "damage" || e.type === "rd" || e.type === "vuln",
+        // vuln mostra o toggle de valor percentual
+        isVuln: e.type === "vuln",
         // reroll1/reroll6 mostram o campo "todos" e o valor é uma contagem
         isReroll: e.type === "reroll1" || e.type === "reroll6",
       };

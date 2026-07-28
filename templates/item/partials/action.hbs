@@ -321,6 +321,7 @@
               <option value="set" {{#if (eq fx.fxType "set")}}selected{{/if}}>Definir valor</option>
               <option value="damage" {{#if (eq fx.fxType "damage")}}selected{{/if}}>Bônus de dano</option>
               <option value="rd" {{#if (eq fx.fxType "rd")}}selected{{/if}}>Redução de dano</option>
+              <option value="vuln" {{#if (eq fx.fxType "vuln")}}selected{{/if}}>Vulnerabilidade a dano</option>
               <option value="reroll1" {{#if (eq fx.fxType "reroll1")}}selected{{/if}}>Rerrolar dados que caem 1</option>
               <option value="reroll6" {{#if (eq fx.fxType "reroll6")}}selected{{/if}}>Rerrolar dados que caem 6</option>
               <option value="crit" {{#if (eq fx.fxType "crit")}}selected{{/if}}>Crítico aprimorado</option>
@@ -343,6 +344,12 @@
           <label class="lig-inline-check" title="Rerrolar TODOS os dados que caírem nesse valor">
             <input type="checkbox" name="system.actions.{{i}}.appliesEffects.{{fi}}.fxAll" {{checked fx.fxAll}}/>
             Todos
+          </label>
+          {{/if}}
+          {{#if (eq fx.fxType "vuln")}}
+          <label class="lig-inline-check" title="Valor percentual: +50 = +50% de dano recebido; +100 = dobro. Desmarcado, é um acréscimo fixo (+N).">
+            <input type="checkbox" name="system.actions.{{i}}.appliesEffects.{{fi}}.fxAll" {{checked fx.fxAll}}/>
+            Percentual (%)
           </label>
           {{/if}}
         </div>

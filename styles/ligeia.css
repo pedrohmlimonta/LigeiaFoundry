@@ -1138,6 +1138,7 @@
 }
 .lig-atk-line { font-size: 0.85rem; }
 .lig-atk-dmg { font-size: 0.85rem; margin-top: 0.15rem; }
+.lig-vuln { color: #f0a06a; font-size: 0.78rem; }
 .lig-rd { color: #9aa; font-size: 0.78rem; }
 .lig-atk-hint, .lig-atk-line .lig-outcome { font-size: 0.8rem; }
 .lig-outcome.ok { color: #6ee7a4; font-weight: 700; }

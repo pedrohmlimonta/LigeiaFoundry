@@ -35,7 +35,7 @@ async function waitForDiceAnimation(fallbackMs = 1100) {
 import { conditionModifiers, attributeConditionDice, actorHasCondition } from "./conditions.mjs";
 import { playActionAnimation } from "./integrations.mjs";
 import { executeActionMovement } from "./movement.mjs";
-import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvailable } from "./effects.mjs";
+import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvailable, activeEffectsOf } from "./effects.mjs";
 // Re-export: outros módulos importam estas funções daqui.
 export { actorRollData, resolveEffectValue };
 import { promptRollConfig, shouldPromptRoll } from "../apps/roll-dialog.mjs";
@@ -364,7 +364,7 @@ export function damageReductionFor(actor, damageType) {
     for (const e of item.system?.effects || []) {
       if (e.type !== "rd" || e.enabled === false) continue;
       const t = e.damageType || "";
-      if (!t || t === "all" || t === damageType) rd += Number(e.value) || 0;
+      if (!t || t === "all" || t === damageType) rd += resolveEffectValue(e.value, actor);
     }
   }
   // Efeitos aplicados na ficha (buffs de resistência) também contam.
@@ -373,10 +373,50 @@ export function damageReductionFor(actor, damageType) {
     for (const e of ae.effects || []) {
       if (e.type !== "rd" || e.enabled === false) continue;
       const t = e.damageType || "";
-      if (!t || t === "all" || t === damageType) rd += Number(e.value) || 0;
+      if (!t || t === "all" || t === damageType) rd += resolveEffectValue(e.value, actor);
     }
   }
   return rd;
+}
+
+/**
+ * Soma a VULNERABILIDADE de um ator a um tipo de dano, a partir dos efeitos
+ * ativos dos seus itens (respeitando modo, liga/desliga e nível B/A/E) e dos
+ * efeitos aplicados na ficha. Um efeito sem tipo (ou "all") vale para
+ * qualquer tipo de dano.
+ *
+ * Cada efeito "vuln" pode ser:
+ *   - FIXO (padrão): soma N ao dano recebido daquele tipo (espelho da RD);
+ *   - PERCENTUAL (vulnPercent): +N% sobre o dano daquele tipo (100 = dobro).
+ * Havendo vários, os fixos somam e os percentuais somam entre si.
+ *
+ * @returns {{flat:number, pct:number, mult:number}}
+ */
+export function damageVulnerabilityFor(actor, damageType) {
+  let flat = 0;
+  let pct = 0;
+  const add = (e) => {
+    const t = e.damageType || "";
+    if (t && t !== "all" && t !== damageType) return;
+    const v = resolveEffectValue(e.value, actor);
+    if (e.vulnPercent) pct += v;
+    else flat += v;
+  };
+  for (const item of actor?.items || []) {
+    // activeEffectsOf já cuida de modo (ativo/passivo), enabled e nível.
+    for (const e of activeEffectsOf(item)) {
+      if (e.type === "vuln") add(e);
+    }
+  }
+  for (const ae of actor?.system?.appliedEffects || []) {
+    if (ae.disabled) continue;
+    for (const e of ae.effects || []) {
+      if (e.type !== "vuln" || e.enabled === false) continue;
+      add(e);
+    }
+  }
+  // Multiplicador nunca fica negativo (uma "vulnerabilidade" de -100% zeraria).
+  return { flat, pct, mult: Math.max(0, 1 + pct / 100) };
 }
 
 /**
@@ -511,14 +551,22 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
     const applyParcel = async (total, type, resource, scaling, isMain) => {
       const isHp = resource === "hp";
       const rd = isHp ? damageReductionFor(tActor, type || "") : 0;
+      // Vulnerabilidade do ALVO ao tipo de dano: entra depois da RD (a armadura
+      // reduz, a fraqueza amplifica o que passou).
+      const vuln = isHp ? damageVulnerabilityFor(tActor, type || "") : { flat: 0, pct: 0, mult: 1 };
       let amount = (total + (scaling || 0)) * dealtMult;
       amount = amount - rd;
+      amount = (amount + vuln.flat) * vuln.mult;
       amount = amount * takenMult;
       const dealt = Math.max(0, Math.floor(amount));
       const typeLabel = dmgTypeLabel(type);
       const scaleNote = scaling ? ` <span class="lig-scale">(+${scaling} escalonado)</span>` : "";
       const typeNote = isHp && typeLabel ? " " + typeLabel : "";
       const rdNote = rd ? ` <span class="lig-rd">(RD ${rd})</span>` : "";
+      const vulnBits = [];
+      if (vuln.flat) vulnBits.push(`+${vuln.flat}`);
+      if (vuln.pct) vulnBits.push(`+${vuln.pct}%`);
+      const vulnNote = vulnBits.length ? ` <span class="lig-vuln">(vulnerável ${vulnBits.join(" e ")})</span>` : "";
       const resWord = { hp: "Dano", mp: "Mana drenada", heroic: "Heroico drenado" }[resource];
       const applied = await applyDamageToActor(tActor, dealt, resource);
       let applyNote = "";
@@ -531,7 +579,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
         applyNote = `<div class="lig-dmg-applied muted">Sem permissão para alterar a ficha do alvo (peça ao Mestre).</div>`;
       }
       const tag = isMain ? "" : ' <span class="lig-extra-tag">extra</span>';
-      return `<div class="lig-atk-dmg">${resWord}: <strong>${dealt}</strong>${typeNote}${tag}${scaleNote}${rdNote}${isMain ? multNote : ""}</div>${applyNote}`;
+      return `<div class="lig-atk-dmg">${resWord}: <strong>${dealt}</strong>${typeNote}${tag}${scaleNote}${rdNote}${vulnNote}${isMain ? multNote : ""}</div>${applyNote}`;
     };
 
     // Valor do escalonamento (bônus por superar a defesa) — calculado uma vez;
@@ -633,8 +681,12 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
         const fxVal = resolveEffectValue(ae.fxValue, caster);
         if (!isCondition && (fxVal !== 0 || ae.fxAll)) {
           const eff = { type: ae.fxType || "bonus", target: ae.fxTarget || "all", value: fxVal, enabled: true };
-          // Para dano/RD, o "alvo" é o tipo de dano.
-          if (ae.fxType === "damage" || ae.fxType === "rd") eff.damageType = ae.fxTarget || "";
+          // Para dano/RD/vulnerabilidade, o "alvo" é o tipo de dano.
+          if (ae.fxType === "damage" || ae.fxType === "rd" || ae.fxType === "vuln") {
+            eff.damageType = ae.fxTarget || "";
+          }
+          // Vulnerabilidade: a flag "Todos" vira o modo percentual.
+          if (ae.fxType === "vuln") eff.vulnPercent = !!ae.fxAll;
           // Para reroll, propaga a flag "todos".
           if (ae.fxType === "reroll1" || ae.fxType === "reroll6") eff.rerollAll = !!ae.fxAll;
           effects = [eff];

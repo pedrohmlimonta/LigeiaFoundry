@@ -17,7 +17,7 @@ export function effectField() {
       type: new fields.StringField({
         required: true,
         initial: "bonus",
-        choices: ["dice", "bonus", "stat", "set", "damage", "rd", "reroll1", "reroll6", "crit", "fumble", "tempHp", "areaFilter", "info"],
+        choices: ["dice", "bonus", "stat", "set", "damage", "rd", "vuln", "reroll1", "reroll6", "crit", "fumble", "tempHp", "areaFilter", "info"],
       }),
       target: new fields.StringField({ required: true, initial: "all" }),
       // Número OU fórmula determinística com @variáveis do dono — ex.:
@@ -26,6 +26,9 @@ export function effectField() {
       // Para reroll1/reroll6: se true, rerrola TODOS os dados que caírem no
       // valor alvo (ignora "value"). Senão, rerrola até "value" dados.
       rerollAll: new fields.BooleanField({ required: false, initial: false }),
+      // Para "vuln": se true, o valor é PERCENTUAL (+50 = +50%, +100 = dobro);
+      // se false (padrão), é um acréscimo fixo de dano (+N), espelhando a RD.
+      vulnPercent: new fields.BooleanField({ required: false, initial: false }),
       label: new fields.StringField({ required: false, blank: true, initial: "" }),
       enabled: new fields.BooleanField({ initial: true }),
       // Nível em que o efeito passa a valer (SÓ habilidades usam isto):
@@ -37,9 +40,10 @@ export function effectField() {
         initial: "all",
         choices: ["all", "B", "A", "E"],
       }),
-      // Tipo de dano (só relevante para type "damage" e "rd").
+      // Tipo de dano (relevante para type "damage", "rd" e "vuln").
       //   "" / "all" = aplica a qualquer tipo de dano.
-      //   Caso contrário, restringe ao tipo (ex.: rd "fogo" só reduz fogo).
+      //   Caso contrário, restringe ao tipo (ex.: rd "fogo" só reduz fogo;
+      //   vuln "fogo" só aumenta o dano de fogo recebido).
       damageType: new fields.StringField({ required: false, blank: true, initial: "" }),
     }),
   );
@@ -227,7 +231,7 @@ export function actionEntryField() {
         // Tipo do modificador (mesma lista dos efeitos de itens + condição)
         fxType: new fields.StringField({
           initial: "bonus",
-          choices: ["bonus", "dice", "stat", "set", "damage", "rd", "reroll1", "reroll6", "crit", "fumble", "restore", "condition"],
+          choices: ["bonus", "dice", "stat", "set", "damage", "rd", "vuln", "reroll1", "reroll6", "crit", "fumble", "restore", "condition"],
         }),
         // Alvo do modificador — depende do tipo (atributo, recurso, tipo de
         // dano ou id de condição). Sempre escolhido por select.

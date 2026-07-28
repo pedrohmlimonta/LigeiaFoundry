@@ -28,6 +28,11 @@
       <input type="checkbox" name="system.effects.{{i}}.rerollAll" {{checked eff.rerollAll}}/> todos
     </label>
     {{/if}}
+    {{#if eff.isVuln}}
+    <label class="lig-inline-check" title="Valor percentual: +50 = +50% de dano recebido; +100 = dobro. Desmarcado, é um acréscimo fixo (+N).">
+      <input type="checkbox" name="system.effects.{{i}}.vulnPercent" {{checked eff.vulnPercent}}/> %
+    </label>
+    {{/if}}
     {{#if eff.isDamageType}}
     <select name="system.effects.{{i}}.damageType" class="lig-fx-dmgtype" title="Tipo de dano (RD desse tipo / dano desse tipo)">
       {{selectOptions ../damageTypesWithAny selected=eff.damageType}}
