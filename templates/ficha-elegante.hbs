@@ -241,15 +241,15 @@
           <button type="button" class="lig-attr-circle" data-action="rollAttribute" data-attr="{{key}}"
                   title="Rolar {{lookup ../attrLabels key}}">
             <span class="lig-attr-name">{{lookup ../attrLabels key}}</span>
-            <span class="lig-attr-value">{{attr.value}}</span>
-            <span class="lig-attr-dice">{{#if attr.dice}}+{{attr.dice}}D{{else}}—{{/if}}</span>
+            <span class="lig-attr-value">{{attr.total}}</span>
+            <span class="lig-attr-dice">{{#if attr.totalDice}}+{{attr.totalDice}}D{{else}}—{{/if}}</span>
           </button>
           <div class="lig-attr-edit">
             <label>Valor
-              <input type="number" name="system.attributes.{{key}}.value" value="{{attr.value}}" min="0"/>
+              <input type="number" name="system.attributes.{{key}}.value" value="{{attr.value}}" min="0" title="Valor BASE do atributo (sem efeitos). O número grande mostra o total com os efeitos ativos."/>
             </label>
             <label>Dados
-              <input type="number" name="system.attributes.{{key}}.dice" value="{{attr.dice}}" min="0"/>
+              <input type="number" name="system.attributes.{{key}}.dice" value="{{attr.dice}}" min="0" title="Dados de melhoria BASE (sem efeitos)."/>
             </label>
           </div>
         </div>
@@ -511,12 +511,14 @@
           <div class="lig-applied-config">
             <label>Tipo
               <select name="system.appliedEffects.{{ae.index}}.effects.0.type">
-                <option value="bonus" {{#if (eq ae.fx0Type "bonus")}}selected{{/if}}>Bônus em Rolagem</option>
+                <option value="bonus" {{#if (eq ae.fx0Type "bonus")}}selected{{/if}}>Bônus em Rolagem (só na rolagem)</option>
+                <option value="attr" {{#if (eq ae.fx0Type "attr")}}selected{{/if}}>Bônus de Atributo (muda o atributo)</option>
                 <option value="dice" {{#if (eq ae.fx0Type "dice")}}selected{{/if}}>Dados de Melhoria</option>
                 <option value="stat" {{#if (eq ae.fx0Type "stat")}}selected{{/if}}>Modificar Valor</option>
                 <option value="set" {{#if (eq ae.fx0Type "set")}}selected{{/if}}>Definir Valor</option>
                 <option value="damage" {{#if (eq ae.fx0Type "damage")}}selected{{/if}}>Bônus de Dano</option>
                 <option value="rd" {{#if (eq ae.fx0Type "rd")}}selected{{/if}}>Redução de Dano</option>
+                <option value="vuln" {{#if (eq ae.fx0Type "vuln")}}selected{{/if}}>Vulnerabilidade a Dano</option>
                 <option value="reroll1" {{#if (eq ae.fx0Type "reroll1")}}selected{{/if}}>Rerrolar dados que caem 1</option>
                 <option value="reroll6" {{#if (eq ae.fx0Type "reroll6")}}selected{{/if}}>Rerrolar dados que caem 6</option>
                 <option value="crit" {{#if (eq ae.fx0Type "crit")}}selected{{/if}}>Crítico aprimorado</option>
@@ -524,7 +526,7 @@
               </select>
             </label>
             <label>Alvo
-              {{#if (or (eq ae.fx0Type "damage") (eq ae.fx0Type "rd"))}}
+              {{#if (or (or (eq ae.fx0Type "damage") (eq ae.fx0Type "rd")) (eq ae.fx0Type "vuln"))}}
               <select name="system.appliedEffects.{{ae.index}}.effects.0.damageType">
                 {{selectOptions ae.fx0TargetChoices selected=ae.fx0.damageType}}
               </select>
@@ -537,6 +539,12 @@
             <label>{{#if ae.fx0IsReroll}}Qtd. dados{{else}}Valor{{/if}}
               <input type="text" name="system.appliedEffects.{{ae.index}}.effects.0.value" value="{{ae.fx0.value}}" title="Número ou fórmula: @nivel, floor(@nivel/2)... (sem dados como 1d6)"/>
             </label>
+            {{#if ae.fx0IsVuln}}
+            <label class="lig-inline-check" title="Valor percentual: +50 = +50% de dano recebido; +100 = dobro. Desmarcado, é acréscimo fixo (+N).">
+              <input type="checkbox" name="system.appliedEffects.{{ae.index}}.effects.0.vulnPercent" {{checked ae.fx0.vulnPercent}}/>
+              Percentual (%)
+            </label>
+            {{/if}}
             {{#if ae.fx0IsReroll}}
             <label class="lig-inline-check" title="Rerrolar TODOS os dados que caírem nesse valor">
               <input type="checkbox" name="system.appliedEffects.{{ae.index}}.effects.0.rerollAll" {{checked ae.fx0.rerollAll}}/>

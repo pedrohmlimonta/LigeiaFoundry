@@ -28,6 +28,7 @@ function isResponsibleClient() {
 async function rollEndForEffect(actor, ae) {
   const attrKey = ae.endRoll?.attr || "mente";
   const r = resolveAttr(actor, attrKey);
+  const rBonus = r.rollBonus || 0;
   const rm = actor.system?.rollMods || {};
   const rr = rerollFor(actor, attrKey);
   const cr = critFor(actor, attrKey);
@@ -51,7 +52,7 @@ async function rollEndForEffect(actor, ae) {
       const atkRoll = await rollLigeia({
         attribute: aR.value,
         improvement: aR.dice + (aRm.all?.dice || 0) + (aRm.attack?.dice || 0),
-        bonus: (aRm.all?.bonus || 0) + (aRm.attack?.bonus || 0),
+        bonus: (aRm.all?.bonus || 0) + (aRm.attack?.bonus || 0) + (aR.rollBonus || 0),
         reroll1: aRr.reroll1, reroll6: aRr.reroll6,
         critBonus: aCr.critBonus, failBonus: aCr.failBonus,
       });
@@ -71,7 +72,7 @@ async function rollEndForEffect(actor, ae) {
   const result = await rollLigeia({
     attribute: r.value,
     improvement: r.dice + (rm.all?.dice || 0),
-    bonus: rm.all?.bonus || 0,
+    bonus: (rm.all?.bonus || 0) + rBonus,
     difficulty: dc,
     reroll1: rr.reroll1,
     reroll6: rr.reroll6,

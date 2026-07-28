@@ -12,6 +12,7 @@ import "./sheets/ficha-elegante.mjs";
 import { registerEmanationHooks } from "./helpers/emanation.mjs";
 import { registerTokenRuler } from "./helpers/token-ruler.mjs";
 import { registerMovementHooks, registerMovementSocket, registerForcedMovementActions } from "./helpers/movement.mjs";
+import { registerRollRequestSocket } from "./helpers/roll-request.mjs";
 import { registerTurnEffectHooks } from "./helpers/turn-effects.mjs";
 import { registerBarrierHooks } from "./helpers/barrier.mjs";
 import { applyTempHpToActor } from "./helpers/dice.mjs";
@@ -323,6 +324,7 @@ Hooks.once("ready", function () {
   // Efeitos de movimento: trava da Telecinese e receptor de pedidos ao Mestre.
   registerMovementHooks();
   registerMovementSocket();
+  registerRollRequestSocket();
 });
 
 /* ------------------------------------------------------------------ */

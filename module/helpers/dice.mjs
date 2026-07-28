@@ -39,6 +39,7 @@ import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvail
 // Re-export: outros módulos importam estas funções daqui.
 export { actorRollData, resolveEffectValue };
 import { promptRollConfig, shouldPromptRoll } from "../apps/roll-dialog.mjs";
+import { requestRollConfig } from "./roll-request.mjs";
 
 /**
  * Executa uma rolagem do Ligeia e devolve um objeto Roll do Foundry
@@ -320,7 +321,16 @@ export async function postRollToChat({ actor, label, result, hidden = false }) {
 export function resolveAttr(actor, key) {
   const sys = actor?.system || {};
   const prim = sys.attributes?.[key];
-  if (prim) return { value: prim.value || 0, dice: prim.dice || 0, key };
+  if (prim) {
+    // value/dice = TOTAL (base + bônus de atributo/dados de efeitos).
+    // rollBonus = bônus que vale só na rolagem (some ao "bonus" do rollLigeia).
+    return {
+      value: prim.total ?? prim.value ?? 0,
+      dice: prim.totalDice ?? prim.dice ?? 0,
+      rollBonus: prim.rollBonus || 0,
+      key,
+    };
+  }
   const sec = sys.secondary || {};
   if (key in sec) {
     const value = sec[key] || 0;
@@ -332,9 +342,9 @@ export function resolveAttr(actor, key) {
       conjuracao: sec.conjuracaoDice ?? sys.attributes?.mente?.dice ?? 0,
       iniciativa: sec.iniciativaDice || 0,
     };
-    return { value, dice: diceMap[key] || 0, key };
+    return { value, dice: diceMap[key] || 0, rollBonus: sys.secondaryRollBonus?.[key] || 0, key };
   }
-  return { value: 0, dice: 0, key };
+  return { value: 0, dice: 0, rollBonus: 0, key };
 }
 
 /**
@@ -1023,7 +1033,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
       improvement: dlgImprovement != null
         ? dlgImprovement
         : atk.dice + (Number(action.rollDice) || 0) + atkCond.atkDice + rmDice + attrCondDice + surpriseDice,
-      bonus: (Number(action.rollBonus) || 0) + rmBonus + dlgBonus,
+      bonus: (Number(action.rollBonus) || 0) + rmBonus + dlgBonus + (atk.rollBonus || 0),
       baseDice: dlgBaseDice,
       // Passa a CD fixa (quando houver) para marcar sucesso/falha e crítico.
       difficulty: fixedDC,
@@ -1258,7 +1268,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
         const cands = keys.map((k) => {
           const r = resolveAttr(tActor, k);
           const penalty = k === "esquiva" ? defCond.esquivaMod : 0;
-          return { key: k, base: r.value, dice: r.dice, penalty, eff: r.value + penalty };
+          return { key: k, base: r.value, dice: r.dice, rollBonus: r.rollBonus || 0, penalty, eff: r.value + penalty };
         });
         let def = cands[0];
         for (let i = 1; i < cands.length; i++) if (cands[i].eff > def.eff) def = cands[i];
@@ -1271,10 +1281,37 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
         const defCrit = critFor(tActor, def.key, "defense");
         // Surdo: -1D se a defesa usar Conjuração.
         const defAttrCondDice = attributeConditionDice(tActor, def.key);
+        const defImpBase =
+          def.dice + defCond.defDice +
+          (tActor.system?.rollMods?.all?.dice || 0) +
+          (tActor.system?.rollMods?.defense?.dice || 0) + defAttrCondDice;
+        // ---- Caixa de rolagem da DEFESA ----
+        // Abre para quem CONTROLA o alvo (jogador dono; Mestre se for NPC),
+        // a menos que esse personagem esteja com "sem caixa" marcado. Não
+        // depende da caixa do atacante: cada lado segue a própria configuração.
+        let defImp = defImpBase;
+        let defDlgBonus = 0;
+        let defBaseDice = 2;
+        if (!action.autoTrigger && shouldPromptRoll(tActor)) {
+          const dLabel = (cfg.defenseAttrs?.[def.key]) || def.key;
+          const dcfg = await requestRollConfig(tActor, {
+            title: `${tActor.name} — Defesa (${dLabel})`,
+            improvement: defImpBase,
+            hint: `Ataque de ${actor.name}: <strong>${atkTotal}</strong>. É preciso superar esse valor para não ser atingido.`,
+            showDifficulty: false,
+            allowDefense: false,
+          });
+          if (dcfg) {
+            defDlgBonus = dcfg.bonus || 0;
+            if (dcfg.improvement != null) defImp = dcfg.improvement;
+            defBaseDice = dcfg.baseDice ?? 2;
+          }
+        }
         const defRoll = await rollLigeia({
           attribute: def.base,
-          improvement: def.dice + defCond.defDice + (tActor.system?.rollMods?.all?.dice || 0) + (tActor.system?.rollMods?.defense?.dice || 0) + defAttrCondDice,
-          bonus: def.penalty + (tActor.system?.rollMods?.all?.bonus || 0) + (tActor.system?.rollMods?.defense?.bonus || 0),
+          improvement: defImp,
+          baseDice: defBaseDice,
+          bonus: def.penalty + (def.rollBonus || 0) + defDlgBonus + (tActor.system?.rollMods?.all?.bonus || 0) + (tActor.system?.rollMods?.defense?.bonus || 0),
           difficulty: atkTotal,
           reroll1: defRr.reroll1,
           reroll6: defRr.reroll6,

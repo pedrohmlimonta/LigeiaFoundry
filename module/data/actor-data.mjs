@@ -206,12 +206,20 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
       this.attrCrit[k] = { critBonus: mods.attr[k].critBonus || 0, failBonus: mods.attr[k].failBonus || 0 };
     }
     this.effectMods = mods; // exposto para depuração/uso externo
+    // ATENÇÃO: value e dice são a BASE editada na ficha (vão para o banco).
+    // NUNCA sobrescrever aqui — a ficha renderiza esses campos nos <input>,
+    // então gravar o valor buffado tornaria o efeito PERMANENTE e cumulativo.
+    // Os efeitos entram apenas em campos DERIVADOS:
+    //   total     = base + bônus de ATRIBUTO (ou "set")
+    //   totalDice = dados base + dados de melhoria dos efeitos
+    //   rollBonus = bônus que vale SÓ na rolagem (não altera o atributo)
     for (const k of ["forca", "agilidade", "vigor", "mente", "percepcao"]) {
-      if (a[k]) {
-        a[k].value = (a[k].value || 0) + (mods.attr[k]?.bonus || 0);
-        a[k].dice = (a[k].dice || 0) + (mods.attr[k]?.dice || 0);
-        if (mods.attr[k]?.set !== null && mods.attr[k]?.set !== undefined) a[k].value = mods.attr[k].set;
-      }
+      if (!a[k]) continue;
+      const m = mods.attr[k] || {};
+      const base = a[k].value || 0;
+      a[k].total = (m.set !== null && m.set !== undefined) ? m.set : base + (m.attrBonus || 0);
+      a[k].totalDice = (a[k].dice || 0) + (m.dice || 0);
+      a[k].rollBonus = m.bonus || 0;
     }
 
     // Bônus concedidos pelas definições embutidas (vocação: PV/PM; raça: deslocamento)
@@ -219,32 +227,41 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
 
     // ---- Atributos secundários ----
     this.secondary = {
-      bloqueio: a.forca.value,
-      esquiva: a.agilidade.value,
-      conjuracao: a.mente.value,
+      bloqueio: a.forca.total,
+      esquiva: a.agilidade.total,
+      conjuracao: a.mente.total,
       // Iniciativa = maior entre Agilidade e Percepção (herda dados de ambos)
-      iniciativa: Math.max(a.agilidade.value, a.percepcao.value),
-      iniciativaDice: Math.max(a.agilidade.dice, a.percepcao.dice),
+      iniciativa: Math.max(a.agilidade.total, a.percepcao.total),
+      iniciativaDice: Math.max(a.agilidade.totalDice, a.percepcao.totalDice),
       // Deslocamento = Agilidade + bônus da raça + ajuste do GM
       deslocamento:
-        a.agilidade.value +
+        a.agilidade.total +
         defBonus.move +
         (this.secondaryBonus.moveBonusRace || 0) +
         (this.secondaryBonus.deslocamento || 0),
     };
 
-    // Aplica bônus/dados de efeitos aos SECUNDÁRIOS (esquiva, bloqueio,
-    // conjuração, iniciativa) por cima do valor derivado.
-    this.secondary.bloqueio += mods.attr.bloqueio?.bonus || 0;
-    this.secondary.esquiva += mods.attr.esquiva?.bonus || 0;
-    this.secondary.conjuracao += mods.attr.conjuracao?.bonus || 0;
-    this.secondary.iniciativa += mods.attr.iniciativa?.bonus || 0;
+    // Aplica os bônus de ATRIBUTO dos efeitos aos SECUNDÁRIOS (esquiva,
+    // bloqueio, conjuração, iniciativa) por cima do valor derivado. O bônus
+    // de ROLAGEM fica separado em secondaryRollBonus (usado só ao rolar).
+    for (const k of ["bloqueio", "esquiva", "conjuracao", "iniciativa"]) {
+      const m = mods.attr[k] || {};
+      this.secondary[k] += m.attrBonus || 0;
+      if (m.set !== null && m.set !== undefined) this.secondary[k] = m.set;
+    }
+    this.secondaryRollBonus = {
+      bloqueio: mods.attr.bloqueio?.bonus || 0,
+      esquiva: mods.attr.esquiva?.bonus || 0,
+      conjuracao: mods.attr.conjuracao?.bonus || 0,
+      iniciativa: mods.attr.iniciativa?.bonus || 0,
+      deslocamento: mods.attr.deslocamento?.bonus || 0,
+    };
     this.secondary.iniciativaDice += mods.attr.iniciativa?.dice || 0;
     // Dados extras de bloqueio/esquiva/conjuração (herdam do primário, mas o
     // efeito pode adicionar) — guardados para o resolveAttr usar.
-    this.secondary.bloqueioDice = (a.forca.dice || 0) + (mods.attr.bloqueio?.dice || 0);
-    this.secondary.esquivaDice = (a.agilidade.dice || 0) + (mods.attr.esquiva?.dice || 0);
-    this.secondary.conjuracaoDice = (a.mente.dice || 0) + (mods.attr.conjuracao?.dice || 0);
+    this.secondary.bloqueioDice = (a.forca.totalDice || 0) + (mods.attr.bloqueio?.dice || 0);
+    this.secondary.esquivaDice = (a.agilidade.totalDice || 0) + (mods.attr.esquiva?.dice || 0);
+    this.secondary.conjuracaoDice = (a.mente.totalDice || 0) + (mods.attr.conjuracao?.dice || 0);
     // Deslocamento via efeito "stat"
     this.secondary.deslocamento += mods.stat.deslocamento || 0;
 
@@ -258,9 +275,9 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
 
     // ---- Máximos de recursos ----
     // PV = Vigor + bônus da vocação + bônus manual + nível (+ efeito stat hp)
-    const hpMax = a.vigor.value + defBonus.hp + (this.resources.hp.bonus || 0) + lvl + (mods.stat.hp || 0);
+    const hpMax = a.vigor.total + defBonus.hp + (this.resources.hp.bonus || 0) + lvl + (mods.stat.hp || 0);
     // PM = Mente + bônus da vocação + bônus manual + nível (+ efeito stat mp)
-    const mpMax = a.mente.value + defBonus.mp + (this.resources.mp.bonus || 0) + lvl + (mods.stat.mp || 0);
+    const mpMax = a.mente.total + defBonus.mp + (this.resources.mp.bonus || 0) + lvl + (mods.stat.mp || 0);
     // PH = nível (+ efeito stat heroic)
     const heroicMax = lvl + (this.resources.heroic.bonus || 0) + (mods.stat.heroic || 0);
 

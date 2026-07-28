@@ -193,11 +193,6 @@
       Cura escalonada (+1 por 2 pontos acima da defesa/CD)
     </label>
 
-    <label class="lig-inline-check" title="Quando ligado, executar esta ação não abre a caixa de configuração da rolagem.">
-      <input type="checkbox" name="system.actions.{{i}}.skipRollDialog" {{checked act.skipRollDialog}}/>
-      Não abrir caixa de rolagem
-    </label>
-
     {{!-- Dano extra: parcelas adicionais, cada uma com fórmula e tipo próprios --}}
     <div class="lig-extra-damage">
       <div class="lig-subtitle">Dano extra</div>
@@ -315,7 +310,8 @@
         <div class="lig-item-row">
           <label>Modificador
             <select name="system.actions.{{i}}.appliesEffects.{{fi}}.fxType">
-              <option value="bonus" {{#if (eq fx.fxType "bonus")}}selected{{/if}}>Bônus</option>
+              <option value="bonus" {{#if (eq fx.fxType "bonus")}}selected{{/if}}>Bônus em rolagem (só na rolagem)</option>
+              <option value="attr" {{#if (eq fx.fxType "attr")}}selected{{/if}}>Bônus de atributo (muda o atributo)</option>
               <option value="dice" {{#if (eq fx.fxType "dice")}}selected{{/if}}>Dado de melhoria</option>
               <option value="stat" {{#if (eq fx.fxType "stat")}}selected{{/if}}>Modificar valor</option>
               <option value="set" {{#if (eq fx.fxType "set")}}selected{{/if}}>Definir valor</option>

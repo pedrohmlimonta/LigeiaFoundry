@@ -91,11 +91,13 @@ export function actorRollData(actor) {
   const num = (v) => Number(v) || 0;
   return {
     // Atributos
-    forca: num(attrs.forca?.value),
-    agilidade: num(attrs.agilidade?.value),
-    vigor: num(attrs.vigor?.value),
-    mente: num(attrs.mente?.value),
-    percepcao: num(attrs.percepcao?.value),
+    // Usa o TOTAL (base + bônus de atributo); cai na base se ainda não
+    // houver derivado calculado.
+    forca: num(attrs.forca?.total ?? attrs.forca?.value),
+    agilidade: num(attrs.agilidade?.total ?? attrs.agilidade?.value),
+    vigor: num(attrs.vigor?.total ?? attrs.vigor?.value),
+    mente: num(attrs.mente?.total ?? attrs.mente?.value),
+    percepcao: num(attrs.percepcao?.total ?? attrs.percepcao?.value),
     // Secundários (derivados)
     bloqueio: num(sec.bloqueio),
     esquiva: num(sec.esquiva),
@@ -153,7 +155,9 @@ const STAT_TARGETS = ["hp", "mp", "heroic", "deslocamento"];
  */
 function emptyMods() {
   const attr = {};
-  for (const k of [...PRIMARY_ATTRS, ...SECONDARY_ATTRS]) attr[k] = { bonus: 0, dice: 0, set: null, reroll1: 0, reroll6: 0, critBonus: 0, failBonus: 0 };
+  // bonus     = bônus SÓ NA ROLAGEM daquele atributo (não muda o atributo)
+  // attrBonus = bônus no VALOR do atributo (muda a ficha e o que dele deriva)
+  for (const k of [...PRIMARY_ATTRS, ...SECONDARY_ATTRS]) attr[k] = { bonus: 0, attrBonus: 0, dice: 0, set: null, reroll1: 0, reroll6: 0, critBonus: 0, failBonus: 0 };
   const roll = {};
   for (const k of ROLL_CATEGORIES) roll[k] = { bonus: 0, dice: 0, reroll1: 0, reroll6: 0, critBonus: 0, failBonus: 0 };
   const stat = {};
@@ -174,7 +178,10 @@ function combineReroll(a, b) {
 
 /**
  * Aplica um único efeito (já ativo) à estrutura de modificadores.
- *  - bonus: +valor ao destino (atributo, categoria de rolagem). NEGATIVO reduz.
+ *  - bonus: +valor na ROLAGEM do destino (atributo ou categoria). O valor do
+ *           atributo na ficha NÃO muda. NEGATIVO reduz.
+ *  - attr:  +valor no ATRIBUTO em si (reflete na ficha, nos secundários
+ *           derivados e em tudo que usa o atributo). NEGATIVO reduz.
  *  - dice:  +valor de dados de melhoria ao destino. NEGATIVO reduz/dá desvantagem.
  *  - stat:  +valor a um recurso/derivado (hp/mp/heroic/deslocamento). NEGATIVO reduz.
  *  - set:   define (sobrescreve) o valor de um atributo.
@@ -187,7 +194,13 @@ function applyEffectToMods(mods, effect, actor) {
   const v = resolveEffectValue(effect.value, actor);
 
   if (effect.type === "bonus") {
+    // SÓ rolagem: nunca altera o valor do atributo (ver prepareDerivedData).
     if (mods.attr[t]) mods.attr[t].bonus += v;
+    else if (mods.roll[t]) mods.roll[t].bonus += v;
+  } else if (effect.type === "attr") {
+    // Altera o ATRIBUTO em si. Só faz sentido em atributos (primários e
+    // secundários); em categorias de rolagem, cai como bônus de rolagem.
+    if (mods.attr[t]) mods.attr[t].attrBonus += v;
     else if (mods.roll[t]) mods.roll[t].bonus += v;
   } else if (effect.type === "dice") {
     if (mods.attr[t]) mods.attr[t].dice += v;

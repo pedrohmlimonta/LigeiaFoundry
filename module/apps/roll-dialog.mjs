@@ -38,9 +38,13 @@ export function applyDiceDelta(improvement, delta) {
 
 /** O diálogo deve ser mostrado para esta rolagem? */
 export function shouldPromptRoll(actor, action = null) {
+  // Disparos automáticos (emanações que reaplicam a ação a cada turno) nunca
+  // abrem caixa — ninguém está clicando para que ela apareça.
+  if (action?.autoTrigger) return false;
+  // Único interruptor: a checkbox "sem caixa" da ficha do personagem.
+  // (O antigo "não abrir caixa" por ação não é mais consultado: a caixa deve
+  //  aparecer em todas as rolagens de quem não marcou "sem caixa".)
   if (actor?.system?.skipRollDialog) return false;
-  // Nas ações, a caixa é DESLIGADA por padrão (skipRollDialog = true).
-  if (action && action.skipRollDialog !== false) return false;
   return true;
 }
 
@@ -90,7 +94,7 @@ function stepperField(label, name, value, hint = "") {
 }
 
 /** Monta o HTML da caixa. */
-function buildContent({ improvement, targets, defenseAttr, difficulty, allowDefense }) {
+function buildContent({ improvement, targets, defenseAttr, difficulty, allowDefense, hint = "", showDifficulty = true }) {
   const cfg = CONFIG.LIGEIA || {};
   const impLabel =
     improvement > 0 ? `+${improvement}D vantagem` :
@@ -128,12 +132,14 @@ function buildContent({ improvement, targets, defenseAttr, difficulty, allowDefe
         <span class="lig-rd-dice">${preview}</span>
       </div>
 
+      ${showDifficulty ? `
       <div class="lig-rd-row">
         <label class="lig-rd-field lig-rd-wide">
           <span class="lig-rd-label">Dificuldade (CD)</span>
           <input type="number" name="difficulty" value="${difficulty ?? ""}" step="1" placeholder="vazio = sem CD"/>
         </label>
-      </div>
+      </div>` : ""}
+      ${hint ? `<div class="lig-rd-hint">${hint}</div>` : ""}
 
       ${defenseBlock}
 
@@ -193,9 +199,11 @@ export async function promptRollConfig({
   difficulty = null,
   defenseAttr = "",
   allowDefense = true,
+  hint = "",
+  showDifficulty = true,
 } = {}) {
   const targets = allowDefense ? currentTargetActors() : [];
-  const content = buildContent({ improvement, targets, defenseAttr, difficulty, allowDefense });
+  const content = buildContent({ improvement, targets, defenseAttr, difficulty, allowDefense, hint, showDifficulty });
 
   const parse = (form) => {
     const bonus = num(form, "bonus", 0);

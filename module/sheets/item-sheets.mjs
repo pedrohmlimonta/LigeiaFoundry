@@ -219,7 +219,8 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     };
     context.effectTypes = {
       dice: "+Dados de Melhoria",
-      bonus: "+Bônus em Rolagem",
+      bonus: "+Bônus em Rolagem (só na rolagem)",
+      attr: "+Bônus de Atributo (muda o atributo)",
       stat: "Modificar Valor",
       set: "Definir Valor",
       damage: "Bônus de Dano",
@@ -296,6 +297,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     const targetsForType = (type) => {
       switch (type) {
         case "bonus":
+        case "attr":
         case "dice":
         case "reroll1":
         case "reroll6":
@@ -337,6 +339,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     const typeToTargetSet = {
       dice: "roll",
       bonus: "roll",
+      attr: "roll",
       stat: "stat",
       set: "set",
       damage: "none",
