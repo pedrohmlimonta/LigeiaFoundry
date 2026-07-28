@@ -29,7 +29,8 @@ export class LigeiaActor extends Actor {
     // Modificadores de categoria "all" (efeitos que afetam todas as rolagens)
     const rm = sys.rollMods || {};
     dice += rm.all?.dice || 0;
-    const bonus = value + (rm.all?.bonus || 0);
+    // Bônus que valem só na rolagem: categoria "all" + o do atributo iniciativa
+    const bonus = value + (rm.all?.bonus || 0) + (sys.secondaryRollBonus?.iniciativa || 0);
 
     const extra = Math.abs(dice);
     const totalDice = 2 + extra;

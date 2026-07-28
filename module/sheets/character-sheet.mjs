@@ -772,8 +772,10 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
   static async #onRollAttribute(event, target) {
     const key = target.dataset.attr;
     const actor = this.document;
-    const attr = actor.system.attributes[key];
-    if (!attr) return;
+    if (!actor.system.attributes?.[key]) return;
+    // resolveAttr devolve o TOTAL (base + bônus de atributo), os dados de
+    // melhoria já somados (totalDice) e o bônus que vale só na rolagem.
+    const attr = resolveAttr(actor, key);
 
     const labels = {
       forca: "Força",
