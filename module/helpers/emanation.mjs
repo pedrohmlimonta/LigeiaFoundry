@@ -229,8 +229,49 @@ async function handleTokenMove(tokenDoc, dest) {
   const y = dest?.y ?? tokenDoc.y ?? 0;
   const cx = x + ((tokenDoc.width ?? 1) * gridSize) / 2;
   const cy = y + ((tokenDoc.height ?? 1) * gridSize) / 2;
-  const updates = templatesFollowing(scene, tokenDoc.id).map((t) => ({ _id: t.id, x: cx, y: cy }));
-  if (updates.length) await scene.updateEmbeddedDocuments("MeasuredTemplate", updates);
+
+  const following = templatesFollowing(scene, tokenDoc.id);
+  if (!following.length) return;
+
+  // A área é REFEITA (some e reaparece no destino) em vez de movida.
+  // Motivo: no V14 os Measured Templates são um shim sobre Template Regions
+  // e atualizar x/y do documento NÃO reposiciona a área desenhada — a aura
+  // ficava para trás. Recriar funciona no V13 e no V14; o custo é um piscar
+  // no momento em que o token para.
+  const ids = [];
+  const creations = [];
+  for (const t of following) {
+    // Flags lidas do documento vivo: no V14 o template vem de uma Region e o
+    // toObject() pode não trazê-las de volta, então reanexamos explicitamente.
+    const lig = t.getFlag?.("ligeia-rpg") ?? t.flags?.["ligeia-rpg"] ?? null;
+    let data;
+    try { data = t.toObject ? t.toObject() : foundry.utils.deepClone(t); }
+    catch (e) { data = null; }
+    // Reconstrução mínima caso o toObject não sirva como dado de criação.
+    if (!data || typeof data !== "object") data = {};
+    data.t = data.t || "circle";
+    data.distance = data.distance ?? t.distance ?? lig?.emanation?.radius ?? 0;
+    data.direction = data.direction ?? 0;
+    data.user = data.user || t.user || game.user.id;
+    if (data.fillColor === undefined && t.fillColor !== undefined) data.fillColor = t.fillColor;
+    // Sem _id (é uma criação nova) e no centro do token no destino.
+    delete data._id;
+    delete data.id;
+    data.x = cx;
+    data.y = cy;
+    // Preserva TODAS as flags (dados da emanação: ataque congelado, rodadas
+    // restantes, item de origem, âncora do token...).
+    if (lig) data.flags = { ...(data.flags || {}), "ligeia-rpg": foundry.utils.deepClone(lig) };
+    creations.push(data);
+    ids.push(t.id);
+  }
+
+  try {
+    await scene.deleteEmbeddedDocuments("MeasuredTemplate", ids);
+    await scene.createEmbeddedDocuments("MeasuredTemplate", creations);
+  } catch (e) {
+    console.warn("Ligeia | falha ao reposicionar a área da aura:", e);
+  }
 }
 
 /**
