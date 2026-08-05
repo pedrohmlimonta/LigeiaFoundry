@@ -34,6 +34,43 @@ function emanationTemplates(scene) {
   return templates.filter((t) => !!emanationOf(t));
 }
 
+/**
+ * Templates que ACOMPANHAM um token: qualquer aura ancorada a ele pela flag
+ * "follow" (auras simples e emanações novas) e — por compatibilidade com
+ * áreas já colocadas antes desta versão — emanações de aura cujo
+ * sourceTokenId aponte para o token.
+ * @returns {Array} documentos de MeasuredTemplate
+ */
+function templatesFollowing(scene, tokenId) {
+  const sc = scene || canvas?.scene;
+  const templates = sc?.templates;
+  if (!templates?.filter || !tokenId) return [];
+  return templates.filter((t) => {
+    const lig = t.getFlag?.("ligeia-rpg") ?? t.flags?.["ligeia-rpg"];
+    if (lig?.follow === tokenId) return true;
+    const ema = lig?.emanation;
+    return !!ema?.isAura && ema.sourceTokenId === tokenId;
+  });
+}
+
+/**
+ * Quem cuida das auras de um documento (mover/remover): o GM responsável,
+ * evitando duplicar a operação. Sem nenhum GM conectado, o próprio dono.
+ */
+function shouldHandleFor(doc) {
+  const activeGMs = game.users.filter((u) => u.isGM && u.active);
+  if (activeGMs.length) return isResponsibleClient();
+  return !!doc?.isOwner;
+}
+const shouldMoveAuras = shouldHandleFor;
+
+/** Remove templates de uma cena, ignorando erros de permissão. */
+async function deleteTemplates(scene, ids) {
+  if (!scene || !ids?.length) return;
+  try { await scene.deleteEmbeddedDocuments("MeasuredTemplate", ids); }
+  catch (e) { console.warn("Ligeia | falha ao remover área de aura:", e); }
+}
+
 /** Converte raio (unidades do grid) para pixels. */
 function radiusToPx(radiusUnits) {
   const grid = canvas.grid;
@@ -190,15 +227,9 @@ async function handleTokenMove(tokenDoc, dest) {
   const gridSize = scene.grid?.size || canvas.grid?.size || 100;
   const x = dest?.x ?? tokenDoc.x ?? 0;
   const y = dest?.y ?? tokenDoc.y ?? 0;
-  const updates = [];
-  for (const template of emanationTemplates(scene)) {
-    const ema = emanationOf(template);
-    if (!ema?.isAura) continue;
-    if (ema.sourceTokenId !== tokenDoc.id) continue;
-    const cx = x + ((tokenDoc.width ?? 1) * gridSize) / 2;
-    const cy = y + ((tokenDoc.height ?? 1) * gridSize) / 2;
-    updates.push({ _id: template.id, x: cx, y: cy });
-  }
+  const cx = x + ((tokenDoc.width ?? 1) * gridSize) / 2;
+  const cy = y + ((tokenDoc.height ?? 1) * gridSize) / 2;
+  const updates = templatesFollowing(scene, tokenDoc.id).map((t) => ({ _id: t.id, x: cx, y: cy }));
   if (updates.length) await scene.updateEmbeddedDocuments("MeasuredTemplate", updates);
 }
 
@@ -282,8 +313,12 @@ export function registerEmanationHooks() {
   // dispara emanações em que ele ENTROU. Lê o destino de `changed` (e não de
   // tokenDoc.x/y, que pode estar na posição de partida no momento do hook).
   Hooks.on("updateToken", async (tokenDoc, changed, options, userId) => {
-    if (!isResponsibleClient()) return;
     if (!("x" in changed) && !("y" in changed)) return;
+    // O acompanhamento da aura e os disparos de emanação têm responsáveis
+    // diferentes: a aura pode ser movida pelo dono do token quando não há GM.
+    const moveAuras = shouldMoveAuras(tokenDoc);
+    const runTriggers = isResponsibleClient();
+    if (!moveAuras && !runTriggers) return;
 
     const gs = tokenDoc.parent?.grid?.size || canvas.grid?.size || 100;
     const newX = changed.x ?? tokenDoc.x;
@@ -292,10 +327,9 @@ export function registerEmanationHooks() {
     const newCenter = centerFromPos(tokenDoc, newX, newY, gs);
     const oldCenter = options.ligeiaOldCenter || centerFromPos(tokenDoc, tokenDoc.x, tokenDoc.y, gs);
 
-    // (1) Mover auras que seguem este token (espera a animação terminar).
-    const followsThis = emanationTemplates(tokenDoc.parent).some(
-      (t) => emanationOf(t)?.isAura && emanationOf(t)?.sourceTokenId === tokenDoc.id
-    );
+    // (1) Mover as auras ancoradas a este token (espera a animação terminar,
+    // para a área chegar junto com o token e não saltar na frente dele).
+    const followsThis = moveAuras && templatesFollowing(tokenDoc.parent, tokenDoc.id).length > 0;
     if (followsThis) {
       try {
         const obj = tokenDoc.object;
@@ -309,7 +343,33 @@ export function registerEmanationHooks() {
     }
 
     // (2) Detectar ENTRADA em qualquer emanação (gatilho enter/both).
-    await handleTokenEnter(tokenDoc, oldCenter, newCenter);
+    if (runTriggers) await handleTokenEnter(tokenDoc, oldCenter, newCenter);
+  });
+
+  // A aura acaba quando o EFEITO acaba: ao DESLIGAR o item que a criou, as
+  // emanações dele saem do mapa. (Ligar de novo recria a área ao executar a
+  // ação.) Vale para qualquer cena carregada.
+  Hooks.on("updateItem", async (item, changes) => {
+    const becameOff = foundry.utils.getProperty(changes, "system.active") === false;
+    if (!becameOff) return;
+    if (!shouldHandleFor(item)) return;
+    const scene = canvas?.scene;
+    if (!scene) return;
+    const ids = emanationTemplates(scene)
+      .filter((t) => emanationOf(t)?.itemUuid && emanationOf(t).itemUuid === item.uuid)
+      .map((t) => t.id);
+    if (ids.length) {
+      await deleteTemplates(scene, ids);
+      ui.notifications?.info(`${item.name} desligada — a área da aura foi removida.`);
+    }
+  });
+
+  // Token removido da cena (morreu/saiu): as auras ancoradas a ele somem.
+  Hooks.on("deleteToken", async (tokenDoc) => {
+    if (!shouldHandleFor(tokenDoc)) return;
+    const scene = tokenDoc.parent;
+    const ids = templatesFollowing(scene, tokenDoc.id).map((t) => t.id);
+    if (ids.length) await deleteTemplates(scene, ids);
   });
 
   // Limpeza: ao encerrar o combate, remove as emanações de duração por rodada.

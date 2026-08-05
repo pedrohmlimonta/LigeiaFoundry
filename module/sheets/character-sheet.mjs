@@ -5,7 +5,7 @@ import { rollLigeia, postRollToChat, rollItemAction, resolveAttr, rerollFor, cri
 import { rollSingleEndEffect } from "../helpers/turn-effects.mjs";
 import { promptRollConfig, shouldPromptRoll, currentTargetActors } from "../apps/roll-dialog.mjs";
 import { requestRollConfig } from "../helpers/roll-request.mjs";
-import { placeTemplateForAction } from "../helpers/template.mjs";
+import { placeTemplateForAction, scheduleTransientCleanup } from "../helpers/template.mjs";
 import { computeXpSpent, computeXpGained } from "../helpers/xp.mjs";
 import { effectIsActive, availableActionsOf } from "../helpers/effects.mjs";
 
@@ -499,6 +499,10 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
         console.warn("Ligeia | falha ao congelar ataque da emanação:", e);
       }
     }
+
+    // Ação normal (sem emanação contínua): a área/aura é só o retrato do
+    // momento — some do mapa logo após a resolução.
+    if (templateId && !action.persistArea) scheduleTransientCleanup(templateId);
   }
 
   /** Liga/desliga uma condição na ficha. */

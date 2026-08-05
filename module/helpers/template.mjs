@@ -79,10 +79,13 @@ export function targetTokensInCircle(cx, cy, radiusUnits, filterFn = null) {
  *  Se `persistFlags` for fornecido, a área é PERSISTENTE (emanação): não é
  *  transitória e carrega os metadados para refazer a rolagem por turno.
  */
-function circleData(radius, x, y, persistFlags = null) {
+function circleData(radius, x, y, persistFlags = null, followTokenId = null) {
   const lig = persistFlags
     ? { transient: false, emanation: persistFlags }
     : { transient: true };
+  // AURA: guarda o token de origem para que a área ACOMPANHE o token quando
+  // ele se mover (vale tanto para auras simples quanto para emanações).
+  if (followTokenId) lig.follow = followTokenId;
   return {
     t: "circle",
     user: game.user.id,
@@ -93,6 +96,32 @@ function circleData(radius, x, y, persistFlags = null) {
     fillColor: game.user.color || "#ff0000",
     flags: { "ligeia-rpg": lig },
   };
+}
+
+/**
+ * Remove a área TEMPORÁRIA (não-emanação) alguns segundos após a ação, para
+ * o círculo não ficar marcado no mapa (e, no caso das auras, não seguir o
+ * token para sempre). Emanações contínuas são preservadas — elas têm o
+ * próprio ciclo de vida (duração em rodadas / fim de cena).
+ * @param {string} templateId
+ * @param {Scene} [scene]
+ * @param {number} [delayMs] tempo que a área fica visível após resolver
+ */
+export function scheduleTransientCleanup(templateId, scene = null, delayMs = 3000) {
+  if (!templateId) return;
+  const sc = scene || canvas?.scene;
+  if (!sc) return;
+  setTimeout(async () => {
+    try {
+      const tpl = sc.templates?.get?.(templateId);
+      if (!tpl) return;
+      const lig = tpl.getFlag?.("ligeia-rpg") ?? tpl.flags?.["ligeia-rpg"];
+      if (lig?.transient === false || lig?.emanation) return; // emanação: mantém
+      await sc.deleteEmbeddedDocuments("MeasuredTemplate", [templateId]);
+    } catch (e) {
+      console.warn("Ligeia | falha ao remover a área temporária:", e);
+    }
+  }, Math.max(0, delayMs));
 }
 
 /**
@@ -137,7 +166,8 @@ export async function placeAuraTemplate(actor, radius, persistFlags = null, filt
     ui.notifications?.warn("O personagem precisa de um token na cena para a aura.");
     return null;
   }
-  const data = circleData(radius, token.center.x, token.center.y, persistFlags);
+  // A aura nasce centrada no token e passa a segui-lo (flag "follow").
+  const data = circleData(radius, token.center.x, token.center.y, persistFlags, token.id);
   let created = null;
   try {
     created = await canvas.scene.createEmbeddedDocuments("MeasuredTemplate", [data]);
