@@ -7,7 +7,7 @@ import { promptRollConfig, shouldPromptRoll, currentTargetActors } from "../apps
 import { requestRollConfig } from "../helpers/roll-request.mjs";
 import { placeTemplateForAction, scheduleTransientCleanup } from "../helpers/template.mjs";
 import { computeXpSpent, computeXpGained } from "../helpers/xp.mjs";
-import { woundOf, performRest, performMedicalCare, DEATH_HP } from "../helpers/wounds.mjs";
+import { performRest, performMedicalCare, DEATH_HP } from "../helpers/wounds.mjs";
 import { effectIsActive, availableActionsOf } from "../helpers/effects.mjs";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -138,9 +138,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     context.actor = actor;
     context.system = sys;
     context.isGM = game.user.isGM;
-    // Estado de ferimento (PV <= 0): usado no cabeçalho das fichas.
-    const wound = woundOf(actor);
-    context.wound = wound ? { ...wound, hpValue: sys.resources?.hp?.value ?? 0 } : null;
+    // Limite inferior dos PV (morte), usado no campo de PV das fichas.
     context.deathHp = DEATH_HP;
     context.editable = this.isEditable;
     // NPCs usam exatamente a mesma ficha, mas sem NADA de XP.

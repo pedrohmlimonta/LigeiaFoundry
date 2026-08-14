@@ -36,7 +36,7 @@ import { conditionModifiers, attributeConditionDice, actorHasCondition } from ".
 import { playActionAnimation } from "./integrations.mjs";
 import { executeActionMovement } from "./movement.mjs";
 import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvailable, activeEffectsOf } from "./effects.mjs";
-import { DEATH_HP, WOUND_LEVELS, woundLevelFor, setWoundLevel, syncWoundState } from "./wounds.mjs";
+import { DEATH_HP, WOUND_LEVELS, woundLevelFor, setWoundLevel } from "./wounds.mjs";
 // Re-export: outros módulos importam estas funções daqui.
 export { actorRollData, resolveEffectValue };
 import { promptRollConfig, shouldPromptRoll } from "../apps/roll-dialog.mjs";
@@ -470,12 +470,7 @@ export async function applyDamageToActor(actor, amount, resource = "hp") {
   update[`system.resources.${resource}.value`] = newValue;
   await actor.update(update);
 
-  let wound = null;
-  if (resource === "hp") {
-    wound = woundLevelFor(newValue);
-    // Acerta as condições ligadas ao estado (inconsciente/morto).
-    await syncWoundState(actor);
-  }
+  const wound = resource === "hp" ? woundLevelFor(newValue) : null;
 
   return {
     applied: true,
@@ -529,7 +524,6 @@ export async function applyHealingToActor(actor, amount, resource = "hp") {
   const newValue = Math.min(max, (res.value || 0) + heal);
   const gained = newValue - (res.value || 0);
   await actor.update({ [`system.resources.${resource}.value`]: newValue });
-  if (resource === "hp") await syncWoundState(actor);
   return { applied: true, heal, gained, newValue, newMax: max, resource };
 }
 

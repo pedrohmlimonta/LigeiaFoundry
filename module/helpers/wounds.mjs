@@ -131,25 +131,6 @@ export function isDead(actor) {
   return (actor?.system?.resources?.hp?.value ?? 0) <= DEATH_HP;
 }
 
-/** Marca (ou desmarca) as condições ligadas ao estado de ferimento. */
-async function syncWoundConditions(actor, level) {
-  const conds = new Set(actor.system?.conditions || []);
-  const before = conds.size;
-  // Morto e inconsciente andam junto com o estado; leve/moderado acordado.
-  if (level?.key === "morto") {
-    conds.add("morto");
-    conds.add("inconsciente");
-  } else {
-    conds.delete("morto");
-    if (level && (level.key === "grave" || level.key === "beira")) conds.add("inconsciente");
-    else if (level && level.wakesOnRest === true) conds.delete("inconsciente");
-  }
-  const arr = Array.from(conds);
-  if (arr.length !== before || arr.some((c) => !(actor.system?.conditions || []).includes(c))) {
-    await actor.update({ "system.conditions": arr });
-  }
-}
-
 /**
  * Define o PV para o topo (valor menos severo) de uma faixa de ferimento.
  * Usado por cuidados médicos e cura mágica, que sobem o personagem de faixa
@@ -161,7 +142,6 @@ export async function setWoundLevel(actor, key, { announce = true, reason = "" }
   if (!actor?.isOwner || !level) return null;
   const fromLevel = woundOf(actor);
   await actor.update({ "system.resources.hp.value": level.hp });
-  await syncWoundConditions(actor, level);
   if (announce) {
     const arrow = key === "morto" ? "☠" : "→";
     await ChatMessage.create({
@@ -170,15 +150,6 @@ export async function setWoundLevel(actor, key, { announce = true, reason = "" }
     });
   }
   return { from: fromLevel?.key ?? null, to: key, hp: level.hp };
-}
-
-/**
- * Ajusta as condições após um dano/cura que mudou o PV (chamado pelo dice).
- * Não anuncia nada: quem aplicou o dano já escreve a linha no chat.
- */
-export async function syncWoundState(actor) {
-  if (!actor?.isOwner) return;
-  await syncWoundConditions(actor, woundOf(actor));
 }
 
 /**
@@ -314,16 +285,7 @@ export async function performRest(actor, { proper = true } = {}) {
   };
   await actor.update(update);
 
-  // Consciência: leve e moderado voltam a si com o descanso.
   const newLevel = woundLevelFor(hpAfter);
-  if (!newLevel || newLevel.wakesOnRest) {
-    const conds = (actor.system?.conditions || []).filter((c) => c !== "inconsciente");
-    if (conds.length !== (actor.system?.conditions || []).length) {
-      await actor.update({ "system.conditions": conds });
-    }
-  } else {
-    await syncWoundConditions(actor, newLevel);
-  }
 
   // --- Relatório no chat ---
   const linhas = [

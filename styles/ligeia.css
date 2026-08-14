@@ -1546,16 +1546,4 @@
 .lig-wound-moderado { color: #e8b96a; }
 .lig-wound-grave { color: #e88a5a; }
 .lig-wound-beira { color: #e2564a; }
-.lig-wound-morto { color: #a0a0a0; }
-.lig-wound-banner {
-  margin: 0.25rem 0 0.35rem;
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
-  font-size: 0.82rem;
-  text-align: center;
-  background: rgba(200, 60, 60, 0.14);
-  border: 1px solid rgba(200, 60, 60, 0.45);
-}
-.lig-wound-banner.lig-wound-leve { background: rgba(200,170,110,0.12); border-color: rgba(200,170,110,0.4); }
-.lig-wound-banner.lig-wound-morto { background: rgba(120,120,120,0.16); border-color: rgba(160,160,160,0.45); }
-.lig-rest-report { font-size: 0.85rem; margin-top: 0.2rem; }
+.lig-wound-morto { color: #a0a0a0; }.lig-rest-report { font-size: 0.85rem; margin-top: 0.2rem; }

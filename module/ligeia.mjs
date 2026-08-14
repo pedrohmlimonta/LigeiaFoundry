@@ -214,11 +214,6 @@ Hooks.once("init", function () {
         icon: "icons/svg/anchor.svg",
         desc: "Incapaz de se mover. Anula com Força ou Vigor.",
       },
-      morto: {
-        label: "Morto",
-        icon: "icons/svg/skull.svg",
-        desc: "Chegou a -7 pontos de vida (ou falhou à beira da morte). O personagem morreu.",
-      },
       inconsciente: {
         label: "Inconsciente",
         icon: "icons/svg/sleep.svg",

@@ -65,11 +65,6 @@
 
     {{!-- ===== Barras de recurso ===== --}}
     <div class="lig-bars">
-      {{#if wound}}
-      <div class="lig-wound-banner lig-wound-{{wound.key}}" title="{{wound.desc}}">
-        <strong>{{wound.label}}</strong> — PV {{wound.hpValue}} (morte em {{deathHp}})
-      </div>
-      {{/if}}
       <div class="lig-bar-box hp {{#if bars.hp.low}}is-low{{/if}}">
         <div class="lig-bar-top">
           <span class="lig-bar-name">Pontos de Vida</span>
