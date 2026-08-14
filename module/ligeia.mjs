@@ -183,6 +183,16 @@ Hooks.once("init", function () {
         icon: "icons/svg/falling.svg",
         desc: "Deitado no chão. Perde 1D em todas as rolagens. Fica também Lento e Indefeso. Levanta usando o movimento.",
       },
+      cobertura_parcial: {
+        label: "Cobertura Parcial",
+        icon: "icons/svg/shield.svg",
+        desc: "Parte da linha de visão está bloqueada. Recebe +1D em rolagens de Esquiva e Bloqueio contra o ataque. Ex.: quina de parede, meio muro, tronco fino, criatura pequena.",
+      },
+      cobertura_completa: {
+        label: "Cobertura Completa",
+        icon: "icons/svg/castle.svg",
+        desc: "A linha de visão está totalmente bloqueada: NÃO pode sofrer o ataque. Ex.: porta fechada, tronco largo, criatura média ou maior.",
+      },
       cego: {
         label: "Cego",
         icon: "icons/svg/blind.svg",
@@ -243,6 +253,11 @@ Hooks.once("init", function () {
         icon: "icons/svg/clockwork.svg",
         desc: "Deslocamento reduzido à metade. Anula com Vigor.",
       },
+      oculto: {
+        label: "Oculto",
+        icon: "icons/svg/cowled.svg",
+        desc: "Está escondido de quem ataca. Quem não o vê tem o alvo com +1D em Esquiva e Bloqueio, mesmo ouvindo-o. Iniciar o combate oculto dá +4 na iniciativa.",
+      },
       paralisado: {
         label: "Paralisado",
         icon: "icons/svg/paralysis.svg",
@@ -252,6 +267,16 @@ Hooks.once("init", function () {
         label: "Pasmo",
         icon: "icons/svg/stoned.svg",
         desc: "Faz apenas uma ação por turno. Anula com Mente.",
+      },
+      vendo_invisivel: {
+        label: "Vendo Invisível",
+        icon: "icons/svg/eye.svg",
+        desc: "Enxerga criaturas invisíveis: os alvos com Invisível não recebem o bônus de defesa contra os ataques deste personagem.",
+      },
+      vendo_oculto: {
+        label: "Vendo Oculto",
+        icon: "icons/svg/target.svg",
+        desc: "Percebe criaturas ocultas: os alvos com Oculto não recebem o bônus de defesa contra os ataques deste personagem.",
       },
       surdo: {
         label: "Surdo",

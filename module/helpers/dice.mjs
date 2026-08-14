@@ -32,7 +32,7 @@ async function waitForDiceAnimation(fallbackMs = 1100) {
   await delay(fallbackMs);
 }
 
-import { conditionModifiers, attributeConditionDice, actorHasCondition } from "./conditions.mjs";
+import { conditionModifiers, attributeConditionDice, actorHasCondition, coverDefenseDice, hasFullCover } from "./conditions.mjs";
 import { playActionAnimation } from "./integrations.mjs";
 import { executeActionMovement } from "./movement.mjs";
 import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvailable, activeEffectsOf } from "./effects.mjs";
@@ -1275,6 +1275,12 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
         lines.push(`<div class="lig-target-line lig-out-range"><span class="lig-tgt-name">${tActor.name}</span> <span class="lig-outcome ko">Fora de alcance (${d}m > ${rangeM}m)</span></div>`);
         continue;
       }
+      // COBERTURA COMPLETA: a linha de visão está totalmente bloqueada, o
+      // alvo não pode sofrer o ataque (nem dano, nem efeitos).
+      if (!isSelf && action.canRoll && hasFullCover(tActor)) {
+        lines.push(`<div class="lig-target-line lig-out-range"><span class="lig-tgt-name">${tActor.name}</span> <span class="lig-outcome ko">Cobertura completa — não pode ser atacado</span></div>`);
+        continue;
+      }
       // Há defesa quando: a ação faz ATAQUE E o modo é target/area/aura E não é o self.
       const needsDefense = action.canRoll && !isSelf && (mode === "target" || mode === "area" || mode === "aura");
 
@@ -1314,8 +1320,11 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
         const defCrit = critFor(tActor, def.key, "defense");
         // Surdo: -1D se a defesa usar Conjuração.
         const defAttrCondDice = attributeConditionDice(tActor, def.key);
+        // Cobertura / ocultação / invisibilidade: +1D defensivo, anulados
+        // quando o atacante tem a percepção correspondente.
+        const cover = coverDefenseDice(tActor, actor);
         const defImpBase =
-          def.dice + defCond.defDice +
+          def.dice + defCond.defDice + cover.dice +
           (tActor.system?.rollMods?.all?.dice || 0) +
           (tActor.system?.rollMods?.defense?.dice || 0) + defAttrCondDice;
         // ---- Caixa de rolagem da DEFESA ----
@@ -1363,6 +1372,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
         const condBits = [];
         if (def.penalty) condBits.push(`${def.penalty} Esquiva (Indefeso)`);
         if (defCond.defDice) condBits.push(`${defCond.defDice}D`);
+        if (cover.dice) condBits.push(`+${cover.dice}D por ${cover.notes.join(" e ")}`);
         if (defCond.blockDisabled && (action.defenseAttr === "bloqueio" || action.defenseAttr2 === "bloqueio")) {
           condBits.push("sem Bloqueio");
         }

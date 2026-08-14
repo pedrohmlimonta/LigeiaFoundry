@@ -1,3 +1,5 @@
+import { initiativeConditionBonus } from "../helpers/conditions.mjs";
+
 /**
  * Classe base de Actor do Ligeia.
  * A maior parte da lógica derivada vive nos DataModels (prepareDerivedData).
@@ -30,7 +32,10 @@ export class LigeiaActor extends Actor {
     const rm = sys.rollMods || {};
     dice += rm.all?.dice || 0;
     // Bônus que valem só na rolagem: categoria "all" + o do atributo iniciativa
-    const bonus = value + (rm.all?.bonus || 0) + (sys.secondaryRollBonus?.iniciativa || 0);
+    // + 4 por iniciar o combate Oculto.
+    const bonus =
+      value + (rm.all?.bonus || 0) + (sys.secondaryRollBonus?.iniciativa || 0) +
+      initiativeConditionBonus(this);
 
     const extra = Math.abs(dice);
     const totalDice = 2 + extra;

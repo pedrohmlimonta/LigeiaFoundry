@@ -67,6 +67,50 @@ export function attributeConditionDice(actor, attrKey) {
   return dice;
 }
 
+/**
+ * Condições que dão +1D DEFENSIVO por não ser visto e que podem ser anuladas
+ * quando o ATACANTE tem a condição de percepção correspondente.
+ */
+const PERCEPTION_COUNTER = {
+  oculto: "vendo_oculto",
+  invisivel: "vendo_invisivel",
+};
+
+/**
+ * Dados de melhoria DEFENSIVOS por cobertura e por não ser visto — o único
+ * cálculo do sistema que depende dos dois lados: um alvo Oculto/Invisível não
+ * ganha nada contra quem tem Vendo Oculto / Vendo Invisível.
+ *
+ * @param {Actor} defender
+ * @param {Actor} [attacker]
+ * @returns {{dice:number, notes:string[]}}
+ */
+export function coverDefenseDice(defender, attacker = null) {
+  const def = expandConditions(defender?.system?.conditions || []);
+  const atk = expandConditions(attacker?.system?.conditions || []);
+  let dice = 0;
+  const notes = [];
+  // Cobertura é física: a percepção do atacante não anula.
+  if (def.has("cobertura_parcial")) { dice += 1; notes.push("cobertura parcial"); }
+  for (const [cond, counter] of Object.entries(PERCEPTION_COUNTER)) {
+    if (!def.has(cond)) continue;
+    if (atk.has(counter)) continue; // o atacante enxerga: sem bônus
+    dice += 1;
+    notes.push(cond === "oculto" ? "ocultação" : "invisibilidade");
+  }
+  return { dice, notes };
+}
+
+/** O alvo está em cobertura completa (não pode sofrer o ataque)? */
+export function hasFullCover(defender) {
+  return expandConditions(defender?.system?.conditions || []).has("cobertura_completa");
+}
+
+/** Bônus de iniciativa por iniciar o combate oculto. */
+export function initiativeConditionBonus(actor) {
+  return expandConditions(actor?.system?.conditions || []).has("oculto") ? 4 : 0;
+}
+
 /** O ator tem a condição (considerando condições implícitas)? */
 export function actorHasCondition(actor, id) {
   return expandConditions(actor?.system?.conditions || []).has(id);
