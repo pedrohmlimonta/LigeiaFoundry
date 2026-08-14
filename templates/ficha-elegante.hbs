@@ -57,17 +57,24 @@
           <input type="checkbox" name="system.skipRollDialog" {{#if system.skipRollDialog}}checked{{/if}}/>
           🎲 sem caixa
         </label>
+        <button type="button" class="lig-mini-btn" data-action="rest" title="Descanso de 8 horas: recupera PV (Vigor), PM (Mente) e todos os Pontos Heroicos, respeitando o nível de ferimento.">🛏 descansar</button>
+        <button type="button" class="lig-mini-btn" data-action="medicalCare" title="Cuidados médicos: rolagem de Mente que reduz o nível de ferimento do alvo mirado (ou de você mesmo).">⚕ cuidados</button>
         <button type="button" class="lig-mini-btn lig-vars-btn" data-action="showRollVars" title="Variáveis deste personagem para usar em fórmulas de dano/cura — @forca, @nivel, floor(@nivel/2)...">ƒx variáveis</button>
       </div>
     </header>
 
     {{!-- ===== Barras de recurso ===== --}}
     <div class="lig-bars">
+      {{#if wound}}
+      <div class="lig-wound-banner lig-wound-{{wound.key}}" title="{{wound.desc}}">
+        <strong>{{wound.label}}</strong> — PV {{wound.hpValue}} (morte em {{deathHp}})
+      </div>
+      {{/if}}
       <div class="lig-bar-box hp {{#if bars.hp.low}}is-low{{/if}}">
         <div class="lig-bar-top">
           <span class="lig-bar-name">Pontos de Vida</span>
           <span class="lig-bar-nums">
-            <input type="number" class="lig-bar-input" name="system.resources.hp.value" value="{{system.resources.hp.value}}"/>
+            <input type="number" class="lig-bar-input" name="system.resources.hp.value" value="{{system.resources.hp.value}}" min="{{deathHp}}" title="Os PV podem ficar negativos até {{deathHp}} (morte). O excedente define o nível de ferimento."/>
             <span class="lig-bar-max">/ {{system.resources.hp.max}}</span>
             {{#if editable}}
             <span class="lig-bar-temp" title="PV temporário">+<input type="number" name="system.resources.hp.temp" value="{{system.resources.hp.temp}}" min="0"/></span>

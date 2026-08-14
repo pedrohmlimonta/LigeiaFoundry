@@ -12,6 +12,7 @@
  */
 
 import { rollLigeia, resolveAttr, rerollFor, critFor, applyHealingToActor } from "./dice.mjs";
+import { processWoundRollAtTurnStart } from "./wounds.mjs";
 
 /** Detecta se ESTE cliente deve processar (apenas um GM ativo). */
 function isResponsibleClient() {
@@ -186,5 +187,7 @@ export function registerTurnEffectHooks() {
     // mesmo que uma rolagem de fim o encerre logo em seguida.
     await processRegenAtTurnStart(actor);
     await processEndRollsAtTurnStart(actor);
+    // Ferimentos graves / à beira da morte: Vigor no começo do turno.
+    await processWoundRollAtTurnStart(actor);
   });
 }

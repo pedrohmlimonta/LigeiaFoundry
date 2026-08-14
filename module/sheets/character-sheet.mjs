@@ -7,6 +7,7 @@ import { promptRollConfig, shouldPromptRoll, currentTargetActors } from "../apps
 import { requestRollConfig } from "../helpers/roll-request.mjs";
 import { placeTemplateForAction, scheduleTransientCleanup } from "../helpers/template.mjs";
 import { computeXpSpent, computeXpGained } from "../helpers/xp.mjs";
+import { woundOf, performRest, performMedicalCare, DEATH_HP } from "../helpers/wounds.mjs";
 import { effectIsActive, availableActionsOf } from "../helpers/effects.mjs";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -35,6 +36,8 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       editImage: LigeiaCharacterSheet.#onEditImage,
       itemCreate: LigeiaCharacterSheet.#onItemCreate,
       showRollVars: LigeiaCharacterSheet.#onShowRollVars,
+      rest: LigeiaCharacterSheet.#onRest,
+      medicalCare: LigeiaCharacterSheet.#onMedicalCare,
     },
     form: {
       submitOnChange: true,
@@ -135,6 +138,10 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     context.actor = actor;
     context.system = sys;
     context.isGM = game.user.isGM;
+    // Estado de ferimento (PV <= 0): usado no cabeçalho das fichas.
+    const wound = woundOf(actor);
+    context.wound = wound ? { ...wound, hpValue: sys.resources?.hp?.value ?? 0 } : null;
+    context.deathHp = DEATH_HP;
     context.editable = this.isEditable;
     // NPCs usam exatamente a mesma ficha, mas sem NADA de XP.
     context.isNpc = actor.type === "npc";
@@ -747,6 +754,33 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
         });
       },
     });
+  }
+
+  /** Botão DESCANSAR: pergunta o local e aplica os efeitos do descanso. */
+  static async #onRest() {
+    const actor = this.document;
+    const proper = await foundry.applications.api.DialogV2.wait({
+      window: { title: `Descanso de ${actor.name}` },
+      content: `<p class="lig-hint">Um descanso leva <strong>8 horas</strong> e recupera PV igual ao Vigor, PM igual à Mente e <strong>todos</strong> os Pontos Heroicos.</p>
+        <p class="lig-hint">Em local inapropriado (sem cama, colchão, peles ou ao menos um saco de dormir), recupera apenas <strong>metade</strong> de tudo. Níveis de ferimento limitam a recuperação de PV.</p>`,
+      buttons: [
+        { action: "proper", label: "Local apropriado", default: true },
+        { action: "rough", label: "Local inapropriado (metade)" },
+        { action: "cancel", label: "Cancelar" },
+      ],
+      rejectClose: false,
+    });
+    if (!proper || proper === "cancel") return;
+    await performRest(actor, { proper: proper === "proper" });
+  }
+
+  /** Botão CUIDADOS MÉDICOS: rola Mente para reduzir o nível de ferimento. */
+  static async #onMedicalCare() {
+    const actor = this.document;
+    // Alvo mirado = paciente; sem alvo, cuida de si mesmo.
+    const targets = Array.from(game.user?.targets ?? []).map((t) => t.actor).filter(Boolean);
+    const patient = targets[0] || actor;
+    await performMedicalCare(actor, patient);
   }
 
   static async #onItemCreate(event, target) {

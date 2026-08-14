@@ -89,6 +89,8 @@ Hooks.once("init", function () {
 
   // Constantes do sistema (palavras arcanas, custos de XP, etc.)
   CONFIG.LIGEIA = {
+    // CDs das rolagens por dificuldade (usadas pelos níveis de ferimento)
+    difficulties: { facil: 6, normal: 8, dificil: 10, muito_dificil: 12 },
     // Custo de XP por nível de habilidade
     skillCost: { B: 20, A: 40, E: 80 },
     // XP CONCEDIDO por nível de complicação (o inverso do custo de
@@ -211,6 +213,11 @@ Hooks.once("init", function () {
         label: "Imobilizado",
         icon: "icons/svg/anchor.svg",
         desc: "Incapaz de se mover. Anula com Força ou Vigor.",
+      },
+      morto: {
+        label: "Morto",
+        icon: "icons/svg/skull.svg",
+        desc: "Chegou a -7 pontos de vida (ou falhou à beira da morte). O personagem morreu.",
       },
       inconsciente: {
         label: "Inconsciente",

@@ -36,6 +36,7 @@ import { conditionModifiers, attributeConditionDice, actorHasCondition } from ".
 import { playActionAnimation } from "./integrations.mjs";
 import { executeActionMovement } from "./movement.mjs";
 import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvailable, activeEffectsOf } from "./effects.mjs";
+import { DEATH_HP, WOUND_LEVELS, woundLevelFor, setWoundLevel, syncWoundState } from "./wounds.mjs";
 // Re-export: outros módulos importam estas funções daqui.
 export { actorRollData, resolveEffectValue };
 import { promptRollConfig, shouldPromptRoll } from "../apps/roll-dialog.mjs";
@@ -462,9 +463,19 @@ export async function applyDamageToActor(actor, amount, resource = "hp") {
     update["system.resources.hp.temp"] = temp - fromTemp;
   }
 
-  const newValue = Math.max(0, (res.value || 0) - rest);
+  // PV podem ficar NEGATIVOS: o excedente define o nível de ferimento, até
+  // o limite de -7 (morte automática). Outros recursos param em 0.
+  const floor = resource === "hp" ? DEATH_HP : 0;
+  const newValue = Math.max(floor, (res.value || 0) - rest);
   update[`system.resources.${resource}.value`] = newValue;
   await actor.update(update);
+
+  let wound = null;
+  if (resource === "hp") {
+    wound = woundLevelFor(newValue);
+    // Acerta as condições ligadas ao estado (inconsciente/morto).
+    await syncWoundState(actor);
+  }
 
   return {
     applied: true,
@@ -474,6 +485,7 @@ export async function applyDamageToActor(actor, amount, resource = "hp") {
     newMax: res.max,
     resource,
     downed: resource === "hp" && newValue <= 0,
+    wound,
   };
 }
 
@@ -493,9 +505,31 @@ export async function applyHealingToActor(actor, amount, resource = "hp") {
     return { applied: false, heal, gained: 0, resource, noPermission: true };
   }
   const max = res.max || 0;
+
+  // FERIMENTOS GRAVES / À BEIRA DA MORTE: a cura mágica sobe o NÍVEL DE
+  // FERIMENTO "independente de quantos pontos de vida ele recuperaria" —
+  // grave vira leve (PV 0) e à beira da morte vira moderado (PV -1). Morto
+  // não é curado por cura comum.
+  if (resource === "hp") {
+    const level = woundLevelFor(res.value || 0);
+    if (level?.key === "morto") {
+      return { applied: false, heal, gained: 0, resource, dead: true };
+    }
+    if (level?.magicTo) {
+      const to = WOUND_LEVELS[level.magicTo];
+      await setWoundLevel(actor, level.magicTo, { announce: false });
+      return {
+        applied: true, heal, gained: to.hp - (res.value || 0),
+        newValue: to.hp, newMax: max, resource,
+        woundFrom: level.key, woundTo: level.magicTo, woundLabel: to.label,
+      };
+    }
+  }
+
   const newValue = Math.min(max, (res.value || 0) + heal);
   const gained = newValue - (res.value || 0);
   await actor.update({ [`system.resources.${resource}.value`]: newValue });
+  if (resource === "hp") await syncWoundState(actor);
   return { applied: true, heal, gained, newValue, newMax: max, resource };
 }
 
@@ -584,7 +618,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
         const resLabel = { hp: "PV", mp: "PM", heroic: "PH" }[resource];
         const parts = [];
         if (applied.fromTemp) parts.push(`${applied.fromTemp} do PV temp.`);
-        applyNote = `<div class="lig-dmg-applied">${resLabel}: ${applied.newValue}/${applied.newMax}${parts.length ? " — " + parts.join(", ") : ""}${applied.downed ? ' <span class="lig-downed">⚠ Caído!</span>' : ""}</div>`;
+        applyNote = `<div class="lig-dmg-applied">${resLabel}: ${applied.newValue}/${applied.newMax}${parts.length ? " — " + parts.join(", ") : ""}${applied.wound ? ` <span class="lig-wound lig-wound-${applied.wound.key}">⚠ ${applied.wound.label}</span>` : (applied.downed ? ' <span class="lig-downed">⚠ Caído!</span>' : "")}</div>`;
       } else if (applied.noPermission) {
         applyNote = `<div class="lig-dmg-applied muted">Sem permissão para alterar a ficha do alvo (peça ao Mestre).</div>`;
       }
@@ -655,7 +689,12 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       const applied = await applyHealingToActor(tActor, amount, hResource);
       if (applied.applied) {
         const overNote = applied.gained < applied.heal ? ` <span class="lig-cond-note">(+${applied.heal - applied.gained} acima do máximo)</span>` : "";
-        applyNote = `<div class="lig-heal-applied">${resShort}: ${applied.newValue}/${applied.newMax}${overNote}</div>`;
+        const woundNote = applied.woundTo
+          ? ` <span class="lig-wound lig-wound-${applied.woundTo}">→ ${applied.woundLabel}</span>`
+          : "";
+        applyNote = `<div class="lig-heal-applied">${resShort}: ${applied.newValue}/${applied.newMax}${overNote}${woundNote}</div>`;
+      } else if (applied.dead) {
+        applyNote = `<div class="lig-dmg-applied muted">O alvo está morto — a cura não tem efeito.</div>`;
       } else if (applied.noPermission) {
         applyNote = `<div class="lig-dmg-applied muted">Sem permissão para alterar a ficha do alvo (peça ao Mestre).</div>`;
       }
