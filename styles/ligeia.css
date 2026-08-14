@@ -1547,3 +1547,13 @@
 .lig-wound-grave { color: #e88a5a; }
 .lig-wound-beira { color: #e2564a; }
 .lig-wound-morto { color: #a0a0a0; }.lig-rest-report { font-size: 0.85rem; margin-top: 0.2rem; }
+
+/* PV negativo (dano excedente): o marcador de PV fica em destaque */
+.lig-bar-box.hp.is-negative .lig-bar-input,
+.lig-resource.hp.is-negative input[name$="hp.value"] {
+  color: #e2564a;
+  font-weight: 700;
+}
+.lig-bar-box.hp.is-negative .lig-bar-track {
+  box-shadow: inset 0 0 0 1px rgba(226, 86, 74, 0.6);
+}

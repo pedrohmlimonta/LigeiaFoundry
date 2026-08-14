@@ -81,7 +81,7 @@
 
   {{!-- ===== Recursos ===== --}}
   <section class="lig-resources">
-    <div class="lig-resource hp">
+    <div class="lig-resource hp {{#if (lt system.resources.hp.value 0)}}is-negative{{/if}}">
       <div class="lig-res-label">Pontos de Vida</div>
       <div class="lig-res-values">
         <input type="number" name="system.resources.hp.value" value="{{system.resources.hp.value}}" min="{{deathHp}}" title="Os PV podem ficar negativos até {{deathHp}} (morte). O excedente define o nível de ferimento."/>

@@ -90,7 +90,13 @@ class LigeiaFichaElegante extends LigeiaCharacterSheet {
     const ph = sys.resources?.heroic ?? {};
     const hpPct = pct(hp.value, hp.max);
     context.bars = {
-      hp: { pct: hpPct, tempPct: pct(hp.temp, hp.max), low: hpPct <= 30 },
+      hp: {
+        pct: hpPct,
+        tempPct: pct(hp.temp, hp.max),
+        low: hpPct <= 30,
+        // PV negativo: o próprio marcador de PV fica em destaque.
+        negative: (hp.value || 0) < 0,
+      },
       mp: { pct: pct(mp.value, mp.max) },
       heroic: { pct: pct(ph.value, ph.max) },
     };

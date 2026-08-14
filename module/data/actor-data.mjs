@@ -3,6 +3,7 @@
  */
 import { expandConditions } from "../helpers/conditions.mjs";
 import { actorRollData } from "../helpers/dice.mjs";
+import { DEATH_HP } from "../helpers/wounds.mjs";
 import { aggregateEffectModifiers } from "../helpers/effects.mjs";
 import { effectField } from "./fields.mjs";
 import { migrateEffectTargets } from "./fields.mjs";
@@ -285,8 +286,9 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
     this.resources.mp.max = mpMax;
     this.resources.heroic.max = heroicMax;
 
-    // Clampa atuais ao máximo (não-negativo)
-    this.resources.hp.value = Math.max(0, Math.min(this.resources.hp.value, hpMax));
+    // Clampa atuais ao máximo. Os PV podem ficar NEGATIVOS até -7 (o valor
+    // negativo é o dano excedente / nível de ferimento); os demais param em 0.
+    this.resources.hp.value = Math.max(DEATH_HP, Math.min(this.resources.hp.value, hpMax));
     this.resources.mp.value = Math.max(0, Math.min(this.resources.mp.value, mpMax));
     this.resources.heroic.value = Math.max(0, Math.min(this.resources.heroic.value, heroicMax));
     this.resources.hp.temp = Math.max(0, this.resources.hp.temp || 0);
