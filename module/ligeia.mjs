@@ -13,6 +13,7 @@ import { registerEmanationHooks } from "./helpers/emanation.mjs";
 import { registerTokenRuler } from "./helpers/token-ruler.mjs";
 import { registerMovementHooks, registerMovementSocket, registerForcedMovementActions } from "./helpers/movement.mjs";
 import { registerRollRequestSocket } from "./helpers/roll-request.mjs";
+import { registerTokenLinkSettings, registerTokenLinkHooks, migrateTokenLinks } from "./helpers/token-link.mjs";
 import { registerTurnEffectHooks } from "./helpers/turn-effects.mjs";
 import { registerBarrierHooks } from "./helpers/barrier.mjs";
 import { applyTempHpToActor } from "./helpers/dice.mjs";
@@ -43,6 +44,9 @@ import {
 /*  INIT                                                               */
 /* ------------------------------------------------------------------ */
 Hooks.once("init", function () {
+  // Token e ficha do ator são a MESMA ficha (configurável).
+  registerTokenLinkSettings();
+  registerTokenLinkHooks();
   console.log("Ligeia RPG | Inicializando sistema");
 
   // Namespace global para debug/macros
@@ -327,6 +331,8 @@ Hooks.once("ready", function () {
   registerMovementHooks();
   registerMovementSocket();
   registerRollRequestSocket();
+  // Vincula fichas de token já existentes (uma vez, preservando os valores).
+  migrateTokenLinks();
 });
 
 /* ------------------------------------------------------------------ */
