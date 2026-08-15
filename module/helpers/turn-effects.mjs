@@ -153,8 +153,12 @@ export async function processDurationAtTurnStart(actor) {
   const restantes = [];
   for (const ae of arr) {
     const rounds = ae?.duration?.rounds || 0;
-    if (rounds <= 0) { restantes.push(ae); continue; } // 0 = até o fim da cena
-    const remaining = Math.max(0, (ae.duration.remaining ?? rounds) - 1);
+    if (rounds <= 0) { restantes.push(ae); continue; } // vazio/0 = permanente
+    // remaining só vale quando já foi iniciado (> 0). Como o campo da ficha
+    // grava apenas "rounds", um efeito recém-criado tem remaining 0 — nesse
+    // caso a contagem começa pelo total informado.
+    const atual = (ae.duration.remaining > 0) ? ae.duration.remaining : rounds;
+    const remaining = Math.max(0, atual - 1);
     ae.duration.remaining = remaining;
     if (remaining <= 0) expirados.push(ae);
     else restantes.push(ae);

@@ -155,7 +155,7 @@
         <input type="text" name="system.appliedEffects.{{ae.index}}.label" value="{{ae.label}}" class="lig-applied-label" placeholder="Nome do efeito"/>
         <button type="button" class="lig-mini-btn" data-action="toggleAppliedEffect" data-index="{{ae.index}}" title="Ligar/desligar">{{#if ae.disabled}}○{{else}}●{{/if}}</button>
         {{#if ae.hasDuration}}
-        <button type="button" class="lig-mini-btn" data-action="tickAppliedEffect" data-index="{{ae.index}}" title="Passar 1 rodada">⏱ {{ae.duration.remaining}}</button>
+        <button type="button" class="lig-mini-btn" data-action="tickAppliedEffect" data-index="{{ae.index}}" title="Passar 1 rodada">⏱ {{ae.durationLeft}}</button>
         {{/if}}
         {{#if ae.endRoll.enabled}}
         <button type="button" class="lig-mini-btn" data-action="rollEndEffect" data-index="{{ae.index}}" title="Rolar para encerrar">🎲</button>
@@ -208,7 +208,7 @@
         </label>
         {{/if}}
         <label>Duração (rodadas)
-          <input type="number" name="system.appliedEffects.{{ae.index}}.duration.rounds" value="{{ae.duration.rounds}}" min="0"/>
+          <input type="number" name="system.appliedEffects.{{ae.index}}.duration.rounds" value="{{#if ae.duration.rounds}}{{ae.duration.rounds}}{{/if}}" min="0" placeholder="permanente" title="Vazio ou 0 = permanente (dura até ser removido). Um número = quantas rodadas o efeito dura, descontando 1 no início de cada turno do personagem."/>
         </label>
       </div>
       <div class="lig-applied-config">

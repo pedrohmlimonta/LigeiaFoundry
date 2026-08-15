@@ -487,6 +487,18 @@ Hooks.on("updateItem", async function (item, changes, options, userId) {
 Hooks.on("preUpdateActor", function (actor, changes) {
   const nextFx = foundry.utils.getProperty(changes, "system.appliedEffects");
   if (!Array.isArray(nextFx)) return;
+
+  // DURAÇÃO: o editor grava só "rounds". Acerta o contador "remaining" para
+  // que a contagem siga o número informado: vazio/0 = permanente; um número
+  // novo (ou menor que o que falta) reinicia a contagem por ele.
+  for (const ae of nextFx) {
+    const d = ae?.duration;
+    if (!d) continue;
+    const rounds = Number(d.rounds) || 0;
+    if (rounds <= 0) { d.remaining = 0; continue; }
+    const rest = Number(d.remaining) || 0;
+    if (rest <= 0 || rest > rounds) d.remaining = rounds;
+  }
   const base = foundry.utils.getProperty(changes, "system.conditions") ?? actor.system?.conditions ?? [];
   const { conditions, changed } = syncConditionEffects(nextFx, actor.system?.appliedEffects || [], base);
   if (changed) foundry.utils.setProperty(changes, "system.conditions", conditions);

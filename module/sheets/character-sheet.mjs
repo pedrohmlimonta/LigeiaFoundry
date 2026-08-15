@@ -263,6 +263,10 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
             : "",
         ].filter(Boolean).join(" · "),
         hasDuration: (ae.duration?.rounds || 0) > 0,
+        // Rodadas que ainda faltam (parte do total quando ainda não começou).
+        durationLeft: (ae.duration?.rounds || 0) > 0
+          ? ((ae.duration.remaining > 0) ? ae.duration.remaining : ae.duration.rounds)
+          : null,
       };
     });
 
@@ -627,7 +631,8 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     const rounds = ae.duration?.rounds || 0;
     if (rounds > 0) {
       // Duração contada em rodadas
-      ae.duration.remaining = Math.max(0, (ae.duration.remaining ?? rounds) - 1);
+      const atual = (ae.duration.remaining > 0) ? ae.duration.remaining : rounds;
+      ae.duration.remaining = Math.max(0, atual - 1);
       if (ae.duration.remaining <= 0) {
         arr.splice(idx, 1);
         const upd = { "system.appliedEffects": arr };
