@@ -14,6 +14,7 @@ import { registerTokenRuler } from "./helpers/token-ruler.mjs";
 import { registerMovementHooks, registerMovementSocket, registerForcedMovementActions } from "./helpers/movement.mjs";
 import { registerRollRequestSocket } from "./helpers/roll-request.mjs";
 import { registerTokenLinkSettings, registerTokenLinkHooks, migrateTokenLinks } from "./helpers/token-link.mjs";
+import { syncConditionEffects } from "./helpers/conditions.mjs";
 import { registerTurnEffectHooks } from "./helpers/turn-effects.mjs";
 import { registerBarrierHooks } from "./helpers/barrier.mjs";
 import { applyTempHpToActor } from "./helpers/dice.mjs";
@@ -476,6 +477,19 @@ Hooks.on("updateItem", async function (item, changes, options, userId) {
     speaker: ChatMessage.getSpeaker({ actor }),
     flavor: `<div class="ligeia-roll-flavor"><strong>${item.name}</strong> ativada — <span class="lig-atk-heal">Sobrevida: <strong>${total}</strong></span><div class="lig-heal-applied">Sobrevida atual: ${res.newTemp}${keptNote}</div></div>`,
   });
+});
+
+/* ------------------------------------------------------------------ */
+/*  Efeitos aplicados do tipo "Condição"                               */
+/*  Marcam/desmarcam a condição escolhida enquanto o efeito existir,    */
+/*  venha ele de uma ação ou da aba Efeitos & Condições.                */
+/* ------------------------------------------------------------------ */
+Hooks.on("preUpdateActor", function (actor, changes) {
+  const nextFx = foundry.utils.getProperty(changes, "system.appliedEffects");
+  if (!Array.isArray(nextFx)) return;
+  const base = foundry.utils.getProperty(changes, "system.conditions") ?? actor.system?.conditions ?? [];
+  const { conditions, changed } = syncConditionEffects(nextFx, actor.system?.appliedEffects || [], base);
+  if (changed) foundry.utils.setProperty(changes, "system.conditions", conditions);
 });
 
 Hooks.once("setup", async function () {

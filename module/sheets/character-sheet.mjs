@@ -217,12 +217,17 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       bloqueio: "Bloqueio", esquiva: "Esquiva", conjuracao: "Conjuração", iniciativa: "Iniciativa", deslocamento: "Deslocamento",
     };
     const dmgTargets = { all: "Qualquer", ...(CONFIG.LIGEIA?.damageTypes || {}) };
+    // Condições disponíveis como alvo do efeito do tipo "Condição".
+    const condTargets = Object.fromEntries(
+      Object.entries(CONFIG.LIGEIA?.conditions || {}).map(([id, d]) => [id, d.label || id]),
+    );
     const targetsFor = (type) => {
       switch (type) {
         case "bonus": case "attr": case "dice": case "reroll1": case "reroll6": case "crit": case "fumble": return rollTargets;
         case "stat": return statTargets;
         case "set": return setTargets;
         case "damage": case "rd": case "vuln": return dmgTargets;
+        case "condition": return condTargets;
         default: return rollTargets;
       }
     };

@@ -11,7 +11,7 @@
  * rolagens/remoções duplicadas em mesa com vários jogadores.
  */
 
-import { rollLigeia, resolveAttr, rerollFor, critFor, applyHealingToActor } from "./dice.mjs";
+import { rollLigeia, resolveAttr, rerollFor, critFor, applyHealingToActor, applyDamageToActor } from "./dice.mjs";
 import { processWoundRollAtTurnStart } from "./wounds.mjs";
 
 /** Detecta se ESTE cliente deve processar (apenas um GM ativo). */
@@ -117,6 +117,75 @@ export async function processRegenAtTurnStart(actor) {
 }
 
 /**
+ * DANO CONTÍNUO no início do turno: efeitos aplicados com tickDamage ferem o
+ * portador enquanto durarem (contraparte da regeneração acima).
+ */
+export async function processTickDamageAtTurnStart(actor) {
+  if (!actor) return;
+  for (const ae of actor.system?.appliedEffects || []) {
+    if (ae?.disabled) continue;
+    const tick = ae?.tickDamage || {};
+    const amount = Number(tick.amount) || 0;
+    if (amount <= 0) continue;
+    const resource = tick.resource || "hp";
+    const applied = await applyDamageToActor(actor, amount, resource);
+    const resLabel = { hp: "PV", mp: "PM", heroic: "PH" }[resource];
+    const typeLabel = tick.type ? (CONFIG.LIGEIA?.damageTypes?.[tick.type] || tick.type) : "";
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: `<div class="ligeia-roll-flavor"><strong>${actor.name}</strong> — <em>${ae.label}</em>: ${amount} de dano${typeLabel ? " " + typeLabel : ""}${applied.applied ? ` (${resLabel}: ${applied.newValue}/${applied.newMax})` : ""}</div>`,
+    });
+  }
+}
+
+/**
+ * DURAÇÃO POR RODADA: desconta 1 rodada de cada efeito aplicado com duração
+ * no INÍCIO do turno do personagem e remove os que chegaram a zero (junto das
+ * condições que eles marcavam). Efeitos com rounds = 0 duram até o fim da
+ * cena e não são tocados.
+ */
+export async function processDurationAtTurnStart(actor) {
+  if (!actor?.isOwner) return;
+  const arr = foundry.utils.deepClone(actor.system?.appliedEffects || []);
+  if (!arr.length) return;
+
+  const expirados = [];
+  const restantes = [];
+  for (const ae of arr) {
+    const rounds = ae?.duration?.rounds || 0;
+    if (rounds <= 0) { restantes.push(ae); continue; } // 0 = até o fim da cena
+    const remaining = Math.max(0, (ae.duration.remaining ?? rounds) - 1);
+    ae.duration.remaining = remaining;
+    if (remaining <= 0) expirados.push(ae);
+    else restantes.push(ae);
+  }
+  if (!expirados.length && !arr.some((ae) => (ae?.duration?.rounds || 0) > 0)) return;
+
+  const update = { "system.appliedEffects": restantes };
+  if (expirados.length) {
+    // Tira as condições marcadas pelos efeitos que acabaram, a menos que
+    // outro efeito ativo ainda as sustente.
+    const aindaAtivas = new Set(
+      restantes.filter((ae) => !ae.disabled && ae.conditionId).map((ae) => ae.conditionId),
+    );
+    const sair = new Set(
+      expirados.map((ae) => ae.conditionId).filter((c) => c && !aindaAtivas.has(c)),
+    );
+    if (sair.size) {
+      update["system.conditions"] = (actor.system?.conditions || []).filter((c) => !sair.has(c));
+    }
+  }
+  await actor.update(update);
+
+  for (const ae of expirados) {
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: `<div class="ligeia-roll-flavor"><strong>${actor.name}</strong>: o efeito <em>${ae.label}</em> terminou.</div>`,
+    });
+  }
+}
+
+/**
  * Processa TODAS as rolagens de fim de efeito de um ator (as que estão
  * habilitadas e não desativadas). Remove os efeitos que encerrarem, junto das
  * condições associadas. Faz uma única atualização ao final.
@@ -183,10 +252,13 @@ export function registerTurnEffectHooks() {
     if (!turnChanged) return;
     const actor = combat.combatant?.actor;
     if (!actor) return;
-    // Regeneração primeiro: o efeito ainda está ativo no início do turno,
-    // mesmo que uma rolagem de fim o encerre logo em seguida.
+    // Ordem do início do turno: os efeitos agem (dano/cura contínuos), o
+    // personagem tenta se livrar deles (rolagens de fim) e só então o tempo
+    // passa (desconto de 1 rodada de duração).
+    await processTickDamageAtTurnStart(actor);
     await processRegenAtTurnStart(actor);
     await processEndRollsAtTurnStart(actor);
+    await processDurationAtTurnStart(actor);
     // Ferimentos graves / à beira da morte: Vigor no começo do turno.
     await processWoundRollAtTurnStart(actor);
   });

@@ -106,6 +106,43 @@ export function hasFullCover(defender) {
   return expandConditions(defender?.system?.conditions || []).has("cobertura_completa");
 }
 
+/**
+ * Sincroniza os efeitos aplicados do tipo "condição" com a lista de condições
+ * do ator: o efeito grava em conditionId a condição escolhida, ela é marcada
+ * enquanto o efeito existir e sai quando ele é removido (a menos que outro
+ * efeito ativo ainda a sustente). Assim, criar o efeito na aba Efeitos &
+ * Condições tem o mesmo comportamento de aplicá-lo por uma ação.
+ *
+ * @param {Array} nextFx  efeitos aplicados que estão sendo gravados
+ * @param {Array} prevFx  efeitos aplicados anteriores
+ * @param {Array} currentConditions  condições atuais do ator
+ * @returns {{conditions: string[], changed: boolean}}
+ */
+export function syncConditionEffects(nextFx, prevFx, currentConditions) {
+  const condOf = (ae) => {
+    const e = (ae?.effects || []).find((x) => x?.type === "condition" && x?.target);
+    return e ? e.target : null;
+  };
+  // Grava conditionId a partir do efeito escolhido no editor.
+  for (const ae of nextFx || []) {
+    const id = condOf(ae);
+    if (id) ae.conditionId = id;
+    else if (ae && (prevFx || []).some((p) => p?.fxId && p.fxId === ae.fxId && condOf(p))) {
+      ae.conditionId = ""; // deixou de ser efeito de condição
+    }
+  }
+  const antes = new Set((prevFx || []).map((ae) => ae?.conditionId).filter(Boolean));
+  const agora = new Set(
+    (nextFx || []).filter((ae) => !ae?.disabled).map((ae) => ae?.conditionId).filter(Boolean),
+  );
+  const out = new Set(currentConditions || []);
+  const before = Array.from(out).join("|");
+  for (const id of antes) if (!agora.has(id)) out.delete(id);
+  for (const id of agora) out.add(id);
+  const conditions = Array.from(out);
+  return { conditions, changed: conditions.join("|") !== before };
+}
+
 /** Bônus de iniciativa por iniciar o combate oculto. */
 export function initiativeConditionBonus(actor) {
   return expandConditions(actor?.system?.conditions || []).has("oculto") ? 4 : 0;
