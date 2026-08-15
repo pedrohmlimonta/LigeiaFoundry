@@ -9,7 +9,8 @@ const fields = foundry.data.fields;
  * Tipos: dice (+dados melhoria), bonus (+rolagem), stat (modifica valor),
  *        set (define valor fixo), damage, rd (redução de dano), tempHp
  *        (sobrevida concedida ao ativar o item), areaFilter (força as áreas
- *        do personagem a afetar só aliados/só inimigos), info (condição).
+ *        do personagem a afetar só aliados/só inimigos), condition (marca uma
+ *        condição enquanto o efeito durar), info (texto).
  */
 export function effectField() {
   return new fields.ArrayField(
@@ -17,7 +18,7 @@ export function effectField() {
       type: new fields.StringField({
         required: true,
         initial: "bonus",
-        choices: ["dice", "bonus", "attr", "stat", "set", "damage", "rd", "vuln", "reroll1", "reroll6", "crit", "fumble", "tempHp", "areaFilter", "info"],
+        choices: ["dice", "bonus", "attr", "stat", "set", "damage", "rd", "vuln", "reroll1", "reroll6", "crit", "fumble", "tempHp", "areaFilter", "condition", "info"],
       }),
       target: new fields.StringField({ required: true, initial: "all" }),
       // Número OU fórmula determinística com @variáveis do dono — ex.:

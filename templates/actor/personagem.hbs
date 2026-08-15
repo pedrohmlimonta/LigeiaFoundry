@@ -181,7 +181,7 @@
                 <option value="condition" {{#if (eq ae.fx0Type "condition")}}selected{{/if}}>Condição</option>
           </select>
         </label>
-        <label>Alvo
+        <label>{{#if (eq ae.fx0Type "condition")}}Condição{{else}}Alvo{{/if}}
           {{#if (or (or (eq ae.fx0Type "damage") (eq ae.fx0Type "rd")) (eq ae.fx0Type "vuln"))}}
           <select name="system.appliedEffects.{{ae.index}}.effects.0.damageType">
             {{selectOptions ae.fx0TargetChoices selected=ae.fx0.damageType}}

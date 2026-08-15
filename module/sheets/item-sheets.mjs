@@ -232,6 +232,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       fumble: "Falha crítica piorada",
       tempHp: "Sobrevida ao ativar",
       areaFilter: "Filtro de área (força só aliados/inimigos)",
+      condition: "Condição (marca enquanto durar)",
       info: "Condição / Texto",
     };
     context.costResources = {
@@ -268,6 +269,11 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     context.damageTypesWithAny = { "": "Qualquer", ...(CONFIG.LIGEIA?.damageTypes || {}) };
 
     // ----- Opções de ALVO por tipo de efeito -----
+    // Condições e suas escolhas (id → label) — declaradas antes de TARGETS,
+    // que as usa como alvos do tipo "condition".
+    const condDefs = CONFIG.LIGEIA?.conditions || {};
+    const condChoices = Object.fromEntries(Object.entries(condDefs).map(([id, d]) => [id, d.label]));
+
     const TARGETS = {
       roll: {
         all: "Todas as rolagens",
@@ -285,13 +291,11 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         deslocamento: "Deslocamento", percepcao_passiva: "Percepção Passiva",
       },
       areaFilter: { enemies: "Só inimigos", allies: "Só aliados" },
+      condition: condChoices,
       none: { all: "—" },
     };
     context.targetOptions = TARGETS;
 
-    // Condições e suas escolhas (id → label)
-    const condDefs = CONFIG.LIGEIA?.conditions || {};
-    const condChoices = Object.fromEntries(Object.entries(condDefs).map(([id, d]) => [id, d.label]));
     const dmgChoices = { all: "Qualquer", ...(CONFIG.LIGEIA?.damageTypes || {}) };
     // Alvos por tipo de efeito (para o select contextual de appliesEffects)
     const targetsForType = (type) => {
@@ -351,6 +355,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       fumble: "roll",
       tempHp: "none",
       areaFilter: "areaFilter",
+      condition: "condition",
       info: "none",
     };
 
