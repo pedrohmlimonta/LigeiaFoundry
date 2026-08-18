@@ -165,6 +165,9 @@ export async function migrateTokenLinks({ notify = true } = {}) {
 
 /** Quantos quadrados do grid o token deste ator deve ocupar (N x N). */
 export function tokenSizeFor(actor) {
+  // Veículos não usam categorias de tamanho: o token fica como o Mestre
+  // desenhou (um navio pode ser 4x12, e nada aqui deve mexer nisso).
+  if (actor?.type === "veiculo" || actor?.system?.size?.disabled) return null;
   const key = actor?.system?.size?.key;
   const def = CONFIG.LIGEIA?.sizes?.[key];
   return Math.max(1, Number(actor?.system?.size?.token ?? def?.token) || 1);
@@ -189,6 +192,7 @@ export async function syncTokenSize(actor) {
   if (!actor?.id || actor.documentName !== "Actor") return;
   if (!shouldResize(actor)) return;
   const n = tokenSizeFor(actor);
+  if (n === null) return; // tipo sem mecânica de tamanho
 
   // Protótipo (vale para os próximos tokens colocados)
   const pt = actor.prototypeToken;
@@ -230,7 +234,7 @@ export function registerTokenSizeHooks() {
     const actor = game.actors?.get(data?.actorId ?? token.actorId);
     if (!actor) return;
     const n = tokenSizeFor(actor);
-    if (n !== 1 && ((token.width ?? 1) !== n || (token.height ?? 1) !== n)) {
+    if (n !== null && n !== 1 && ((token.width ?? 1) !== n || (token.height ?? 1) !== n)) {
       token.updateSource({ width: n, height: n });
     }
   });

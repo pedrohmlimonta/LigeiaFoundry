@@ -949,7 +949,9 @@ function activeTokenOfActor(actor) {
  */
 function actorSide(actor) {
   if (!actor) return null;
-  if (actor.type === "npc") return actor.system?.isEnemy ? "enemy" : "ally";
+  if (actor.type === "npc" || actor.type === "veiculo") {
+    return actor.system?.isEnemy ? "enemy" : "ally";
+  }
   return "ally";
 }
 

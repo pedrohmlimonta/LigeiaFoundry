@@ -421,3 +421,25 @@ export class NpcData extends PersonagemData {
     };
   }
 }
+
+
+/* ================================================================== */
+/*  VEÍCULO — mesma ficha, SEM a mecânica de categorias de tamanho     */
+/*  Herda tudo do NPC (inclusive não usar XP). A única diferença é que */
+/*  o tamanho fica neutro: nenhuma categoria, nenhum efeito de tamanho */
+/*  aplicado, nenhum bônus de dano de arma nem alcance corpo a corpo   */
+/*  por tamanho, e o token não é redimensionado automaticamente.       */
+/* ================================================================== */
+export class VeiculoData extends NpcData {
+  prepareDerivedData() {
+    super.prepareDerivedData();
+    // Desfaz o que a categoria de tamanho havia somado e zera o estado.
+    const s = this.size || {};
+    if (s.move) this.secondary.deslocamento -= s.move;
+    if (s.hpMod) this.resources.hp.max -= s.hpMod;
+    this.size = {
+      key: null, label: "", move: 0, hpMod: 0, weaponBonus: 0, reach: 0,
+      token: 1, base: null, changed: false, disabled: true,
+    };
+  }
+}

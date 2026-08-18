@@ -216,7 +216,7 @@ Hooks.once("init", () => {
 
   const DSC = foundry.applications.apps.DocumentSheetConfig;
   DSC.registerSheet(Actor, "ligeia-rpg", LigeiaFichaElegante, {
-    types: ["personagem", "npc"],
+    types: ["personagem", "npc", "veiculo"],
     makeDefault: true,
     label: "Ligéia — Ficha Elegante (abas)",
   });

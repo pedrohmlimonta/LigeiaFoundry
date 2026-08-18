@@ -141,10 +141,12 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     // Limite inferior dos PV (morte), usado no campo de PV das fichas.
     context.deathHp = DEATH_HP;
     // Categoria de tamanho atual (exibida junto dos demais dados).
-    context.size = sys.size || null;
+    // Veículos não usam categorias de tamanho.
+    context.size = (sys.size && !sys.size.disabled) ? sys.size : null;
     context.editable = this.isEditable;
-    // NPCs usam exatamente a mesma ficha, mas sem NADA de XP.
-    context.isNpc = actor.type === "npc";
+    // NPCs e veículos usam exatamente a mesma ficha, mas sem NADA de XP.
+    context.isVehicle = actor.type === "veiculo";
+    context.isNpc = actor.type === "npc" || context.isVehicle;
     // Carreira: personagens só no nível 6; NPCs não têm a restrição.
     context.canAddCareer = context.isNpc || (Number(sys.details?.level) || 1) >= 6;
 

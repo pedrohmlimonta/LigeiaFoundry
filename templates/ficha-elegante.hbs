@@ -35,7 +35,7 @@
           <span class="lig-id-chip"><b>Nível</b> {{system.details.level}}</span>
           {{#unless isNpc}}<span class="lig-id-chip {{#if (lt xpAvailable 0)}}neg{{/if}}"><b>XP livre</b> {{xpAvailable}}</span>{{/unless}}
           <span class="lig-id-chip"><b>Corrupção</b> {{system.details.corruption}}</span>
-          {{#if size}}<span class="lig-id-chip" title="Categoria de tamanho: define deslocamento, PV, bônus de dano das armas e alcance corpo a corpo."><b>Tamanho</b> {{size.label}}</span>{{/if}}
+          {{#unless isVehicle}}{{#if size}}<span class="lig-id-chip" title="Categoria de tamanho: define deslocamento, PV, bônus de dano das armas e alcance corpo a corpo."><b>Tamanho</b> {{size.label}}</span>{{/if}}{{/unless}}
         </div>
       </div>
 

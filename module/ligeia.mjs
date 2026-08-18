@@ -28,7 +28,7 @@ import {
   TracoSheet,
   DefinicaoSheet,
 } from "./sheets/item-sheets.mjs";
-import { PersonagemData, NpcData } from "./data/actor-data.mjs";
+import { PersonagemData, NpcData, VeiculoData } from "./data/actor-data.mjs";
 import {
   HabilidadeData,
   ComplicacaoData,
@@ -79,6 +79,7 @@ Hooks.once("init", function () {
   CONFIG.Actor.dataModels = {
     personagem: PersonagemData,
     npc: NpcData,
+    veiculo: VeiculoData,
   };
 
   // DataModels — Items
@@ -330,7 +331,7 @@ Hooks.once("init", function () {
   // A ficha básica continua disponível, mas NÃO é mais a padrão: a "Ficha
   // Elegante" (registrada em ./sheets/ficha-elegante.mjs) é a padrão.
   DSC.registerSheet(Actor, "ligeia-rpg", LigeiaCharacterSheet, {
-    types: ["personagem", "npc"],
+    types: ["personagem", "npc", "veiculo"],
     makeDefault: false,
     label: "Ligeia — Ficha de Personagem (clássica)",
   });

@@ -30,7 +30,8 @@
   "documentTypes": {
     "Actor": {
       "personagem": {},
-      "npc": {}
+      "npc": {},
+      "veiculo": {}
     },
     "Item": {
       "habilidade": {},

@@ -3,6 +3,7 @@
     "Document": {
       "Personagem": "Personagem",
       "Npc": "NPC",
+      "Veiculo": "Veículo",
       "Habilidade": "Habilidade",
       "Complicacao": "Complicação",
       "Magia": "Magia",
@@ -38,7 +39,8 @@
   "TYPES": {
     "Actor": {
       "personagem": "Personagem",
-      "npc": "NPC"
+      "npc": "NPC",
+      "veiculo": "Veículo"
     },
     "Item": {
       "habilidade": "Habilidade",
