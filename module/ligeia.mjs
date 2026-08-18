@@ -13,7 +13,7 @@ import { registerEmanationHooks } from "./helpers/emanation.mjs";
 import { registerTokenRuler } from "./helpers/token-ruler.mjs";
 import { registerMovementHooks, registerMovementSocket, registerForcedMovementActions } from "./helpers/movement.mjs";
 import { registerRollRequestSocket } from "./helpers/roll-request.mjs";
-import { registerTokenLinkSettings, registerTokenLinkHooks, migrateTokenLinks } from "./helpers/token-link.mjs";
+import { registerTokenLinkSettings, registerTokenLinkHooks, migrateTokenLinks, registerTokenSizeHooks, syncTokenSize } from "./helpers/token-link.mjs";
 import { syncConditionEffects } from "./helpers/conditions.mjs";
 import { applyHealingToActor } from "./helpers/dice.mjs";
 import { registerTurnEffectHooks } from "./helpers/turn-effects.mjs";
@@ -49,6 +49,8 @@ Hooks.once("init", function () {
   // Token e ficha do ator são a MESMA ficha (configurável).
   registerTokenLinkSettings();
   registerTokenLinkHooks();
+  // O token acompanha a categoria de tamanho do personagem.
+  registerTokenSizeHooks();
   console.log("Ligeia RPG | Inicializando sistema");
 
   // Namespace global para debug/macros
@@ -100,18 +102,19 @@ Hooks.once("init", function () {
     // hp    = modificador de Pontos de Vida
     // weapon= bônus/penalidade de dano das ARMAS ("Base ±N")
     // reach = alcance corpo a corpo em metros (0 = adjacente)
+    // token = quantos quadrados do grid o token ocupa (N x N)
     // cost  = custo em pontos de traço (referência de criação)
     sizes: {
-      minusculo:   { label: "Minúsculo",   order: 0, cost: -4, move: 1,  hp: -3, weapon: -3, reach: 0 },
-      diminuto:    { label: "Diminuto",    order: 1, cost: -3, move: 2,  hp: -2, weapon: -2, reach: 0 },
-      miudo:       { label: "Miúdo",       order: 2, cost: -2, move: 3,  hp: -1, weapon: -1, reach: 0 },
-      pequeno:     { label: "Pequeno",     order: 3, cost: -1, move: 4,  hp: 0,  weapon: 0,  reach: 0 },
-      medio:       { label: "Médio",       order: 4, cost: 0,  move: 5,  hp: 0,  weapon: 0,  reach: 0 },
-      grande:      { label: "Grande",      order: 5, cost: 2,  move: 7,  hp: 2,  weapon: 1,  reach: 2 },
-      enorme:      { label: "Enorme",      order: 6, cost: 4,  move: 9,  hp: 5,  weapon: 2,  reach: 2 },
-      imenso:      { label: "Imenso",      order: 7, cost: 6,  move: 11, hp: 10, weapon: 3,  reach: 3 },
-      colossal:    { label: "Colossal",    order: 8, cost: 8,  move: 13, hp: 15, weapon: 4,  reach: 3 },
-      continental: { label: "Continental", order: 9, cost: 10, move: 25, hp: 30, weapon: 5,  reach: 5 },
+      minusculo:   { label: "Minúsculo",   order: 0, cost: -4, move: 1,  hp: -3, weapon: -3, reach: 0, token: 1 },
+      diminuto:    { label: "Diminuto",    order: 1, cost: -3, move: 2,  hp: -2, weapon: -2, reach: 0, token: 1 },
+      miudo:       { label: "Miúdo",       order: 2, cost: -2, move: 3,  hp: -1, weapon: -1, reach: 0, token: 1 },
+      pequeno:     { label: "Pequeno",     order: 3, cost: -1, move: 4,  hp: 0,  weapon: 0,  reach: 0, token: 1 },
+      medio:       { label: "Médio",       order: 4, cost: 0,  move: 5,  hp: 0,  weapon: 0,  reach: 0, token: 1 },
+      grande:      { label: "Grande",      order: 5, cost: 2,  move: 7,  hp: 2,  weapon: 1,  reach: 2, token: 2 },
+      enorme:      { label: "Enorme",      order: 6, cost: 4,  move: 9,  hp: 5,  weapon: 2,  reach: 2, token: 3 },
+      imenso:      { label: "Imenso",      order: 7, cost: 6,  move: 11, hp: 10, weapon: 3,  reach: 3, token: 4 },
+      colossal:    { label: "Colossal",    order: 8, cost: 8,  move: 13, hp: 15, weapon: 4,  reach: 3, token: 7 },
+      continental: { label: "Continental", order: 9, cost: 10, move: 25, hp: 30, weapon: 5,  reach: 5, token: 10 },
     },
     // Tamanho padrão de quem não tem raça definida
     defaultSize: "medio",
@@ -382,6 +385,8 @@ Hooks.once("ready", function () {
   registerRollRequestSocket();
   // Vincula fichas de token já existentes (uma vez, preservando os valores).
   migrateTokenLinks();
+  // Acerta o tamanho dos tokens já colocados conforme a categoria atual.
+  if (game.user.isGM) for (const a of game.actors ?? []) syncTokenSize(a);
 });
 
 /* ------------------------------------------------------------------ */

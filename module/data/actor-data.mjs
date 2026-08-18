@@ -250,6 +250,7 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
       hpMod: sizeDef.hp || 0,
       weaponBonus: sizeDef.weapon || 0,
       reach: sizeDef.reach || 0,
+      token: Math.max(1, Number(sizeDef.token) || 1),
       base: baseSizeKey,
       changed: sizeKey !== baseSizeKey,
     };

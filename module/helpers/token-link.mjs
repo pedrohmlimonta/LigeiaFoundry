@@ -156,3 +156,82 @@ export async function migrateTokenLinks({ notify = true } = {}) {
   }
   return result;
 }
+
+/* ==================================================================== */
+/*  TAMANHO DO TOKEN conforme a categoria de tamanho do personagem      */
+/*  Médio ou menor 1x1 · Grande 2x2 · Enorme 3x3 · Imenso 4x4 ·         */
+/*  Colossal 7x7 · Continental 10x10                                    */
+/* ==================================================================== */
+
+/** Quantos quadrados do grid o token deste ator deve ocupar (N x N). */
+export function tokenSizeFor(actor) {
+  const key = actor?.system?.size?.key;
+  const def = CONFIG.LIGEIA?.sizes?.[key];
+  return Math.max(1, Number(actor?.system?.size?.token ?? def?.token) || 1);
+}
+
+/** Quem ajusta os tokens: o GM responsável; sem GM, o dono do ator. */
+function shouldResize(actor) {
+  const gms = game.users?.filter((u) => u.isGM && u.active) || [];
+  if (gms.length) {
+    const responsible = gms.sort((a, b) => a.id.localeCompare(b.id))[0];
+    return responsible?.id === game.user.id;
+  }
+  return !!actor?.isOwner;
+}
+
+/**
+ * Ajusta o protótipo e os tokens colocados para o tamanho atual do ator.
+ * Só escreve quando o valor muda, então chamar de novo não faz nada (e não
+ * entra em laço com o próprio hook de atualização).
+ */
+export async function syncTokenSize(actor) {
+  if (!actor?.id || actor.documentName !== "Actor") return;
+  if (!shouldResize(actor)) return;
+  const n = tokenSizeFor(actor);
+
+  // Protótipo (vale para os próximos tokens colocados)
+  const pt = actor.prototypeToken;
+  if (pt && ((pt.width ?? 1) !== n || (pt.height ?? 1) !== n)) {
+    try { await actor.update({ "prototypeToken.width": n, "prototypeToken.height": n }); }
+    catch (e) { console.warn("Ligeia | falha ao ajustar o protótipo do token:", e); }
+  }
+
+  // Tokens já colocados nas cenas
+  for (const scene of game.scenes ?? []) {
+    const updates = [];
+    for (const token of scene.tokens ?? []) {
+      if (token.actorId !== actor.id) continue;
+      if ((token.width ?? 1) === n && (token.height ?? 1) === n) continue;
+      updates.push({ _id: token.id, width: n, height: n });
+    }
+    if (updates.length) {
+      try { await scene.updateEmbeddedDocuments("Token", updates); }
+      catch (e) { console.warn("Ligeia | falha ao ajustar tokens da cena:", e); }
+    }
+  }
+}
+
+/**
+ * Hooks que mantêm o tamanho do token em dia. A categoria muda por raça
+ * (item), por efeitos de itens ligados/desligados e por efeitos aplicados na
+ * ficha — todos passam por uma destas atualizações.
+ */
+export function registerTokenSizeHooks() {
+  const doSync = (actor) => { if (actor?.documentName === "Actor") syncTokenSize(actor); };
+
+  Hooks.on("updateActor", (actor) => doSync(actor));
+  Hooks.on("createItem", (item) => doSync(item.parent));
+  Hooks.on("updateItem", (item) => doSync(item.parent));
+  Hooks.on("deleteItem", (item) => doSync(item.parent));
+
+  // Token novo já nasce com o tamanho certo (mesmo antes de qualquer sync).
+  Hooks.on("preCreateToken", (token, data) => {
+    const actor = game.actors?.get(data?.actorId ?? token.actorId);
+    if (!actor) return;
+    const n = tokenSizeFor(actor);
+    if (n !== 1 && ((token.width ?? 1) !== n || (token.height ?? 1) !== n)) {
+      token.updateSource({ width: n, height: n });
+    }
+  });
+}
