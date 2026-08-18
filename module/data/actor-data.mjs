@@ -226,6 +226,34 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
     // Bônus concedidos pelas definições embutidas (vocação: PV/PM; raça: deslocamento)
     const defBonus = definitionBonuses(this.parent);
 
+    // ---- CATEGORIA DE TAMANHO ----
+    // Base: a raça do personagem (ou o padrão). Depois os efeitos: uma
+    // categoria fixada tem prioridade e, sobre ela, somam-se os aumentos e
+    // reduções de categoria.
+    const sizes = CONFIG.LIGEIA?.sizes || {};
+    const ordered = Object.entries(sizes).sort((a, b) => (a[1].order ?? 0) - (b[1].order ?? 0));
+    const raceItem = this.parent?.items?.find?.((i) => i.type === "raca");
+    let sizeKey = raceItem?.system?.size || CONFIG.LIGEIA?.defaultSize || "medio";
+    if (!sizes[sizeKey]) sizeKey = CONFIG.LIGEIA?.defaultSize || "medio";
+    const baseSizeKey = sizeKey;
+    if (mods.size?.set && sizes[mods.size.set]) sizeKey = mods.size.set;
+    if (mods.size?.shift) {
+      const idx = ordered.findIndex(([k]) => k === sizeKey);
+      const alvo = Math.min(ordered.length - 1, Math.max(0, idx + mods.size.shift));
+      sizeKey = ordered[alvo]?.[0] || sizeKey;
+    }
+    const sizeDef = sizes[sizeKey] || { label: sizeKey, move: 0, hp: 0, weapon: 0, reach: 0 };
+    this.size = {
+      key: sizeKey,
+      label: sizeDef.label || sizeKey,
+      move: sizeDef.move || 0,
+      hpMod: sizeDef.hp || 0,
+      weaponBonus: sizeDef.weapon || 0,
+      reach: sizeDef.reach || 0,
+      base: baseSizeKey,
+      changed: sizeKey !== baseSizeKey,
+    };
+
     // ---- Atributos secundários ----
     this.secondary = {
       bloqueio: a.forca.total,
@@ -234,9 +262,11 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
       // Iniciativa = maior entre Agilidade e Percepção (herda dados de ambos)
       iniciativa: Math.max(a.agilidade.total, a.percepcao.total),
       iniciativaDice: Math.max(a.agilidade.totalDice, a.percepcao.totalDice),
-      // Deslocamento = Agilidade + bônus da raça + ajuste do GM
+      // Deslocamento = Agilidade + deslocamento da categoria de tamanho
+      // (coluna bípede) + ajuste da raça + ajuste do GM
       deslocamento:
         a.agilidade.total +
+        this.size.move +
         defBonus.move +
         (this.secondaryBonus.moveBonusRace || 0) +
         (this.secondaryBonus.deslocamento || 0),
@@ -276,7 +306,7 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
 
     // ---- Máximos de recursos ----
     // PV = Vigor + bônus da vocação + bônus manual + nível (+ efeito stat hp)
-    const hpMax = a.vigor.total + defBonus.hp + (this.resources.hp.bonus || 0) + lvl + (mods.stat.hp || 0);
+    const hpMax = a.vigor.total + defBonus.hp + this.size.hpMod + (this.resources.hp.bonus || 0) + lvl + (mods.stat.hp || 0);
     // PM = Mente + bônus da vocação + bônus manual + nível (+ efeito stat mp)
     const mpMax = a.mente.total + defBonus.mp + (this.resources.mp.bonus || 0) + lvl + (mods.stat.mp || 0);
     // PH = nível (+ efeito stat heroic)

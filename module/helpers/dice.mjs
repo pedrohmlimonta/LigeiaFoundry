@@ -592,7 +592,10 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       // Vulnerabilidade do ALVO ao tipo de dano: entra depois da RD (a armadura
       // reduz, a fraqueza amplifica o que passou).
       const vuln = isHp ? damageVulnerabilityFor(tActor, type || "") : { flat: 0, pct: 0, mult: 1 };
-      let amount = (total + (scaling || 0)) * dealtMult;
+      // ARMA: bônus (ou penalidade) de dano da categoria de tamanho de quem
+      // ataca. Só vale para ações marcadas como arma.
+      const sizeDmg = (isMain && action.isWeapon) ? (caster?.system?.size?.weaponBonus || 0) : 0;
+      let amount = (total + (scaling || 0) + sizeDmg) * dealtMult;
       amount = amount - rd;
       amount = (amount + vuln.flat) * vuln.mult;
       amount = amount * takenMult;
@@ -600,6 +603,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       const typeLabel = dmgTypeLabel(type);
       const scaleNote = scaling ? ` <span class="lig-scale">(+${scaling} escalonado)</span>` : "";
       const typeNote = isHp && typeLabel ? " " + typeLabel : "";
+      const sizeNote = sizeDmg ? ` <span class="lig-scale">(${sizeDmg > 0 ? "+" : ""}${sizeDmg} por tamanho)</span>` : "";
       const rdNote = rd ? ` <span class="lig-rd">(RD ${rd})</span>` : "";
       const vulnBits = [];
       if (vuln.flat) vulnBits.push(`+${vuln.flat}`);
@@ -617,7 +621,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
         applyNote = `<div class="lig-dmg-applied muted">Sem permissão para alterar a ficha do alvo (peça ao Mestre).</div>`;
       }
       const tag = isMain ? "" : ' <span class="lig-extra-tag">extra</span>';
-      return `<div class="lig-atk-dmg">${resWord}: <strong>${dealt}</strong>${typeNote}${tag}${scaleNote}${rdNote}${vulnNote}${isMain ? multNote : ""}</div>${applyNote}`;
+      return `<div class="lig-atk-dmg">${resWord}: <strong>${dealt}</strong>${typeNote}${tag}${scaleNote}${sizeNote}${rdNote}${vulnNote}${isMain ? multNote : ""}</div>${applyNote}`;
     };
 
     // Valor do escalonamento (bônus por superar a defesa) — calculado uma vez;
@@ -1131,8 +1135,8 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
 
   // Resumo de alcance/área (fórmulas resolvidas com o conjurador)
   const meta = [];
-  const rangeShown = resolveEffectValue(action.range, actor);
-  if (rangeShown > 0) meta.push(`Alcance ${rangeShown}m`);
+  const rangeShown = rangeM;
+  if (rangeShown > 0) meta.push(`Alcance ${rangeShown}m${action.isMelee ? " (corpo a corpo)" : ""}`);
   if (mode === "area" || mode === "aura") {
     meta.push(`${mode === "aura" ? "Aura" : "Área"} ${resolveEffectValue(action.area, actor)}m`);
     const ovFilter = areaFilterOverrideFor(actor);
@@ -1188,7 +1192,13 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
   // até cada alvo. Alvos além do alcance são marcados como fora de alcance
   // (não são atingidos) e geram um aviso. Só se aplica ao modo "target" —
   // em área/aura os alvos já vêm de dentro do template.
-  const rangeM = resolveEffectValue(action.range, actor);
+  let rangeM = resolveEffectValue(action.range, actor);
+  // CORPO A CORPO: o alcance mínimo é o da categoria de tamanho de quem
+  // ataca (adjacente para os pequenos; 2m, 3m ou 5m para os grandes).
+  if (action.isMelee) {
+    const reach = actor.system?.size?.reach || 0;
+    rangeM = Math.max(rangeM || 0, reach > 0 ? reach : (CONFIG.LIGEIA?.adjacentRange ?? 1.5));
+  }
   const rangeOutMsgs = [];
   if (rangeM > 0 && mode === "target") {
     const srcToken = activeTokenOfActor(actor);

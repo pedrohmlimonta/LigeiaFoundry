@@ -140,6 +140,8 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     context.isGM = game.user.isGM;
     // Limite inferior dos PV (morte), usado no campo de PV das fichas.
     context.deathHp = DEATH_HP;
+    // Categoria de tamanho atual (exibida junto dos demais dados).
+    context.size = sys.size || null;
     context.editable = this.isEditable;
     // NPCs usam exatamente a mesma ficha, mas sem NADA de XP.
     context.isNpc = actor.type === "npc";
@@ -221,6 +223,14 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     const condTargets = Object.fromEntries(
       Object.entries(CONFIG.LIGEIA?.conditions || {}).map(([id, d]) => [id, d.label || id]),
     );
+    // Efeito de tamanho: mover categorias ou fixar uma delas
+    const sizeDefs = CONFIG.LIGEIA?.sizes || {};
+    const sizeTargets = {
+      shift: "Aumentar/Diminuir categorias (usa o valor)",
+      ...Object.fromEntries(
+        Object.entries(sizeDefs).sort((a, b) => (a[1].order ?? 0) - (b[1].order ?? 0)).map(([id, d]) => [id, d.label || id]),
+      ),
+    };
     const targetsFor = (type) => {
       switch (type) {
         case "bonus": case "attr": case "dice": case "reroll1": case "reroll6": case "crit": case "fumble": return rollTargets;
@@ -228,6 +238,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
         case "set": return setTargets;
         case "damage": case "rd": case "vuln": return dmgTargets;
         case "condition": return condTargets;
+        case "size": return sizeTargets;
         default: return rollTargets;
       }
     };

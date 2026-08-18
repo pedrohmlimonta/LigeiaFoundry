@@ -11,6 +11,11 @@
   {{!-- Campos específicos por tipo --}}
   {{#if (eq itemType "raca")}}
   <div class="lig-item-row">
+    <label>Categoria de Tamanho
+      <select name="system.size" title="Define o TAMANHO INICIAL de quem tem esta raça e, por ele, o deslocamento base, os PV, o bônus de dano das armas e o alcance corpo a corpo.">
+        {{selectOptions sizeChoices selected=system.size}}
+      </select>
+    </label>
     <label>Bônus de Deslocamento
       <input type="number" name="system.moveBonus" value="{{system.moveBonus}}"/>
     </label>

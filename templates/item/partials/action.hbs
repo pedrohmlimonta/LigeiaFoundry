@@ -161,6 +161,16 @@
       {{/if}}
     </div>
 
+    <label class="lig-inline-check" title="Aplica o bônus (ou a penalidade) de dano da categoria de tamanho de quem ataca — a coluna 'Bônus das Armas' da tabela.">
+      <input type="checkbox" name="system.actions.{{i}}.isWeapon" {{checked act.isWeapon}}/>
+      Esta ação pertence a uma arma
+    </label>
+
+    <label class="lig-inline-check" title="O alcance mínimo passa a ser o alcance corpo a corpo da categoria de tamanho (adjacente, 2m, 3m ou 5m).">
+      <input type="checkbox" name="system.actions.{{i}}.isMelee" {{checked act.isMelee}}/>
+      Esta ação é corpo a corpo
+    </label>
+
     <label class="lig-inline-check">
       <input type="checkbox" name="system.actions.{{i}}.scalingDamage" {{checked act.scalingDamage}}/>
       Dano escalonado (+1 por 2 pontos acima da defesa)

@@ -202,7 +202,10 @@ export class RacaData extends foundry.abstract.TypeDataModel {
   static defineSchema() {
     return {
       ...definitionBaseFields(),
-      // Bônus de deslocamento concedido pela raça
+      // Categoria de tamanho da raça: define o TAMANHO INICIAL do personagem
+      // e, por ele, o deslocamento base (coluna bípede da tabela).
+      size: new fields.StringField({ blank: true, initial: "medio" }),
+      // Ajuste de deslocamento por cima do que o tamanho já concede
       moveBonus: new fields.NumberField({ initial: 0, integer: true }),
     };
   }

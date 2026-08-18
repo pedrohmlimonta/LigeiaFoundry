@@ -35,6 +35,7 @@
           <span class="lig-id-chip"><b>Nível</b> {{system.details.level}}</span>
           {{#unless isNpc}}<span class="lig-id-chip {{#if (lt xpAvailable 0)}}neg{{/if}}"><b>XP livre</b> {{xpAvailable}}</span>{{/unless}}
           <span class="lig-id-chip"><b>Corrupção</b> {{system.details.corruption}}</span>
+          {{#if size}}<span class="lig-id-chip" title="Categoria de tamanho: define deslocamento, PV, bônus de dano das armas e alcance corpo a corpo."><b>Tamanho</b> {{size.label}}</span>{{/if}}
         </div>
       </div>
 
@@ -526,9 +527,10 @@
                 <option value="crit" {{#if (eq ae.fx0Type "crit")}}selected{{/if}}>Crítico aprimorado</option>
                 <option value="fumble" {{#if (eq ae.fx0Type "fumble")}}selected{{/if}}>Falha crítica piorada</option>
                 <option value="condition" {{#if (eq ae.fx0Type "condition")}}selected{{/if}}>Condição</option>
+                <option value="size" {{#if (eq ae.fx0Type "size")}}selected{{/if}}>Tamanho</option>
               </select>
             </label>
-            <label>{{#if (eq ae.fx0Type "condition")}}Condição{{else}}Alvo{{/if}}
+            <label>{{#if (eq ae.fx0Type "condition")}}Condição{{else}}{{#if (eq ae.fx0Type "size")}}Categoria{{else}}Alvo{{/if}}{{/if}}
               {{#if (or (or (eq ae.fx0Type "damage") (eq ae.fx0Type "rd")) (eq ae.fx0Type "vuln"))}}
               <select name="system.appliedEffects.{{ae.index}}.effects.0.damageType">
                 {{selectOptions ae.fx0TargetChoices selected=ae.fx0.damageType}}

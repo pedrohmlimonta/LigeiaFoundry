@@ -18,7 +18,7 @@ export function effectField() {
       type: new fields.StringField({
         required: true,
         initial: "bonus",
-        choices: ["dice", "bonus", "attr", "stat", "set", "damage", "rd", "vuln", "reroll1", "reroll6", "crit", "fumble", "tempHp", "areaFilter", "condition", "info"],
+        choices: ["dice", "bonus", "attr", "stat", "set", "damage", "rd", "vuln", "reroll1", "reroll6", "crit", "fumble", "tempHp", "areaFilter", "condition", "size", "info"],
       }),
       target: new fields.StringField({ required: true, initial: "all" }),
       // Número OU fórmula determinística com @variáveis do dono — ex.:
@@ -232,7 +232,7 @@ export function actionEntryField() {
         // Tipo do modificador (mesma lista dos efeitos de itens + condição)
         fxType: new fields.StringField({
           initial: "bonus",
-          choices: ["bonus", "dice", "attr", "stat", "set", "damage", "rd", "vuln", "reroll1", "reroll6", "crit", "fumble", "restore", "condition"],
+          choices: ["bonus", "dice", "attr", "stat", "set", "damage", "rd", "vuln", "reroll1", "reroll6", "crit", "fumble", "restore", "condition", "size"],
         }),
         // Alvo do modificador — depende do tipo (atributo, recurso, tipo de
         // dano ou id de condição). Sempre escolhido por select.
@@ -270,6 +270,12 @@ export function actionEntryField() {
       }),
       { initial: [] },
     ),
+    // Esta ação pertence a uma ARMA: recebe o bônus (ou a penalidade) de dano
+    // da categoria de tamanho de quem ataca ("Bônus das Armas" na tabela).
+    isWeapon: new fields.BooleanField({ initial: false }),
+    // Esta ação é CORPO A CORPO: o alcance mínimo passa a ser o alcance
+    // corpo a corpo da categoria de tamanho (adjacente, 2m, 3m, 5m).
+    isMelee: new fields.BooleanField({ initial: false }),
     // Alcance e raio da área em metros: número OU fórmula com @variáveis do
     // personagem (ex.: "@nivel", "3+floor(@nivel/2)"), resolvida ao usar.
     range: new fields.StringField({ blank: true, initial: "" }),

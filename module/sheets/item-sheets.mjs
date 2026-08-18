@@ -233,6 +233,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       tempHp: "Sobrevida ao ativar",
       areaFilter: "Filtro de área (força só aliados/inimigos)",
       condition: "Condição (marca enquanto durar)",
+      size: "Tamanho (muda a categoria)",
       info: "Condição / Texto",
     };
     context.costResources = {
@@ -273,6 +274,14 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     // que as usa como alvos do tipo "condition".
     const condDefs = CONFIG.LIGEIA?.conditions || {};
     const condChoices = Object.fromEntries(Object.entries(condDefs).map(([id, d]) => [id, d.label]));
+    // Categorias de tamanho (para a raça e para os efeitos de tamanho)
+    const sizeDefs = CONFIG.LIGEIA?.sizes || {};
+    const sizeChoices = Object.fromEntries(
+      Object.entries(sizeDefs).sort((a, b) => (a[1].order ?? 0) - (b[1].order ?? 0)).map(([id, d]) => [id, d.label || id]),
+    );
+    context.sizeChoices = sizeChoices;
+    // Alvos do efeito de tamanho: mover categorias ou fixar uma delas
+    const sizeTargets = { shift: "Aumentar/Diminuir categorias (usa o valor)", ...sizeChoices };
 
     const TARGETS = {
       roll: {
@@ -292,6 +301,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       },
       areaFilter: { enemies: "Só inimigos", allies: "Só aliados" },
       condition: condChoices,
+      size: sizeTargets,
       none: { all: "—" },
     };
     context.targetOptions = TARGETS;
@@ -313,6 +323,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         case "rd":
         case "vuln": return dmgChoices;
         case "condition": return condChoices;
+        case "size": return sizeTargets;
         case "restore": return { hp: "Vida (PV)", mp: "Mana (PM)", heroic: "Pontos Heroicos" };
         default: return TARGETS.roll;
       }
@@ -356,6 +367,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       tempHp: "none",
       areaFilter: "areaFilter",
       condition: "condition",
+      size: "size",
       info: "none",
     };
 

@@ -158,11 +158,13 @@ function emptyMods() {
   // bonus     = bônus SÓ NA ROLAGEM daquele atributo (não muda o atributo)
   // attrBonus = bônus no VALOR do atributo (muda a ficha e o que dele deriva)
   for (const k of [...PRIMARY_ATTRS, ...SECONDARY_ATTRS]) attr[k] = { bonus: 0, attrBonus: 0, dice: 0, set: null, reroll1: 0, reroll6: 0, critBonus: 0, failBonus: 0 };
+  // Tamanho: shift = categorias a mover (soma); set = categoria fixada.
+  const size = { shift: 0, set: null };
   const roll = {};
   for (const k of ROLL_CATEGORIES) roll[k] = { bonus: 0, dice: 0, reroll1: 0, reroll6: 0, critBonus: 0, failBonus: 0 };
   const stat = {};
   for (const k of STAT_TARGETS) stat[k] = 0;
-  return { attr, roll, stat };
+  return { attr, roll, stat, size };
 }
 
 /**
@@ -197,6 +199,11 @@ function applyEffectToMods(mods, effect, actor) {
     // SÓ rolagem: nunca altera o valor do atributo (ver prepareDerivedData).
     if (mods.attr[t]) mods.attr[t].bonus += v;
     else if (mods.roll[t]) mods.roll[t].bonus += v;
+  } else if (effect.type === "size") {
+    // target "shift" → move N categorias (valor negativo diminui);
+    // target = id de categoria → fixa aquela categoria.
+    if (!effect.target || effect.target === "shift") mods.size.shift += v;
+    else mods.size.set = effect.target;
   } else if (effect.type === "attr") {
     // Altera o ATRIBUTO em si. Só faz sentido em atributos (primários e
     // secundários); em categorias de rolagem, cai como bônus de rolagem.

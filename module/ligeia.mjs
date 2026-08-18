@@ -94,6 +94,28 @@ Hooks.once("init", function () {
 
   // Constantes do sistema (palavras arcanas, custos de XP, etc.)
   CONFIG.LIGEIA = {
+    // ---- CATEGORIAS DE TAMANHO (tabela do livro) ----
+    // move  = deslocamento bípede da categoria (o sistema usa só o bípede)
+    // hp    = modificador de Pontos de Vida
+    // weapon= bônus/penalidade de dano das ARMAS ("Base ±N")
+    // reach = alcance corpo a corpo em metros (0 = adjacente)
+    // cost  = custo em pontos de traço (referência de criação)
+    sizes: {
+      minusculo:   { label: "Minúsculo",   order: 0, cost: -4, move: 1,  hp: -3, weapon: -3, reach: 0 },
+      diminuto:    { label: "Diminuto",    order: 1, cost: -3, move: 2,  hp: -2, weapon: -2, reach: 0 },
+      miudo:       { label: "Miúdo",       order: 2, cost: -2, move: 3,  hp: -1, weapon: -1, reach: 0 },
+      pequeno:     { label: "Pequeno",     order: 3, cost: -1, move: 4,  hp: 0,  weapon: 0,  reach: 0 },
+      medio:       { label: "Médio",       order: 4, cost: 0,  move: 5,  hp: 0,  weapon: 0,  reach: 0 },
+      grande:      { label: "Grande",      order: 5, cost: 2,  move: 7,  hp: 2,  weapon: 1,  reach: 2 },
+      enorme:      { label: "Enorme",      order: 6, cost: 4,  move: 9,  hp: 5,  weapon: 2,  reach: 2 },
+      imenso:      { label: "Imenso",      order: 7, cost: 6,  move: 11, hp: 10, weapon: 3,  reach: 3 },
+      colossal:    { label: "Colossal",    order: 8, cost: 8,  move: 13, hp: 15, weapon: 4,  reach: 3 },
+      continental: { label: "Continental", order: 9, cost: 10, move: 25, hp: 30, weapon: 5,  reach: 5 },
+    },
+    // Tamanho padrão de quem não tem raça definida
+    defaultSize: "medio",
+    // Alcance de um ataque corpo a corpo "adjacente" (metros)
+    adjacentRange: 1.5,
     // CDs das rolagens por dificuldade (usadas pelos níveis de ferimento)
     difficulties: { facil: 6, normal: 8, dificil: 10, muito_dificil: 12 },
     // Custo de XP por nível de habilidade
