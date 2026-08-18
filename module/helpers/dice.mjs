@@ -1133,6 +1133,16 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     catch (e) { healRoll = null; }
   }
 
+  // ALCANCE da ação (fórmula resolvida com o conjurador). Precisa ficar
+  // antes do resumo abaixo, que já mostra o valor final.
+  let rangeM = resolveEffectValue(action.range, actor);
+  // CORPO A CORPO: o alcance mínimo é o da categoria de tamanho de quem
+  // ataca (adjacente para os pequenos; 2m, 3m ou 5m para os grandes).
+  if (action.isMelee) {
+    const reach = actor.system?.size?.reach || 0;
+    rangeM = Math.max(rangeM || 0, reach > 0 ? reach : (CONFIG.LIGEIA?.adjacentRange ?? 1.5));
+  }
+
   // Resumo de alcance/área (fórmulas resolvidas com o conjurador)
   const meta = [];
   const rangeShown = rangeM;
@@ -1192,13 +1202,6 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
   // até cada alvo. Alvos além do alcance são marcados como fora de alcance
   // (não são atingidos) e geram um aviso. Só se aplica ao modo "target" —
   // em área/aura os alvos já vêm de dentro do template.
-  let rangeM = resolveEffectValue(action.range, actor);
-  // CORPO A CORPO: o alcance mínimo é o da categoria de tamanho de quem
-  // ataca (adjacente para os pequenos; 2m, 3m ou 5m para os grandes).
-  if (action.isMelee) {
-    const reach = actor.system?.size?.reach || 0;
-    rangeM = Math.max(rangeM || 0, reach > 0 ? reach : (CONFIG.LIGEIA?.adjacentRange ?? 1.5));
-  }
   const rangeOutMsgs = [];
   if (rangeM > 0 && mode === "target") {
     const srcToken = activeTokenOfActor(actor);
