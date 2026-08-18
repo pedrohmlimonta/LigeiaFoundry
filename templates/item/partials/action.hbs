@@ -318,7 +318,7 @@
           <button type="button" class="lig-mini-btn danger" data-action="removeAppliesEffect" data-action-index="{{i}}" data-index="{{fi}}" title="Remover">✕</button>
         </div>
         <div class="lig-item-row">
-          <label>Modificador
+          <label>Tipo
             <select name="system.actions.{{i}}.appliesEffects.{{fi}}.fxType">
               <option value="bonus" {{#if (eq fx.fxType "bonus")}}selected{{/if}}>Bônus em rolagem (só na rolagem)</option>
               <option value="attr" {{#if (eq fx.fxType "attr")}}selected{{/if}}>Bônus de atributo (muda o atributo)</option>
@@ -333,10 +333,11 @@
               <option value="crit" {{#if (eq fx.fxType "crit")}}selected{{/if}}>Crítico aprimorado</option>
               <option value="fumble" {{#if (eq fx.fxType "fumble")}}selected{{/if}}>Falha crítica piorada</option>
               <option value="condition" {{#if (eq fx.fxType "condition")}}selected{{/if}}>Condição</option>
+              <option value="size" {{#if (eq fx.fxType "size")}}selected{{/if}}>Tamanho</option>
               <option value="restore" {{#if (eq fx.fxType "restore")}}selected{{/if}}>Recuperar recurso (ao aplicar)</option>
             </select>
           </label>
-          <label>Alvo
+          <label>{{#if (eq fx.fxType "condition")}}Condição{{else}}{{#if (eq fx.fxType "size")}}Categoria{{else}}{{#if (eq fx.fxType "restore")}}Recurso{{else}}Alvo{{/if}}{{/if}}{{/if}}
             <select name="system.actions.{{i}}.appliesEffects.{{fi}}.fxTarget">
               {{selectOptions fx.targetChoices selected=fx.fxTarget}}
             </select>

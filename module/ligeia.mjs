@@ -15,6 +15,7 @@ import { registerMovementHooks, registerMovementSocket, registerForcedMovementAc
 import { registerRollRequestSocket } from "./helpers/roll-request.mjs";
 import { registerTokenLinkSettings, registerTokenLinkHooks, migrateTokenLinks } from "./helpers/token-link.mjs";
 import { syncConditionEffects } from "./helpers/conditions.mjs";
+import { applyHealingToActor } from "./helpers/dice.mjs";
 import { registerTurnEffectHooks } from "./helpers/turn-effects.mjs";
 import { registerBarrierHooks } from "./helpers/barrier.mjs";
 import { applyTempHpToActor } from "./helpers/dice.mjs";
@@ -524,6 +525,43 @@ Hooks.on("preUpdateActor", function (actor, changes) {
   const base = foundry.utils.getProperty(changes, "system.conditions") ?? actor.system?.conditions ?? [];
   const { conditions, changed } = syncConditionEffects(nextFx, actor.system?.appliedEffects || [], base);
   if (changed) foundry.utils.setProperty(changes, "system.conditions", conditions);
+});
+
+/* ------------------------------------------------------------------ */
+/*  Efeito "Recuperar recurso (ao aplicar)" criado na ficha            */
+/*  É instantâneo: recupera o recurso uma vez e sai da lista, igual ao  */
+/*  que acontece quando vem de uma ação.                                */
+/* ------------------------------------------------------------------ */
+Hooks.on("updateActor", async function (actor, changes, options, userId) {
+  if (game.user.id !== userId) return;
+  if (options.ligeiaRestoreOp) return;
+  if (!foundry.utils.hasProperty(changes, "system.appliedEffects")) return;
+
+  const lista = actor.system?.appliedEffects || [];
+  const instantaneos = lista.filter((ae) =>
+    !ae?.disabled && (ae.effects || []).some((e) => e?.type === "restore" && e?.enabled !== false),
+  );
+  if (!instantaneos.length) return;
+
+  const restantes = lista.filter((ae) => !instantaneos.includes(ae));
+  const linhas = [];
+  for (const ae of instantaneos) {
+    for (const e of ae.effects || []) {
+      if (e?.type !== "restore" || e?.enabled === false) continue;
+      const recurso = ["hp", "mp", "heroic"].includes(e.target) ? e.target : "mp";
+      const valor = resolveEffectValue(e.value, actor);
+      const r = await applyHealingToActor(actor, valor, recurso);
+      const curto = { hp: "PV", mp: "PM", heroic: "PH" }[recurso];
+      linhas.push(`${ae.label || "Recuperação"}: +${r.gained ?? 0} ${curto}`);
+    }
+  }
+  await actor.update({ "system.appliedEffects": restantes }, { ligeiaRestoreOp: true });
+  if (linhas.length) {
+    await ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: `<div class="ligeia-roll-flavor"><strong>${actor.name}</strong> — <span class="lig-atk-heal">${linhas.join(" · ")}</span></div>`,
+    });
+  }
 });
 
 Hooks.once("setup", async function () {

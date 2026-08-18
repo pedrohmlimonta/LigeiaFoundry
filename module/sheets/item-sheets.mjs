@@ -234,6 +234,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       areaFilter: "Filtro de área (força só aliados/inimigos)",
       condition: "Condição (marca enquanto durar)",
       size: "Tamanho (muda a categoria)",
+      restore: "Recuperar recurso (ao aplicar)",
       info: "Condição / Texto",
     };
     context.costResources = {
@@ -302,6 +303,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       areaFilter: { enemies: "Só inimigos", allies: "Só aliados" },
       condition: condChoices,
       size: sizeTargets,
+      restore: { hp: "Vida (PV)", mp: "Mana (PM)", heroic: "Pontos Heroicos" },
       none: { all: "—" },
     };
     context.targetOptions = TARGETS;
@@ -324,6 +326,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         case "vuln": return dmgChoices;
         case "condition": return condChoices;
         case "size": return sizeTargets;
+        case "restore": return { hp: "Vida (PV)", mp: "Mana (PM)", heroic: "Pontos Heroicos" };
         case "restore": return { hp: "Vida (PV)", mp: "Mana (PM)", heroic: "Pontos Heroicos" };
         default: return TARGETS.roll;
       }
@@ -368,6 +371,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       areaFilter: "areaFilter",
       condition: "condition",
       size: "size",
+      restore: "restore",
       info: "none",
     };
 

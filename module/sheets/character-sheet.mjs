@@ -239,6 +239,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
         case "damage": case "rd": case "vuln": return dmgTargets;
         case "condition": return condTargets;
         case "size": return sizeTargets;
+        case "restore": return { hp: "Vida (PV)", mp: "Mana (PM)", heroic: "Pontos Heroicos" };
         default: return rollTargets;
       }
     };

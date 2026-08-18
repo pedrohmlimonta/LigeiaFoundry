@@ -18,7 +18,7 @@ export function effectField() {
       type: new fields.StringField({
         required: true,
         initial: "bonus",
-        choices: ["dice", "bonus", "attr", "stat", "set", "damage", "rd", "vuln", "reroll1", "reroll6", "crit", "fumble", "tempHp", "areaFilter", "condition", "size", "info"],
+        choices: ["dice", "bonus", "attr", "stat", "set", "damage", "rd", "vuln", "reroll1", "reroll6", "crit", "fumble", "tempHp", "areaFilter", "condition", "size", "restore", "info"],
       }),
       target: new fields.StringField({ required: true, initial: "all" }),
       // Número OU fórmula determinística com @variáveis do dono — ex.:
