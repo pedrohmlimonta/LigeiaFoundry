@@ -149,10 +149,10 @@ function buildEmanationFlags(actor, item, action) {
     // rolado (ou ação sem ataque).
     attackTotal: null,
     // Duração: rounds>0 = N rodadas; 0 = até o fim da cena.
-    rounds: Number(action.persistRounds) || 0,
+    rounds: resolveEffectValue(action.persistRounds, actor),
     // Rodada do combate em que foi criada (para expiração).
     createdRound: game.combat?.round ?? null,
-    remaining: Number(action.persistRounds) || 0,
+    remaining: resolveEffectValue(action.persistRounds, actor),
   };
 }
 

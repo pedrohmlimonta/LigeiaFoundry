@@ -8,6 +8,7 @@
  * de forma incondicional é seguro — itens sem configuração simplesmente não
  * animam.
  */
+import { resolveEffectValue } from "./effects.mjs";
 
 /** O módulo Automated Animations está instalado e ativo? */
 export function isAutomatedAnimationsActive() {
@@ -65,7 +66,7 @@ export function playSequencerAnimation({ actor, action, targetActors = [], attac
     }
 
     const placement = action.animPlacement || "target";
-    const scale = Number(action.animScale) || 1;
+    const scale = resolveEffectValue(action.animScale, actor) || 1;
     // Prende o efeito ao token (acompanha o movimento) quando pedido pela ação
     // ou quando a ação move tokens.
     const doAttach = !!attach || !!action.animAttach;

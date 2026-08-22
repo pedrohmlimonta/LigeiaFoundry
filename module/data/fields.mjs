@@ -128,13 +128,15 @@ export function actionEntryField() {
     }),
     canRoll: new fields.BooleanField({ initial: true }),
     rollAttr: new fields.StringField({ blank: true, initial: "forca" }),
-    rollBonus: new fields.NumberField({ initial: 0, integer: true }),
-    rollDice: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+    rollBonus: new fields.StringField({ blank: true, initial: "0" }),
+    rollDice: new fields.StringField({ blank: true, initial: "0" }),
     // Rolagem contra dificuldade FIXA (CD). Pode coexistir com a rolagem de
     // ataque: quando ambas ativas, a ação precisa superar a defesa do alvo E
     // a CD fixa. Quando só esta está ativa, basta superar a CD.
     vsDifficulty: new fields.BooleanField({ initial: false }),
-    fixedDifficulty: new fields.NumberField({ initial: 8, integer: true, min: 0 }),
+    // Campos abaixo aceitam número OU fórmula com @variáveis do dono
+    // (determinística, sem dados). Ver resolveEffectValue.
+    fixedDifficulty: new fields.StringField({ blank: true, initial: "8" }),
     // Atributo do ALVO somado à dificuldade fixa (a CD efetiva = CD fixa +
     // atributo do alvo). "nenhum" = não soma nada. Inclui especiais
     // (conjuração, iniciativa, esquiva, bloqueio) e os primários.
@@ -216,7 +218,7 @@ export function actionEntryField() {
       }),
       who: new fields.StringField({ initial: "targets", choices: ["self", "targets"] }),
       // Distância em metros. Em teleporte/telecinese, 0 = sem limite.
-      distance: new fields.NumberField({ initial: 0, min: 0 }),
+      distance: new fields.StringField({ blank: true, initial: "0" }),
       lateralSide: new fields.StringField({ initial: "right", choices: ["left", "right"] }),
       // Ignora paredes (sempre verdadeiro no teleporte).
       ignoreWalls: new fields.BooleanField({ initial: false }),
@@ -244,29 +246,29 @@ export function actionEntryField() {
         fxAll: new fields.BooleanField({ initial: false }),
         // Duração: "rounds" (em rodadas) ou "scene" (até o fim da cena)
         durationMode: new fields.StringField({ initial: "scene", choices: ["rounds", "scene"] }),
-        durationRounds: new fields.NumberField({ initial: 1, integer: true, min: 0 }),
+        durationRounds: new fields.StringField({ blank: true, initial: "1" }),
         // Resistência por rodada
         resist: new fields.BooleanField({ initial: false }),
         resistAttr: new fields.StringField({ blank: true, initial: "vigor" }),
         resistVsCast: new fields.BooleanField({ initial: true }),
-        resistDc: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+        resistDc: new fields.StringField({ blank: true, initial: "0" }),
         // Quando true, a CD do teste de resistência é REFEITA a cada rodada:
         // o atacante rola o atributo do ataque de novo (rolagem resistida
         // fresca, ignorando alcance) para gerar a nova CD.
         resistReroll: new fields.BooleanField({ initial: false }),
         // Dano contínuo por rodada (0 = nenhum) — ex.: Corrosão
-        tickAmount: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+        tickAmount: new fields.StringField({ blank: true, initial: "0" }),
         tickType: new fields.StringField({ blank: true, initial: "" }),
         tickResource: new fields.StringField({ initial: "hp", choices: ["hp", "mp", "heroic"] }),
         // REGENERAÇÃO por rodada (0 = nenhuma): recupera o recurso no início
         // dos turnos do portador enquanto o efeito durar (contraparte do
         // dano contínuo acima).
-        tickHealAmount: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+        tickHealAmount: new fields.StringField({ blank: true, initial: "0" }),
         tickHealResource: new fields.StringField({ initial: "hp", choices: ["hp", "mp", "heroic"] }),
         // SOBREVIDA VINCULADA (barreira): concede N de sobrevida ao aplicar.
         // O efeito e a sobrevida vivem e morrem juntos: sobrevida zerou →
         // o efeito termina; efeito terminou → a sobrevida some.
-        grantTempHp: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+        grantTempHp: new fields.StringField({ blank: true, initial: "0" }),
       }),
       { initial: [] },
     ),
@@ -300,22 +302,22 @@ export function actionEntryField() {
       initial: "target",
       choices: ["cast", "target", "ranged"],
     }),
-    animScale: new fields.NumberField({ initial: 1, min: 0.1 }),
+    animScale: new fields.StringField({ blank: true, initial: "1" }),
     animEnabled: new fields.BooleanField({ initial: true }),
     // Prende o efeito ao token (acompanha o movimento). Ações que MOVEM
     // tokens já prendem automaticamente; isto força também nas demais.
     animAttach: new fields.BooleanField({ initial: false }),
     // Custo da ação ao ser executada (descontado do personagem). 0 = grátis.
-    costMp: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
-    costHp: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
-    costHeroic: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+    costMp: new fields.StringField({ blank: true, initial: "0" }),
+    costHp: new fields.StringField({ blank: true, initial: "0" }),
+    costHeroic: new fields.StringField({ blank: true, initial: "0" }),
     // --- Área/aura PERSISTENTE (emanação) ---
     // Quando a ação é de área ou aura, ela pode deixar a área no canvas por
     // uma duração. Enquanto ativa, todo token que INICIAR o turno dentro da
     // área refaz a rolagem/efeito da ação automaticamente (emanação contínua).
     persistArea: new fields.BooleanField({ initial: false }),
     // Duração da emanação: número de rodadas, ou 0 = até o fim da cena.
-    persistRounds: new fields.NumberField({ initial: 1, integer: true, min: 0 }),
+    persistRounds: new fields.StringField({ blank: true, initial: "1" }),
     // Se a área deve afetar também quem a criou ao iniciar o turno dentro dela.
     persistAffectsSelf: new fields.BooleanField({ initial: false }),
     // Se true, a rolagem de ataque é REFEITA a cada disparo; se false, usa o

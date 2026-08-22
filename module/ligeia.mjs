@@ -523,7 +523,7 @@ Hooks.on("preUpdateActor", function (actor, changes) {
   for (const ae of nextFx) {
     const d = ae?.duration;
     if (!d) continue;
-    const rounds = Number(d.rounds) || 0;
+    const rounds = resolveEffectValue(d.rounds, actor);
     if (rounds <= 0) { d.remaining = 0; continue; }
     const rest = Number(d.remaining) || 0;
     if (rest <= 0 || rest > rounds) d.remaining = rounds;

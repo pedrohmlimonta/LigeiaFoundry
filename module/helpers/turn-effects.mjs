@@ -13,6 +13,7 @@
 
 import { rollLigeia, resolveAttr, rerollFor, critFor, applyHealingToActor, applyDamageToActor } from "./dice.mjs";
 import { processWoundRollAtTurnStart } from "./wounds.mjs";
+import { resolveEffectValue } from "./effects.mjs";
 
 /** Detecta se ESTE cliente deve processar (apenas um GM ativo). */
 function isResponsibleClient() {
@@ -152,7 +153,7 @@ export async function processDurationAtTurnStart(actor) {
   const expirados = [];
   const restantes = [];
   for (const ae of arr) {
-    const rounds = ae?.duration?.rounds || 0;
+    const rounds = resolveEffectValue(ae?.duration?.rounds, actor);
     if (rounds <= 0) { restantes.push(ae); continue; } // vazio/0 = permanente
     // remaining só vale quando já foi iniciado (> 0). Como o campo da ficha
     // grava apenas "rounds", um efeito recém-criado tem remaining 0 — nesse
@@ -163,7 +164,9 @@ export async function processDurationAtTurnStart(actor) {
     if (remaining <= 0) expirados.push(ae);
     else restantes.push(ae);
   }
-  if (!expirados.length && !arr.some((ae) => (ae?.duration?.rounds || 0) > 0)) return;
+  // Nada expirou e nenhum efeito tem duração por rodada? Nada a gravar.
+  // (a duração pode ser uma fórmula, então precisa ser resolvida aqui também)
+  if (!expirados.length && !arr.some((ae) => resolveEffectValue(ae?.duration?.rounds, actor) > 0)) return;
 
   const update = { "system.appliedEffects": restantes };
   if (expirados.length) {

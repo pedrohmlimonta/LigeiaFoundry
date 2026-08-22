@@ -38,7 +38,7 @@
     {{#if act.vsDifficulty}}
     <div class="lig-item-row">
       <label>Dificuldade fixa (CD)
-        <input type="number" name="system.actions.{{i}}.fixedDifficulty" value="{{act.fixedDifficulty}}" min="0"/>
+        <input type="text" value="{{act.fixedDifficulty}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.actions.{{i}}.fixedDifficulty"/>
       </label>
       <label>Somar atributo do alvo à CD
         <select name="system.actions.{{i}}.difficultyAttr">{{selectOptions ../difficultyAttrChoices selected=act.difficultyAttr}}</select>
@@ -53,10 +53,10 @@
         <select name="system.actions.{{i}}.rollAttr">{{selectOptions ../attackAttrs selected=act.rollAttr}}</select>
       </label>
       <label>Bônus
-        <input type="number" name="system.actions.{{i}}.rollBonus" value="{{act.rollBonus}}"/>
+        <input type="text" value="{{act.rollBonus}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.actions.{{i}}.rollBonus"/>
       </label>
       <label>Dados extra
-        <input type="number" name="system.actions.{{i}}.rollDice" value="{{act.rollDice}}" min="0"/>
+        <input type="text" value="{{act.rollDice}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.actions.{{i}}.rollDice"/>
       </label>
     </div>
 
@@ -99,7 +99,7 @@
       {{#if act.persistArea}}
       <div class="lig-item-row">
         <label>Duração (rodadas, 0 = até fim da cena)
-          <input type="number" name="system.actions.{{i}}.persistRounds" value="{{act.persistRounds}}" min="0"/>
+          <input type="text" value="{{act.persistRounds}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.actions.{{i}}.persistRounds"/>
         </label>
         <label class="lig-inline-check">
           <input type="checkbox" name="system.actions.{{i}}.persistAffectsSelf" {{checked act.persistAffectsSelf}}/>
@@ -262,7 +262,7 @@
           </select>
         </label>
         <label>Distância (m)
-          <input type="number" name="system.actions.{{i}}.movement.distance" value="{{act.movement.distance}}" min="0" step="0.5"/>
+          <input type="text" value="{{act.movement.distance}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.actions.{{i}}.movement.distance"/>
         </label>
       </div>
       <div class="lig-item-row">
@@ -296,13 +296,13 @@
 
     <div class="lig-item-row lig-action-costs">
       <label>Custo PM
-        <input type="number" name="system.actions.{{i}}.costMp" value="{{act.costMp}}" min="0"/>
+        <input type="text" value="{{act.costMp}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.actions.{{i}}.costMp"/>
       </label>
       <label>Custo PV
-        <input type="number" name="system.actions.{{i}}.costHp" value="{{act.costHp}}" min="0"/>
+        <input type="text" value="{{act.costHp}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.actions.{{i}}.costHp"/>
       </label>
       <label>Custo PH
-        <input type="number" name="system.actions.{{i}}.costHeroic" value="{{act.costHeroic}}" min="0"/>
+        <input type="text" value="{{act.costHeroic}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.actions.{{i}}.costHeroic"/>
       </label>
     </div>
 
@@ -370,7 +370,7 @@
           </label>
           {{#if (eq fx.durationMode "rounds")}}
           <label>Rodadas
-            <input type="number" name="system.actions.{{i}}.appliesEffects.{{fi}}.durationRounds" value="{{fx.durationRounds}}" min="0"/>
+            <input type="text" value="{{fx.durationRounds}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.actions.{{i}}.appliesEffects.{{fi}}.durationRounds"/>
           </label>
           {{/if}}
         </div>
@@ -400,7 +400,7 @@
           </label>
           {{#unless fx.resistVsCast}}
           <label>CD fixa
-            <input type="number" name="system.actions.{{i}}.appliesEffects.{{fi}}.resistDc" value="{{fx.resistDc}}" min="0"/>
+            <input type="text" value="{{fx.resistDc}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.actions.{{i}}.appliesEffects.{{fi}}.resistDc"/>
           </label>
           {{/unless}}
           {{/unless}}
@@ -411,7 +411,7 @@
         </div>
         <div class="lig-item-row">
           <label>Dano contínuo/rodada
-            <input type="number" name="system.actions.{{i}}.appliesEffects.{{fi}}.tickAmount" value="{{fx.tickAmount}}" min="0"/>
+            <input type="text" value="{{fx.tickAmount}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.actions.{{i}}.appliesEffects.{{fi}}.tickAmount"/>
           </label>
           <label>Tipo
             <select name="system.actions.{{i}}.appliesEffects.{{fi}}.tickType">
@@ -429,10 +429,10 @@
         </div>
         <div class="lig-item-row">
           <label title="Concede sobrevida ao aplicar. Vidas ligadas: se a sobrevida zerar, o efeito termina; se o efeito terminar, a sobrevida some.">Sobrevida vinculada
-            <input type="number" name="system.actions.{{i}}.appliesEffects.{{fi}}.grantTempHp" value="{{fx.grantTempHp}}" min="0"/>
+            <input type="text" value="{{fx.grantTempHp}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.actions.{{i}}.appliesEffects.{{fi}}.grantTempHp"/>
           </label>
           <label>Regeneração/rodada
-            <input type="number" name="system.actions.{{i}}.appliesEffects.{{fi}}.tickHealAmount" value="{{fx.tickHealAmount}}" min="0"/>
+            <input type="text" value="{{fx.tickHealAmount}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.actions.{{i}}.appliesEffects.{{fi}}.tickHealAmount"/>
           </label>
           <label>Recurso regenerado
             <select name="system.actions.{{i}}.appliesEffects.{{fi}}.tickHealResource">
@@ -494,7 +494,7 @@
         </div>
         <div class="lig-item-row">
           <label>Escala
-            <input type="number" name="system.actions.{{i}}.animScale" value="{{act.animScale}}" min="0.1" step="0.1"/>
+            <input type="text" value="{{act.animScale}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.actions.{{i}}.animScale"/>
           </label>
           <label class="lig-inline-check">
             <input type="checkbox" name="system.actions.{{i}}.animEnabled" {{checked act.animEnabled}}/>

@@ -195,7 +195,7 @@
           {{/if}}
         </label>
         <label>{{#if ae.fx0IsReroll}}Qtd. dados{{else}}Valor{{/if}}
-          <input type="number" name="system.appliedEffects.{{ae.index}}.effects.0.value" value="{{ae.fx0.value}}"/>
+          <input type="text"  value="{{ae.fx0.value}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.appliedEffects.{{ae.index}}.effects.0.value"/>
         </label>
         {{#if ae.fx0IsVuln}}
         <label class="lig-inline-check" title="Valor percentual: +50 = +50% de dano recebido; +100 = dobro. Desmarcado, é acréscimo fixo (+N).">
@@ -210,7 +210,7 @@
         </label>
         {{/if}}
         <label>Duração (rodadas)
-          <input type="number" name="system.appliedEffects.{{ae.index}}.duration.rounds" value="{{#if ae.duration.rounds}}{{ae.duration.rounds}}{{/if}}" min="0" placeholder="permanente" title="Vazio ou 0 = permanente (dura até ser removido). Um número = quantas rodadas o efeito dura, descontando 1 no início de cada turno do personagem."/>
+          <input type="text" value="{{#if ae.duration.rounds}}{{ae.duration.rounds}}{{/if}}" placeholder="permanente" title="Vazio ou 0 = permanente (dura até ser removido). Um número = quantas rodadas o efeito dura, descontando 1 no início de cada turno do personagem." name="system.appliedEffects.{{ae.index}}.duration.rounds"/>
         </label>
       </div>
       <div class="lig-applied-config">
@@ -225,7 +225,7 @@
           </select>
         </label>
         <label>CD
-          <input type="number" name="system.appliedEffects.{{ae.index}}.endRoll.dc" value="{{ae.endRoll.dc}}" min="0"/>
+          <input type="text" value="{{ae.endRoll.dc}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.appliedEffects.{{ae.index}}.endRoll.dc"/>
         </label>
         {{/if}}
       </div>

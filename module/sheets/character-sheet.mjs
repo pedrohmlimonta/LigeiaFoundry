@@ -8,7 +8,7 @@ import { requestRollConfig } from "../helpers/roll-request.mjs";
 import { placeTemplateForAction, scheduleTransientCleanup } from "../helpers/template.mjs";
 import { computeXpSpent, computeXpGained } from "../helpers/xp.mjs";
 import { performRest, performMedicalCare, DEATH_HP } from "../helpers/wounds.mjs";
-import { effectIsActive, availableActionsOf } from "../helpers/effects.mjs";
+import { effectIsActive, availableActionsOf, resolveEffectValue } from "../helpers/effects.mjs";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ActorSheetV2 } = foundry.applications.sheets;
@@ -276,10 +276,10 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
             ? `Regen +${ae.tickHeal.amount} ${({ hp: "PV", mp: "PM", heroic: "PH" })[ae.tickHeal.resource || "hp"]}/rodada`
             : "",
         ].filter(Boolean).join(" · "),
-        hasDuration: (ae.duration?.rounds || 0) > 0,
+        hasDuration: resolveEffectValue(ae.duration?.rounds, actor) > 0,
         // Rodadas que ainda faltam (parte do total quando ainda não começou).
-        durationLeft: (ae.duration?.rounds || 0) > 0
-          ? ((ae.duration.remaining > 0) ? ae.duration.remaining : ae.duration.rounds)
+        durationLeft: resolveEffectValue(ae.duration?.rounds, actor) > 0
+          ? ((ae.duration.remaining > 0) ? ae.duration.remaining : resolveEffectValue(ae.duration.rounds, actor))
           : null,
       };
     });
@@ -642,7 +642,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       });
     }
 
-    const rounds = ae.duration?.rounds || 0;
+    const rounds = resolveEffectValue(ae.duration?.rounds, this.document);
     if (rounds > 0) {
       // Duração contada em rodadas
       const atual = (ae.duration.remaining > 0) ? ae.duration.remaining : rounds;

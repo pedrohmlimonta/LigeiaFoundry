@@ -741,7 +741,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
         // Ativa a condição no alvo (marcador), se for o caso.
         if (isCondition && condId && !conds.includes(condId)) conds.push(condId);
 
-        const rounds = ae.durationMode === "rounds" ? (ae.durationRounds || 0) : 0;
+        const rounds = ae.durationMode === "rounds" ? resolveEffectValue(ae.durationRounds, caster) : 0;
         const condLabel = CONFIG.LIGEIA?.conditions?.[condId]?.label || condId;
         cur.push({
           label: ae.label || (isCondition ? condLabel : "Efeito"),
@@ -749,12 +749,12 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
           effects,
           conditionId: condId,
           disabled: false,
-          duration: { rounds, remaining: rounds }, // rounds 0 = até o fim da cena
+          duration: { rounds: String(rounds), remaining: rounds }, // rounds 0 = até o fim da cena
           endRoll: {
             enabled: !!ae.resist,
             attr: ae.resistAttr || "vigor",
             // CD inicial: refazível > conjuração > fixa.
-            dc: ae.resistVsCast ? atkTotal : (ae.resistDc || 0),
+            dc: ae.resistVsCast ? atkTotal : resolveEffectValue(ae.resistDc, caster),
             vsCast: !!ae.resistVsCast,
             // Modo "refazer a cada rodada": guarda o atacante e o atributo do
             // ataque para re-rolar a CD por rodada (rolagem resistida fresca).
@@ -762,12 +762,12 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
             attackerUuid: ae.resistReroll ? (caster?.uuid || "") : "",
             attackerAttr: ae.resistReroll ? (action.rollAttr || "forca") : "",
           },
-          tickDamage: { amount: ae.tickAmount || 0, type: ae.tickType || "", resource: ae.tickResource || "hp" },
+          tickDamage: { amount: resolveEffectValue(ae.tickAmount, caster), type: ae.tickType || "", resource: ae.tickResource || "hp" },
           // Regeneração por rodada (contraparte do dano contínuo)
-          tickHeal: { amount: ae.tickHealAmount || 0, resource: ae.tickHealResource || "hp" },
+          tickHeal: { amount: resolveEffectValue(ae.tickHealAmount, caster), resource: ae.tickHealResource || "hp" },
           // Sobrevida VINCULADA (barreira): o efeito e a sobrevida vivem e
           // morrem juntos (ciclo de vida em helpers/barrier.mjs).
-          tempHp: Number(ae.grantTempHp) || 0,
+          tempHp: resolveEffectValue(ae.grantTempHp, caster),
           fxId: foundry.utils.randomID(),
           source: caster?.name || "",
         });
@@ -778,7 +778,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       // Sobrevida vinculada das barreiras recém-aplicadas: concedida na MESMA
       // atualização, pela regra padrão (fica o maior valor; não acumula).
       let barrierNote = "";
-      const maxBarrier = fxList.reduce((m, ae) => Math.max(m, ae.fxType === "restore" ? 0 : Number(ae.grantTempHp) || 0), 0);
+      const maxBarrier = fxList.reduce((m, ae) => Math.max(m, ae.fxType === "restore" ? 0 : resolveEffectValue(ae.grantTempHp, caster)), 0);
       if (maxBarrier > 0) {
         const curTemp = tActor.system?.resources?.hp?.temp || 0;
         if (maxBarrier > curTemp) update["system.resources.hp.temp"] = maxBarrier;
@@ -802,9 +802,9 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
  */
 export async function spendActionCosts(actor, action) {
   const cfg = [
-    { key: "mp", label: "PM", value: Number(action.costMp) || 0 },
-    { key: "hp", label: "PV", value: Number(action.costHp) || 0 },
-    { key: "heroic", label: "PH", value: Number(action.costHeroic) || 0 },
+    { key: "mp", label: "PM", value: resolveEffectValue(action.costMp, actor) },
+    { key: "hp", label: "PV", value: resolveEffectValue(action.costHp, actor) },
+    { key: "heroic", label: "PH", value: resolveEffectValue(action.costHeroic, actor) },
   ].filter((c) => c.value > 0);
   if (!cfg.length) return "";
 
@@ -1023,7 +1023,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
 
   // A ação rola se faz ataque OU se testa contra dificuldade fixa.
   const rollsDice = action.canRoll || action.vsDifficulty;
-  let fixedDC = action.vsDifficulty ? (Number(action.fixedDifficulty) || 0) : null;
+  let fixedDC = action.vsDifficulty ? resolveEffectValue(action.fixedDifficulty, actor) : null;
 
   // Caixa de rolagem (se habilitada para este ator e esta ação). Permite
   // ajustar bônus, dados de melhoria, a CD e o atributo de defesa do alvo.
@@ -1035,7 +1035,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     const atkPre = resolveAttr(actor, atkKey);
     const rmPre = actor.system?.rollMods || {};
     const impPre =
-      atkPre.dice + (Number(action.rollDice) || 0) + atkCond.atkDice +
+      atkPre.dice + resolveEffectValue(action.rollDice, actor) + atkCond.atkDice +
       (rmPre.all?.dice || 0) + (rmPre.attack?.dice || 0) +
       attributeConditionDice(actor, atkKey) +
       surpriseDiceFor(actor, action, overrideTargets);
@@ -1071,7 +1071,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
       attribute: atk.value,
       improvement: dlgImprovement != null
         ? dlgImprovement
-        : atk.dice + (Number(action.rollDice) || 0) + atkCond.atkDice + rmDice + attrCondDice + surpriseDice,
+        : atk.dice + resolveEffectValue(action.rollDice, actor) + atkCond.atkDice + rmDice + attrCondDice + surpriseDice,
       bonus: (Number(action.rollBonus) || 0) + rmBonus + dlgBonus + (atk.rollBonus || 0),
       baseDice: dlgBaseDice,
       // Passa a CD fixa (quando houver) para marcar sucesso/falha e crítico.

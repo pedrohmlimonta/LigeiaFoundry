@@ -52,13 +52,14 @@ function appliedEffectsField() {
       conditionId: new fields.StringField({ blank: true, initial: "" }),
       disabled: new fields.BooleanField({ initial: false }),
       duration: new fields.SchemaField({
-        rounds: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+        // Número OU fórmula com @variáveis do portador (ex.: "@nivel").
+        rounds: new fields.StringField({ blank: true, initial: "" }),
         remaining: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
       }),
       endRoll: new fields.SchemaField({
         enabled: new fields.BooleanField({ initial: false }),
         attr: new fields.StringField({ blank: true, initial: "mente" }),
-        dc: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+        dc: new fields.StringField({ blank: true, initial: "" }),
         // Quando true, a CD veio da rolagem de conjuração de quem aplicou.
         vsCast: new fields.BooleanField({ initial: false }),
         // Quando true, a CD é REFEITA a cada rodada: o atacante rola o atributo
