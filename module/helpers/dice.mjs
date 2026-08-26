@@ -1002,6 +1002,8 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
   }
 
   const mode = action.targetMode || "target";
+  // Modos que atingem uma REGIÃO do mapa (os alvos vêm da mira do template).
+  const isRegion = mode === "area" || mode === "line" || mode === "cone" || mode === "lineCustom";
   const atkKey = action.rollAttr || "forca";
   const lines = [];
   const atkRolls = []; // ataque + dano (1ª mensagem)
@@ -1149,8 +1151,15 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
   const meta = [];
   const rangeShown = rangeM;
   if (rangeShown > 0) meta.push(`Alcance ${rangeShown}m${action.isMelee ? " (corpo a corpo)" : ""}`);
-  if (mode === "area" || mode === "aura") {
-    meta.push(`${mode === "aura" ? "Aura" : "Área"} ${resolveEffectValue(action.area, actor)}m`);
+  if (isRegion || mode === "aura") {
+    if (mode === "line" || mode === "lineCustom") {
+      const comp = mode === "line" ? rangeM : resolveEffectValue(action.area, actor);
+      meta.push(`Linha ${comp}m × ${resolveEffectValue(action.lineWidth, actor)}m`);
+    } else if (mode === "cone") {
+      meta.push(`Cone ${rangeM}m (${resolveEffectValue(action.coneAngle, actor) || 45}°)`);
+    } else {
+      meta.push(`${mode === "aura" ? "Aura" : "Área"} ${resolveEffectValue(action.area, actor)}m`);
+    }
     const ovFilter = areaFilterOverrideFor(actor);
     const fLabel = { allies: "só aliados", enemies: "só inimigos" }[ovFilter || action.areaFilter];
     if (fLabel) meta.push(fLabel + (ovFilter ? " (por efeito)" : ""));
@@ -1170,7 +1179,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     affected.push({ actor, isSelf: true });
   } else if (mode === "target") {
     for (const a of targeted) affected.push({ actor: a, isSelf: a === actor });
-  } else if (mode === "area") {
+  } else if (isRegion) {
     // ÁREA: afeta exatamente quem está na área (vindo do targeting), passando
     // pelo filtro de alvos (todos/aliados/inimigos). Um efeito ativo do tipo
     // "areaFilter" sobrepõe o filtro configurado na ação. O próprio é
@@ -1261,7 +1270,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
   // Determina se HAVERÁ rolagem de defesa (algum alvo que não seja o próprio,
   // num modo com defesa). Só nesse caso separamos em duas mensagens com delay.
   const willDefend = action.canRoll
-    && (mode === "target" || mode === "area" || mode === "aura")
+    && (mode === "target" || isRegion || mode === "aura")
     && affected.some((x) => !x.isSelf);
 
   // Se haverá defesa, posta PRIMEIRO o ataque (e o dano) numa mensagem
@@ -1297,7 +1306,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
         continue;
       }
       // Há defesa quando: a ação faz ATAQUE E o modo é target/area/aura E não é o self.
-      const needsDefense = action.canRoll && !isSelf && (mode === "target" || mode === "area" || mode === "aura");
+      const needsDefense = action.canRoll && !isSelf && (mode === "target" || isRegion || mode === "aura");
 
       let defTotal = NaN;
       let acertou = true;

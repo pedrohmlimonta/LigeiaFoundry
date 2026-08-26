@@ -72,6 +72,15 @@
           <option value="aura:all" {{#if (eq act.targetMode "aura")}}{{#unless (or (eq act.areaFilter "allies") (eq act.areaFilter "enemies"))}}selected{{/unless}}{{/if}}>Aura (afeta os outros, não você)</option>
           <option value="aura:allies" {{#if (eq act.targetMode "aura")}}{{#if (eq act.areaFilter "allies")}}selected{{/if}}{{/if}}>Aura — só aliados</option>
           <option value="aura:enemies" {{#if (eq act.targetMode "aura")}}{{#if (eq act.areaFilter "enemies")}}selected{{/if}}{{/if}}>Aura — só inimigos</option>
+          <option value="line:all" {{#if (eq act.targetMode "line")}}{{#unless (or (eq act.areaFilter "allies") (eq act.areaFilter "enemies"))}}selected{{/unless}}{{/if}}>Linha</option>
+          <option value="line:allies" {{#if (eq act.targetMode "line")}}{{#if (eq act.areaFilter "allies")}}selected{{/if}}{{/if}}>Linha — só aliados</option>
+          <option value="line:enemies" {{#if (eq act.targetMode "line")}}{{#if (eq act.areaFilter "enemies")}}selected{{/if}}{{/if}}>Linha — só inimigos</option>
+          <option value="cone:all" {{#if (eq act.targetMode "cone")}}{{#unless (or (eq act.areaFilter "allies") (eq act.areaFilter "enemies"))}}selected{{/unless}}{{/if}}>Cone</option>
+          <option value="cone:allies" {{#if (eq act.targetMode "cone")}}{{#if (eq act.areaFilter "allies")}}selected{{/if}}{{/if}}>Cone — só aliados</option>
+          <option value="cone:enemies" {{#if (eq act.targetMode "cone")}}{{#if (eq act.areaFilter "enemies")}}selected{{/if}}{{/if}}>Cone — só inimigos</option>
+          <option value="lineCustom:all" {{#if (eq act.targetMode "lineCustom")}}{{#unless (or (eq act.areaFilter "allies") (eq act.areaFilter "enemies"))}}selected{{/unless}}{{/if}}>Linha personalizada</option>
+          <option value="lineCustom:allies" {{#if (eq act.targetMode "lineCustom")}}{{#if (eq act.areaFilter "allies")}}selected{{/if}}{{/if}}>Linha personalizada — só aliados</option>
+          <option value="lineCustom:enemies" {{#if (eq act.targetMode "lineCustom")}}{{#if (eq act.areaFilter "enemies")}}selected{{/if}}{{/if}}>Linha personalizada — só inimigos</option>
         </select>
       </label>
       <label>Alcance (m)
@@ -160,6 +169,29 @@
       </label>
       {{/if}}
     </div>
+
+    {{#if (or (eq act.targetMode "line") (eq act.targetMode "lineCustom"))}}
+    <div class="lig-item-row">
+      <label>Largura da linha (m)
+        <input type="text" name="system.actions.{{i}}.lineWidth" value="{{act.lineWidth}}" placeholder="ex.: 1.5" title="Largura da linha em metros. Aceita fórmula: @nivel, ceil(@nivel/2)..."/>
+      </label>
+      {{#if (eq act.targetMode "lineCustom")}}
+      <label>Rotação inicial (graus)
+        <input type="text" name="system.actions.{{i}}.lineRotation" value="{{act.lineRotation}}" placeholder="0" title="Direção inicial da linha, em graus. Você ainda pode girá-la com o mouse antes de confirmar."/>
+      </label>
+      {{/if}}
+    </div>
+    <p class="lig-hint">{{#if (eq act.targetMode "lineCustom")}}A linha é posicionada onde você clicar (o alcance limita a distância da origem) e o comprimento vem do campo <strong>Raio da área</strong>. Primeiro clique fixa a origem, o segundo confirma a direção.{{else}}A linha parte do seu personagem e o <strong>alcance</strong> é o comprimento dela. Mire a direção e clique para confirmar.{{/if}}</p>
+    {{/if}}
+
+    {{#if (eq act.targetMode "cone")}}
+    <div class="lig-item-row">
+      <label>Abertura do cone (graus)
+        <input type="text" name="system.actions.{{i}}.coneAngle" value="{{act.coneAngle}}" placeholder="45" title="Ângulo de abertura do cone, em graus (45 por padrão). Aceita fórmula."/>
+      </label>
+    </div>
+    <p class="lig-hint">O cone parte do seu personagem e o <strong>alcance</strong> é o comprimento dele. Mire a direção e clique para confirmar.</p>
+    {{/if}}
 
     <label class="lig-inline-check" title="Aplica o bônus (ou a penalidade) de dano da categoria de tamanho de quem ataca — a coluna 'Bônus das Armas' da tabela.">
       <input type="checkbox" name="system.actions.{{i}}.isWeapon" {{checked act.isWeapon}}/>

@@ -107,6 +107,13 @@ export function activatableFields() {
  *    "target" — afeta o(s) alvo(s) mirados (com defesa, se canRoll)
  *    "area"   — área centrada no personagem; inclui ele por padrão (includeSelf)
  *    "aura"   — aura centrada no personagem; NÃO o inclui por padrão
+ *    "line"   — LINHA reta a partir do personagem: o alcance é o
+ *               comprimento e "lineWidth" é a largura
+ *    "cone"   — CONE a partir do personagem: o alcance é o comprimento e
+ *               "coneAngle" é a abertura (45° por padrão)
+ *    "lineCustom" — linha posicionada livremente no mapa: comprimento em
+ *               "area", largura em "lineWidth" e rotação inicial em
+ *               "lineRotation" (o alcance limita onde a origem pode ficar)
  *    Modos COMPOSTOS ("area:all|allies|enemies", "aura:...") vêm do seletor
  *    da UI e são divididos na leitura em targetMode + areaFilter (ver
  *    normalizeCompositeTargetModes) — o resto do sistema só vê os simples.
@@ -145,10 +152,13 @@ export function actionEntryField() {
       required: true,
       initial: "target",
       choices: [
-        "none", "self", "target", "area", "aura",
+        "none", "self", "target", "area", "aura", "line", "cone", "lineCustom",
         // Compostos vindos do seletor da UI (divididos pelo migrateData):
         "area:all", "area:allies", "area:enemies",
         "aura:all", "aura:allies", "aura:enemies",
+        "line:all", "line:allies", "line:enemies",
+        "cone:all", "cone:allies", "cone:enemies",
+        "lineCustom:all", "lineCustom:allies", "lineCustom:enemies",
       ],
     }),
     includeSelf: new fields.BooleanField({ initial: false }),
@@ -272,6 +282,12 @@ export function actionEntryField() {
       }),
       { initial: [] },
     ),
+    // Largura da LINHA em metros (número ou fórmula)
+    lineWidth: new fields.StringField({ blank: true, initial: "1.5" }),
+    // Abertura do CONE em graus (padrão 45°)
+    coneAngle: new fields.StringField({ blank: true, initial: "45" }),
+    // Rotação inicial da linha personalizada, em graus
+    lineRotation: new fields.StringField({ blank: true, initial: "0" }),
     // Esta ação pertence a uma ARMA: recebe o bônus (ou a penalidade) de dano
     // da categoria de tamanho de quem ataca ("Bônus das Armas" na tabela).
     isWeapon: new fields.BooleanField({ initial: false }),

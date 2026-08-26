@@ -325,6 +325,270 @@ export async function placeAreaTemplate(actor, radius, persistFlags = null, filt
   });
 }
 
+
+/* ==================================================================== */
+/*  FORMAS DIRECIONAIS: LINHA (ray) e CONE                              */
+/*  Linha e cone partem do token de quem age; a mira define a direção.  */
+/*  A "linha personalizada" é posicionada livremente (origem e rotação).*/
+/* ==================================================================== */
+
+/** Converte metros do grid para pixels. */
+function toPx(units) {
+  const grid = canvas.grid;
+  return (Number(units) || 0) / grid.distance * grid.size;
+}
+
+/** Dados de um template de LINHA (ray). Comprimento/largura em metros. */
+function rayData(length, width, x, y, direction, persistFlags = null, followTokenId = null) {
+  const lig = persistFlags ? { transient: false, emanation: persistFlags } : { transient: true };
+  if (followTokenId) lig.follow = followTokenId;
+  return {
+    t: "ray",
+    user: game.user.id,
+    x, y,
+    direction: Number(direction) || 0,
+    distance: Number(length) || 0,
+    width: Number(width) || 0,
+    fillColor: game.user.color?.css ?? game.user.color ?? "#ff9900",
+    flags: { "ligeia-rpg": lig },
+  };
+}
+
+/** Dados de um template de CONE. Comprimento em metros, ângulo em graus. */
+function coneData(length, angle, x, y, direction, persistFlags = null, followTokenId = null) {
+  const lig = persistFlags ? { transient: false, emanation: persistFlags } : { transient: true };
+  if (followTokenId) lig.follow = followTokenId;
+  return {
+    t: "cone",
+    user: game.user.id,
+    x, y,
+    direction: Number(direction) || 0,
+    distance: Number(length) || 0,
+    angle: Number(angle) || 45,
+    fillColor: game.user.color?.css ?? game.user.color ?? "#ff9900",
+    flags: { "ligeia-rpg": lig },
+  };
+}
+
+/**
+ * Mira os tokens dentro de uma LINHA: retângulo de comprimento x largura que
+ * começa na origem e segue a direção informada.
+ * @returns {Actor[]} atores mirados
+ */
+export function targetTokensInRay(ox, oy, directionDeg, length, width, filterFn = null) {
+  const lenPx = toPx(length);
+  const widPx = toPx(width);
+  const rad = (Number(directionDeg) || 0) * Math.PI / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  return targetTokensWhere((c) => {
+    const dx = c.x - ox;
+    const dy = c.y - oy;
+    const ao_longo = dx * cos + dy * sin;         // projeção na direção
+    if (ao_longo < 0 || ao_longo > lenPx) return false;
+    const lateral = -dx * sin + dy * cos;         // distância perpendicular
+    return Math.abs(lateral) <= widPx / 2;
+  }, filterFn);
+}
+
+/**
+ * Mira os tokens dentro de um CONE: setor circular de raio "length" e
+ * abertura "angle" (graus), centrado na direção informada.
+ * @returns {Actor[]} atores mirados
+ */
+export function targetTokensInCone(ox, oy, directionDeg, length, angleDeg, filterFn = null) {
+  const lenPx = toPx(length);
+  const rad = (Number(directionDeg) || 0) * Math.PI / 180;
+  const meia = ((Number(angleDeg) || 45) * Math.PI / 180) / 2;
+  return targetTokensWhere((c) => {
+    const dx = c.x - ox;
+    const dy = c.y - oy;
+    const dist = Math.hypot(dx, dy);
+    if (dist > lenPx) return false;
+    if (dist === 0) return true; // exatamente na origem
+    let delta = Math.atan2(dy, dx) - rad;
+    while (delta > Math.PI) delta -= 2 * Math.PI;
+    while (delta < -Math.PI) delta += 2 * Math.PI;
+    return Math.abs(delta) <= meia;
+  }, filterFn);
+}
+
+/**
+ * Base comum: mira os tokens cujo centro satisfaz o teste geométrico e que
+ * passam pelo filtro de alvos (só aliados / só inimigos).
+ */
+function targetTokensWhere(dentro, filterFn = null) {
+  try {
+    let alvos = canvas.tokens.placeables.filter((tk) => dentro(tk.center));
+    if (typeof filterFn === "function") alvos = alvos.filter((tk) => tk.actor && filterFn(tk.actor));
+    const ids = new Set(alvos.map((tk) => tk.id));
+    for (const tk of canvas.tokens.placeables) {
+      const querido = ids.has(tk.id);
+      if (tk.targeted?.has?.(game.user) !== querido) tk.setTarget(querido, { user: game.user, releaseOthers: false, groupSelection: true });
+    }
+    return alvos.map((tk) => tk.actor).filter(Boolean);
+  } catch (e) {
+    console.warn("Ligeia | falha ao mirar tokens da forma:", e);
+    return [];
+  }
+}
+
+/**
+ * Posiciona LINHA, CONE ou LINHA PERSONALIZADA e devolve os atores atingidos.
+ *
+ * spec = {
+ *   kind: "ray" | "cone",
+ *   length,            // comprimento em metros
+ *   width,             // largura da linha (só ray)
+ *   angle,             // abertura do cone em graus (só cone)
+ *   rotation,          // direção inicial em graus
+ *   freeOrigin,        // true = a origem é escolhida no mapa (linha custom)
+ * }
+ *
+ * Da origem: a mira define a DIREÇÃO e o clique confirma.
+ * Origem livre: o 1º clique fixa a origem, a mira gira a forma e o 2º clique
+ * confirma (o botão direito cancela em qualquer fase).
+ */
+export async function placeShapeTemplate(actor, spec, persistFlags = null, filterFn = null, maxRange = 0) {
+  const Base = MTObjectClass();
+  if (!Base) return { ok: true, actors: [], templateId: null };
+  const cls = CONFIG.MeasuredTemplate?.documentClass;
+  if (!cls) return { ok: true, actors: [], templateId: null };
+
+  const token = actor.getActiveTokens?.(true)?.[0] || actor.getActiveTokens?.()?.[0];
+  const centro = token?.center || { x: 0, y: 0 };
+  const seguir = spec.freeOrigin ? null : token?.id;
+
+  let origem = { x: centro.x, y: centro.y };
+  let direcao = Number(spec.rotation) || 0;
+
+  const montaDados = () => (spec.kind === "cone"
+    ? coneData(spec.length, spec.angle, origem.x, origem.y, direcao, persistFlags, seguir)
+    : rayData(spec.length, spec.width, origem.x, origem.y, direcao, persistFlags, seguir));
+
+  const doc = new cls(montaDados(), { parent: canvas.scene });
+  const preview = new Base(doc);
+  const initialLayer = canvas.activeLayer;
+  await preview.draw();
+  preview.layer.activate();
+  preview.layer.preview.addChild(preview);
+
+  const nomeForma = spec.kind === "cone" ? "cone" : "linha";
+
+  return new Promise((resolve) => {
+    let finished = false;
+    let lastMove = 0;
+    // Origem livre começa na fase 1 (posicionar); as demais já giram.
+    let fase = spec.freeOrigin ? "posicao" : "direcao";
+
+    const getPoint = (event) => {
+      if (typeof event.getLocalPosition === "function") return event.getLocalPosition(preview.layer);
+      if (event.data?.getLocalPosition) return event.data.getLocalPosition(preview.layer);
+      return { x: origem.x, y: origem.y };
+    };
+
+    const snap = (pt) => {
+      try {
+        const m = CONST.GRID_SNAPPING_MODES?.CENTER ?? 0;
+        return canvas.grid.getSnappedPoint ? canvas.grid.getSnappedPoint({ x: pt.x, y: pt.y }, { mode: m }) : pt;
+      } catch (e) { return pt; }
+    };
+
+    const distDoConjurador = (pt) =>
+      Math.hypot(pt.x - centro.x, pt.y - centro.y) / canvas.grid.size * canvas.grid.distance;
+
+    const onMove = (event) => {
+      if (finished) return;
+      event.stopPropagation?.();
+      const agora = Date.now();
+      if (agora - lastMove < 20) return;
+      lastMove = agora;
+      const pt = getPoint(event);
+      if (fase === "posicao") {
+        origem = snap(pt);
+        doc.updateSource({ x: origem.x, y: origem.y });
+      } else {
+        const dx = pt.x - origem.x;
+        const dy = pt.y - origem.y;
+        if (dx || dy) {
+          direcao = Math.atan2(dy, dx) * 180 / Math.PI;
+          doc.updateSource({ direction: direcao });
+        }
+      }
+      preview.refresh();
+    };
+
+    const cleanup = () => {
+      finished = true;
+      canvas.stage.off("mousemove", onMove);
+      canvas.stage.off("mousedown", onClick);
+      if (canvas.app?.view) canvas.app.view.oncontextmenu = null;
+      try { preview.destroy(); } catch (e) {}
+      initialLayer?.activate();
+    };
+
+    const mirar = (dados) => (spec.kind === "cone"
+      ? targetTokensInCone(dados.x, dados.y, dados.direction, spec.length, spec.angle, filterFn)
+      : targetTokensInRay(dados.x, dados.y, dados.direction, spec.length, spec.width, filterFn));
+
+    const onClick = async (event) => {
+      if (finished) return;
+      event.stopPropagation?.();
+
+      // Fase 1 (linha personalizada): fixa a origem e passa a girar.
+      if (fase === "posicao") {
+        const pt = snap(getPoint(event));
+        if (maxRange > 0 && token?.center) {
+          const d = distDoConjurador(pt);
+          if (d > maxRange + 0.001) {
+            cleanup();
+            ui.notifications?.warn(`Fora de alcance: a origem está a ${d.toFixed(1)}m — alcance máximo ${maxRange}m. A ação não foi executada.`);
+            resolve({ ok: false, actors: [] });
+            return;
+          }
+        }
+        origem = pt;
+        doc.updateSource({ x: origem.x, y: origem.y });
+        preview.refresh();
+        fase = "direcao";
+        ui.notifications?.info("Agora gire a linha e clique para confirmar (botão direito cancela).");
+        return;
+      }
+
+      // Fase final: confirma a forma.
+      const finalData = doc.toObject();
+      finalData.x = origem.x;
+      finalData.y = origem.y;
+      finalData.direction = direcao;
+      cleanup();
+      let templateId = null;
+      try {
+        const created = await canvas.scene.createEmbeddedDocuments("MeasuredTemplate", [finalData]);
+        templateId = created?.[0]?.id || null;
+      } catch (e) {
+        console.warn(`Ligeia | falha ao criar template de ${nomeForma} (seguindo sem o desenho):`, e);
+      }
+      resolve({ ok: true, actors: mirar(finalData), templateId });
+    };
+
+    const onCancel = (event) => {
+      event.preventDefault?.();
+      if (finished) return;
+      cleanup();
+      resolve({ ok: false, actors: [] });
+    };
+
+    canvas.stage.on("mousemove", onMove);
+    canvas.stage.on("mousedown", onClick);
+    if (canvas.app?.view) canvas.app.view.oncontextmenu = onCancel;
+    ui.notifications?.info(
+      fase === "posicao"
+        ? "Clique para posicionar a origem da linha (botão direito cancela)."
+        : `Mire a direção do ${nomeForma} e clique para confirmar (botão direito cancela).`,
+    );
+  });
+}
+
 /**
  * Ponto de entrada: posiciona o template apropriado para uma ação de
  * área/aura e devolve os atores afetados.
@@ -336,8 +600,14 @@ export async function placeAreaTemplate(actor, radius, persistFlags = null, filt
 export async function placeTemplateForAction(actor, item, action) {
   const mode = action.targetMode;
   const radius = resolveEffectValue(action.area, actor);
-  if (mode !== "area" && mode !== "aura") return { proceed: true, actors: null };
-  if (radius <= 0) return { proceed: true, actors: null };
+  const formas = ["line", "cone", "lineCustom"];
+  if (mode !== "area" && mode !== "aura" && !formas.includes(mode)) return { proceed: true, actors: null };
+  // Linha/cone usam o ALCANCE como comprimento; a linha personalizada usa a
+  // "área" como comprimento.
+  const comprimento = (mode === "line" || mode === "cone")
+    ? resolveEffectValue(action.range, actor)
+    : radius;
+  if (formas.includes(mode) ? comprimento <= 0 : radius <= 0) return { proceed: true, actors: null };
   if (!canvas?.scene) return { proceed: true, actors: null };
 
   // Filtro de alvos EFETIVO (todos/só aliados/só inimigos): um efeito ativo
@@ -368,7 +638,7 @@ export async function placeTemplateForAction(actor, item, action) {
       }
       return { proceed: true, actors: [], templateId: null };
     }
-    // área: usa os alvos mirados (aplicando o filtro de alvos)
+    // linha/cone/área: usa os alvos mirados (aplicando o filtro de alvos)
     let targeted = Array.from(game.user?.targets ?? []).map((t) => t.actor).filter(Boolean);
     if (filterFn) targeted = targeted.filter(filterFn);
     ui.notifications?.info(`Área de ${radius}m: usando os alvos mirados (sem círculo visual no V14). Mire os alvos atingidos.`);
@@ -380,6 +650,21 @@ export async function placeTemplateForAction(actor, item, action) {
   const persistFlags = action.persistArea ? buildEmanationFlags(actor, item, action) : null;
 
   try {
+    if (formas.includes(mode)) {
+      const spec = {
+        kind: mode === "cone" ? "cone" : "ray",
+        length: comprimento,
+        width: resolveEffectValue(action.lineWidth, actor) || 1.5,
+        angle: resolveEffectValue(action.coneAngle, actor) || 45,
+        rotation: resolveEffectValue(action.lineRotation, actor) || 0,
+        freeOrigin: mode === "lineCustom",
+      };
+      // Só a linha personalizada tem a origem limitada pelo alcance; linha e
+      // cone partem do próprio personagem.
+      const limite = mode === "lineCustom" ? maxRange : 0;
+      const res = await placeShapeTemplate(actor, spec, persistFlags, filterFn, limite);
+      return { proceed: res.ok, actors: res.actors || [], templateId: res?.templateId || null };
+    }
     if (mode === "aura") {
       const res = await placeAuraTemplate(actor, radius, persistFlags, filterFn);
       return { proceed: true, actors: (res?.actors) || [], templateId: res?.templateId || null };
