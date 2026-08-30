@@ -37,6 +37,7 @@ import { playActionAnimation } from "./integrations.mjs";
 import { executeActionMovement } from "./movement.mjs";
 import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvailable, activeEffectsOf } from "./effects.mjs";
 import { DEATH_HP, WOUND_LEVELS, woundLevelFor, setWoundLevel } from "./wounds.mjs";
+import { updateActorAsGM, canAffectActor } from "./gm-proxy.mjs";
 // Re-export: outros módulos importam estas funções daqui.
 export { actorRollData, resolveEffectValue };
 import { promptRollConfig, shouldPromptRoll } from "../apps/roll-dialog.mjs";
@@ -447,7 +448,9 @@ export async function applyDamageToActor(actor, amount, resource = "hp") {
   if (!res || dmg <= 0) {
     return { applied: false, dmg, fromTemp: 0, resource };
   }
-  if (!actor.isOwner) {
+  // Sem ser dono da ficha (ex.: jogador atingindo um NPC), a alteração é
+  // repassada ao Mestre — o jogador nunca abre a ficha do alvo.
+  if (!canAffectActor(actor)) {
     return { applied: false, dmg, fromTemp: 0, resource, noPermission: true };
   }
 
@@ -468,7 +471,8 @@ export async function applyDamageToActor(actor, amount, resource = "hp") {
   const floor = resource === "hp" ? DEATH_HP : 0;
   const newValue = Math.max(floor, (res.value || 0) - rest);
   update[`system.resources.${resource}.value`] = newValue;
-  await actor.update(update);
+  const r = await updateActorAsGM(actor, update);
+  if (!r.ok) return { applied: false, dmg, fromTemp: 0, resource, noPermission: true };
 
   const wound = resource === "hp" ? woundLevelFor(newValue) : null;
 
@@ -496,7 +500,7 @@ export async function applyHealingToActor(actor, amount, resource = "hp") {
   if (!res || heal <= 0) {
     return { applied: false, heal, gained: 0, resource };
   }
-  if (!actor.isOwner) {
+  if (!canAffectActor(actor)) {
     return { applied: false, heal, gained: 0, resource, noPermission: true };
   }
   const max = res.max || 0;
@@ -523,7 +527,8 @@ export async function applyHealingToActor(actor, amount, resource = "hp") {
 
   const newValue = Math.min(max, (res.value || 0) + heal);
   const gained = newValue - (res.value || 0);
-  await actor.update({ [`system.resources.${resource}.value`]: newValue });
+  const r = await updateActorAsGM(actor, { [`system.resources.${resource}.value`]: newValue });
+  if (!r.ok) return { applied: false, heal, gained: 0, resource, noPermission: true };
   return { applied: true, heal, gained, newValue, newMax: max, resource };
 }
 
@@ -538,11 +543,12 @@ export async function applyTempHpToActor(actor, amount, { stack = false } = {}) 
   const gain = Math.max(0, Math.floor(amount));
   const hp = actor.system?.resources?.hp;
   if (!hp || gain <= 0) return { applied: false, gain };
-  if (!actor.isOwner) return { applied: false, gain, noPermission: true };
+  if (!canAffectActor(actor)) return { applied: false, gain, noPermission: true };
   const cur = hp.temp || 0;
   const newTemp = stack ? cur + gain : Math.max(cur, gain);
   if (newTemp !== cur) {
-    await actor.update({ "system.resources.hp.temp": newTemp });
+    const r = await updateActorAsGM(actor, { "system.resources.hp.temp": newTemp });
+    if (!r.ok) return { applied: false, gain, noPermission: true };
   }
   // kept = a sobrevida atual era maior e foi mantida (nada mudou).
   return { applied: true, gain, kept: newTemp === cur, newTemp };
@@ -554,11 +560,12 @@ export async function applyTempHpToActor(actor, amount, { stack = false } = {}) 
  * @returns {string[]} rótulos das condições efetivamente adicionadas
  */
 export async function applyConditionsToActor(actor, ids = []) {
-  if (!ids.length || !actor?.isOwner) return [];
+  if (!ids.length || !canAffectActor(actor)) return [];
   const current = actor.system?.conditions || [];
   const toAdd = ids.filter((id) => !current.includes(id));
   if (!toAdd.length) return [];
-  await actor.update({ "system.conditions": [...current, ...toAdd] });
+  const r = await updateActorAsGM(actor, { "system.conditions": [...current, ...toAdd] });
+  if (!r.ok) return [];
   const defs = CONFIG.LIGEIA?.conditions || {};
   return toAdd.map((id) => defs[id]?.label || id);
 }
@@ -704,7 +711,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
   let fxText = "";
   const fxList = action.appliesEffects || [];
   if (acertou && fxList.length) {
-    if (tActor.isOwner) {
+    if (canAffectActor(tActor)) {
       const cur = foundry.utils.deepClone(tActor.system?.appliedEffects || []);
       const conds = foundry.utils.deepClone(tActor.system?.conditions || []);
       const condsBefore = conds.length;
@@ -784,7 +791,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
         if (maxBarrier > curTemp) update["system.resources.hp.temp"] = maxBarrier;
         barrierNote = `<div class="lig-heal-applied">Sobrevida vinculada: ${Math.max(maxBarrier, curTemp)}${maxBarrier <= curTemp ? ' <span class="lig-cond-note">(manteve a atual, maior)</span>' : ""}</div>`;
       }
-      await tActor.update(update);
+      await updateActorAsGM(tActor, update);
       fxText = `<div class="lig-atk-fx">Efeitos aplicados: <strong>${names.join(", ")}</strong></div>${barrierNote}`;
     } else {
       fxText = `<div class="lig-atk-fx muted">Efeitos a aplicar: ${fxList.map((e) => e.label || "Efeito").join(", ")} (peça ao Mestre)</div>`;

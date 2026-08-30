@@ -14,6 +14,7 @@
  * Vale igualmente para personagens e NPCs.
  */
 import { rollLigeia, postRollToChat, resolveAttr } from "./dice.mjs";
+import { updateActorAsGM, canAffectActor } from "./gm-proxy.mjs";
 
 /** PV em que o personagem morre automaticamente. */
 export const DEATH_HP = -7;
@@ -139,9 +140,9 @@ export function isDead(actor) {
  */
 export async function setWoundLevel(actor, key, { announce = true, reason = "" } = {}) {
   const level = WOUND_LEVELS[key];
-  if (!actor?.isOwner || !level) return null;
+  if (!canAffectActor(actor) || !level) return null;
   const fromLevel = woundOf(actor);
-  await actor.update({ "system.resources.hp.value": level.hp });
+  await updateActorAsGM(actor, { "system.resources.hp.value": level.hp });
   if (announce) {
     const arrow = key === "morto" ? "☠" : "→";
     await ChatMessage.create({

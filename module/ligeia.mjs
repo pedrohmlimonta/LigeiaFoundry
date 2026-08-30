@@ -13,6 +13,7 @@ import { registerEmanationHooks } from "./helpers/emanation.mjs";
 import { registerTokenRuler } from "./helpers/token-ruler.mjs";
 import { registerMovementHooks, registerMovementSocket, registerForcedMovementActions } from "./helpers/movement.mjs";
 import { registerRollRequestSocket } from "./helpers/roll-request.mjs";
+import { registerGmProxySocket } from "./helpers/gm-proxy.mjs";
 import { registerTokenLinkSettings, registerTokenLinkHooks, migrateTokenLinks, registerTokenSizeHooks, syncTokenSize } from "./helpers/token-link.mjs";
 import { syncConditionEffects } from "./helpers/conditions.mjs";
 import { applyHealingToActor } from "./helpers/dice.mjs";
@@ -384,6 +385,8 @@ Hooks.once("ready", function () {
   registerMovementHooks();
   registerMovementSocket();
   registerRollRequestSocket();
+  // Relé: alterações em fichas de terceiros passam pelo Mestre.
+  registerGmProxySocket();
   // Vincula fichas de token já existentes (uma vez, preservando os valores).
   migrateTokenLinks();
   // Acerta o tamanho dos tokens já colocados conforme a categoria atual.
