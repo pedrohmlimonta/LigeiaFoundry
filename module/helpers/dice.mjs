@@ -451,7 +451,7 @@ export async function applyDamageToActor(actor, amount, resource = "hp") {
   // Sem ser dono da ficha (ex.: jogador atingindo um NPC), a alteração é
   // repassada ao Mestre — o jogador nunca abre a ficha do alvo.
   if (!canAffectActor(actor)) {
-    return { applied: false, dmg, fromTemp: 0, resource, noPermission: true };
+    return { applied: false, dmg, fromTemp: 0, resource, noPermission: true, noGM: true };
   }
 
   const update = {};
@@ -472,7 +472,7 @@ export async function applyDamageToActor(actor, amount, resource = "hp") {
   const newValue = Math.max(floor, (res.value || 0) - rest);
   update[`system.resources.${resource}.value`] = newValue;
   const r = await updateActorAsGM(actor, update);
-  if (!r.ok) return { applied: false, dmg, fromTemp: 0, resource, noPermission: true };
+  if (!r.ok) return { applied: false, dmg, fromTemp: 0, resource, noPermission: true, ...r };
 
   const wound = resource === "hp" ? woundLevelFor(newValue) : null;
 
@@ -489,6 +489,17 @@ export async function applyDamageToActor(actor, amount, resource = "hp") {
 }
 
 /**
+ * Explica por que uma alteração no alvo não foi aplicada. O caminho normal é
+ * o relé pelo Mestre (ver helpers/gm-proxy.mjs); quando ele não funciona, o
+ * motivo ajuda a identificar o que falta.
+ */
+function relayFailNote(res) {
+  if (res?.noGM) return "Nenhum Mestre conectado — o alvo não pôde ser alterado.";
+  if (res?.timeout) return "O Mestre não respondeu a tempo — o alvo não foi alterado.";
+  return "Não foi possível alterar a ficha do alvo.";
+}
+
+/**
  * Aplica CURA a um ator, somando ao recurso e limitando ao máximo da ficha.
  * Cura não interage com PV temporário, RD nem multiplicadores de condição.
  * @returns {{applied:boolean, heal:number, gained:number, newValue?:number,
@@ -501,7 +512,7 @@ export async function applyHealingToActor(actor, amount, resource = "hp") {
     return { applied: false, heal, gained: 0, resource };
   }
   if (!canAffectActor(actor)) {
-    return { applied: false, heal, gained: 0, resource, noPermission: true };
+    return { applied: false, heal, gained: 0, resource, noPermission: true, noGM: true };
   }
   const max = res.max || 0;
 
@@ -528,7 +539,7 @@ export async function applyHealingToActor(actor, amount, resource = "hp") {
   const newValue = Math.min(max, (res.value || 0) + heal);
   const gained = newValue - (res.value || 0);
   const r = await updateActorAsGM(actor, { [`system.resources.${resource}.value`]: newValue });
-  if (!r.ok) return { applied: false, heal, gained: 0, resource, noPermission: true };
+  if (!r.ok) return { applied: false, heal, gained: 0, resource, noPermission: true, ...r };
   return { applied: true, heal, gained, newValue, newMax: max, resource };
 }
 
@@ -543,7 +554,7 @@ export async function applyTempHpToActor(actor, amount, { stack = false } = {}) 
   const gain = Math.max(0, Math.floor(amount));
   const hp = actor.system?.resources?.hp;
   if (!hp || gain <= 0) return { applied: false, gain };
-  if (!canAffectActor(actor)) return { applied: false, gain, noPermission: true };
+  if (!canAffectActor(actor)) return { applied: false, gain, noPermission: true, noGM: true };
   const cur = hp.temp || 0;
   const newTemp = stack ? cur + gain : Math.max(cur, gain);
   if (newTemp !== cur) {
@@ -625,7 +636,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
         if (applied.fromTemp) parts.push(`${applied.fromTemp} do PV temp.`);
         applyNote = `<div class="lig-dmg-applied">${resLabel}: ${applied.newValue}/${applied.newMax}${parts.length ? " — " + parts.join(", ") : ""}${applied.wound ? ` <span class="lig-wound lig-wound-${applied.wound.key}">⚠ ${applied.wound.label}</span>` : (applied.downed ? ' <span class="lig-downed">⚠ Caído!</span>' : "")}</div>`;
       } else if (applied.noPermission) {
-        applyNote = `<div class="lig-dmg-applied muted">Sem permissão para alterar a ficha do alvo (peça ao Mestre).</div>`;
+        applyNote = `<div class="lig-dmg-applied muted">${relayFailNote(applied)}</div>`;
       }
       const tag = isMain ? "" : ' <span class="lig-extra-tag">extra</span>';
       return `<div class="lig-atk-dmg">${resWord}: <strong>${dealt}</strong>${typeNote}${tag}${scaleNote}${sizeNote}${rdNote}${vulnNote}${isMain ? multNote : ""}</div>${applyNote}`;
@@ -685,7 +696,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
         const keptNote = applied.kept ? ` <span class="lig-cond-note">(manteve a atual, maior)</span>` : "";
         applyNote = `<div class="lig-heal-applied">Sobrevida atual: ${applied.newTemp}${keptNote}</div>`;
       } else if (applied.noPermission) {
-        applyNote = `<div class="lig-dmg-applied muted">Sem permissão para alterar a ficha do alvo (peça ao Mestre).</div>`;
+        applyNote = `<div class="lig-dmg-applied muted">${relayFailNote(applied)}</div>`;
       }
       healText = `<div class="lig-atk-heal">Sobrevida: <strong>${amount}</strong>${scaleNote}</div>${applyNote}`;
     } else {
@@ -701,7 +712,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       } else if (applied.dead) {
         applyNote = `<div class="lig-dmg-applied muted">O alvo está morto — a cura não tem efeito.</div>`;
       } else if (applied.noPermission) {
-        applyNote = `<div class="lig-dmg-applied muted">Sem permissão para alterar a ficha do alvo (peça ao Mestre).</div>`;
+        applyNote = `<div class="lig-dmg-applied muted">${relayFailNote(applied)}</div>`;
       }
       healText = `<div class="lig-atk-heal">${resWord}: <strong>${amount}</strong>${scaleNote}</div>${applyNote}`;
     }
@@ -794,7 +805,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       await updateActorAsGM(tActor, update);
       fxText = `<div class="lig-atk-fx">Efeitos aplicados: <strong>${names.join(", ")}</strong></div>${barrierNote}`;
     } else {
-      fxText = `<div class="lig-atk-fx muted">Efeitos a aplicar: ${fxList.map((e) => e.label || "Efeito").join(", ")} (peça ao Mestre)</div>`;
+      fxText = `<div class="lig-atk-fx muted">Efeitos a aplicar: ${fxList.map((e) => e.label || "Efeito").join(", ")} — nenhum Mestre conectado para aplicar no alvo.</div>`;
     }
   }
 
