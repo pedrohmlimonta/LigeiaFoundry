@@ -215,6 +215,7 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
     //   total     = base + bônus de ATRIBUTO (ou "set")
     //   totalDice = dados base + dados de melhoria dos efeitos
     //   rollBonus = bônus que vale SÓ na rolagem (não altera o atributo)
+    //   rollDice  = dados de melhoria que valem SÓ na rolagem
     for (const k of ["forca", "agilidade", "vigor", "mente", "percepcao"]) {
       if (!a[k]) continue;
       const m = mods.attr[k] || {};
@@ -222,6 +223,7 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
       a[k].total = (m.set !== null && m.set !== undefined) ? m.set : base + (m.attrBonus || 0);
       a[k].totalDice = (a[k].dice || 0) + (m.dice || 0);
       a[k].rollBonus = m.bonus || 0;
+      a[k].rollDice = m.rollDice || 0;
     }
 
     // Bônus concedidos pelas definições embutidas (vocação: PV/PM; raça: deslocamento)
@@ -282,6 +284,13 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
       this.secondary[k] += m.attrBonus || 0;
       if (m.set !== null && m.set !== undefined) this.secondary[k] = m.set;
     }
+    this.secondaryRollDice = {
+      bloqueio: mods.attr.bloqueio?.rollDice || 0,
+      esquiva: mods.attr.esquiva?.rollDice || 0,
+      conjuracao: mods.attr.conjuracao?.rollDice || 0,
+      iniciativa: mods.attr.iniciativa?.rollDice || 0,
+      deslocamento: mods.attr.deslocamento?.rollDice || 0,
+    };
     this.secondaryRollBonus = {
       bloqueio: mods.attr.bloqueio?.bonus || 0,
       esquiva: mods.attr.esquiva?.bonus || 0,
@@ -308,9 +317,15 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
 
     // ---- Máximos de recursos ----
     // PV = Vigor + bônus da vocação + bônus manual + nível (+ efeito stat hp)
-    const hpMax = a.vigor.total + defBonus.hp + this.size.hpMod + (this.resources.hp.bonus || 0) + lvl + (mods.stat.hp || 0);
-    // PM = Mente + bônus da vocação + bônus manual + nível (+ efeito stat mp)
-    const mpMax = a.mente.total + defBonus.mp + (this.resources.mp.bonus || 0) + lvl + (mods.stat.mp || 0);
+    // PV = Vigor + DADOS DE MELHORIA de Vigor + bônus da vocação + tamanho
+    //      + bônus manual + nível (+ efeito stat hp).
+    // totalDice = dados da ficha + dados de melhoria vindos de efeitos. Os
+    // "dados na rolagem" (rollDice) ficam de fora de propósito: eles valem
+    // só ao rolar e não alteram o atributo.
+    const hpMax = a.vigor.total + (a.vigor.totalDice || 0) + defBonus.hp + this.size.hpMod + (this.resources.hp.bonus || 0) + lvl + (mods.stat.hp || 0);
+    // PM = Mente + DADOS DE MELHORIA de Mente + bônus da vocação + bônus
+    //      manual + nível (+ efeito stat mp). Ver a nota dos PV acima.
+    const mpMax = a.mente.total + (a.mente.totalDice || 0) + defBonus.mp + (this.resources.mp.bonus || 0) + lvl + (mods.stat.mp || 0);
     // PH = nível (+ efeito stat heroic)
     const heroicMax = lvl + (this.resources.heroic.bonus || 0) + (mods.stat.heroic || 0);
 

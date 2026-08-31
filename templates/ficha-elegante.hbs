@@ -516,7 +516,8 @@
               <select name="system.appliedEffects.{{ae.index}}.effects.0.type">
                 <option value="bonus" {{#if (eq ae.fx0Type "bonus")}}selected{{/if}}>Bônus em Rolagem (só na rolagem)</option>
                 <option value="attr" {{#if (eq ae.fx0Type "attr")}}selected{{/if}}>Bônus de Atributo (muda o atributo)</option>
-                <option value="dice" {{#if (eq ae.fx0Type "dice")}}selected{{/if}}>Dados de Melhoria</option>
+                <option value="dice" {{#if (eq ae.fx0Type "dice")}}selected{{/if}}>Dados de Melhoria (muda o atributo)</option>
+                <option value="rollDice" {{#if (eq ae.fx0Type "rollDice")}}selected{{/if}}>Dados na Rolagem (só na rolagem)</option>
                 <option value="stat" {{#if (eq ae.fx0Type "stat")}}selected{{/if}}>Modificar Valor</option>
                 <option value="set" {{#if (eq ae.fx0Type "set")}}selected{{/if}}>Definir Valor</option>
                 <option value="damage" {{#if (eq ae.fx0Type "damage")}}selected{{/if}}>Bônus de Dano</option>

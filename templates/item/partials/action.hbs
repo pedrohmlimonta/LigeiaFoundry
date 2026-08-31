@@ -354,7 +354,8 @@
             <select name="system.actions.{{i}}.appliesEffects.{{fi}}.fxType">
               <option value="bonus" {{#if (eq fx.fxType "bonus")}}selected{{/if}}>Bônus em rolagem (só na rolagem)</option>
               <option value="attr" {{#if (eq fx.fxType "attr")}}selected{{/if}}>Bônus de atributo (muda o atributo)</option>
-              <option value="dice" {{#if (eq fx.fxType "dice")}}selected{{/if}}>Dado de melhoria</option>
+              <option value="dice" {{#if (eq fx.fxType "dice")}}selected{{/if}}>Dados de melhoria (muda o atributo)</option>
+              <option value="rollDice" {{#if (eq fx.fxType "rollDice")}}selected{{/if}}>Dados na rolagem (só na rolagem)</option>
               <option value="stat" {{#if (eq fx.fxType "stat")}}selected{{/if}}>Modificar valor</option>
               <option value="set" {{#if (eq fx.fxType "set")}}selected{{/if}}>Definir valor</option>
               <option value="damage" {{#if (eq fx.fxType "damage")}}selected{{/if}}>Bônus de dano</option>

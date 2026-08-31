@@ -204,7 +204,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     // Efeitos aplicados na ficha (buffs/debuffs), enriquecidos para exibição.
     // Cada efeito recebe os alvos contextuais (como nos efeitos de habilidade).
     const fxTypeLabels = {
-      dice: "Dados", bonus: "Bônus", stat: "Modificar", set: "Definir",
+      dice: "Dados", rollDice: "Dados (rolagem)", bonus: "Bônus", stat: "Modificar", set: "Definir",
       attr: "Atributo", damage: "Dano", rd: "Red. Dano", vuln: "Vulnerab.", reroll1: "Rerrola 1", reroll6: "Rerrola 6",
       crit: "Crít. apr.", fumble: "Falha pior.", info: "Info",
     };
@@ -235,7 +235,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     };
     const targetsFor = (type) => {
       switch (type) {
-        case "bonus": case "attr": case "dice": case "reroll1": case "reroll6": case "crit": case "fumble": return rollTargets;
+        case "bonus": case "attr": case "dice": case "rollDice": case "reroll1": case "reroll6": case "crit": case "fumble": return rollTargets;
         case "stat": return statTargets;
         case "set": return setTargets;
         case "damage": case "rd": case "vuln": return dmgTargets;
@@ -306,7 +306,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     // Rótulos amigáveis para tipos de efeito e alvos (para exibir na ficha
     // sem precisar abrir a edição do item).
     context.effectTypeLabels = {
-      dice: "Dados", bonus: "Bônus", stat: "Modifica", set: "Define",
+      dice: "Dados", rollDice: "Dados (rolagem)", bonus: "Bônus", stat: "Modifica", set: "Define",
       attr: "Atributo", damage: "Dano", rd: "Red. Dano", vuln: "Vulnerab.", tempHp: "Sobrevida", areaFilter: "Filtro de área", info: "Condição",
     };
     context.effectTargetLabels = {
@@ -852,7 +852,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       actor,
       label: labels[key] || key,
       attribute: attr.value,
-      improvement: attr.dice + (rm.all?.dice || 0),
+      improvement: attr.dice + (attr.rollDice || 0) + (rm.all?.dice || 0),
       bonus: (rm.all?.bonus || 0) + (attr.rollBonus || 0),
       reroll: rr,
       crit: cr,
@@ -891,7 +891,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
         const drm = defActor.system?.rollMods || {};
         const drr = rerollFor(defActor, defAttr, "defense");
         const dcr = critFor(defActor, defAttr, "defense");
-        const dImpBase = d.dice + (drm.all?.dice || 0) + (drm.defense?.dice || 0);
+        const dImpBase = d.dice + (d.rollDice || 0) + (drm.all?.dice || 0) + (drm.defense?.dice || 0);
         // A caixa da defesa abre para quem controla o alvo (ou o Mestre, se
         // for NPC), respeitando o "sem caixa" DELE.
         let dImp = dImpBase;
@@ -967,7 +967,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       actor,
       label: labels[key] || key,
       attribute: r.value,
-      improvement: r.dice + (rm.all?.dice || 0),
+      improvement: r.dice + (r.rollDice || 0) + (rm.all?.dice || 0),
       bonus: (rm.all?.bonus || 0) + (r.rollBonus || 0),
       reroll: rr,
       crit: cr,

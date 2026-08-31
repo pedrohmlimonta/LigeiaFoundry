@@ -157,7 +157,9 @@ function emptyMods() {
   const attr = {};
   // bonus     = bônus SÓ NA ROLAGEM daquele atributo (não muda o atributo)
   // attrBonus = bônus no VALOR do atributo (muda a ficha e o que dele deriva)
-  for (const k of [...PRIMARY_ATTRS, ...SECONDARY_ATTRS]) attr[k] = { bonus: 0, attrBonus: 0, dice: 0, set: null, reroll1: 0, reroll6: 0, critBonus: 0, failBonus: 0 };
+  // dice     = dados de melhoria NO ATRIBUTO (aparecem na ficha)
+  // rollDice = dados que valem SÓ na rolagem (não mexem no atributo)
+  for (const k of [...PRIMARY_ATTRS, ...SECONDARY_ATTRS]) attr[k] = { bonus: 0, attrBonus: 0, dice: 0, rollDice: 0, set: null, reroll1: 0, reroll6: 0, critBonus: 0, failBonus: 0 };
   // Tamanho: shift = categorias a mover (soma); set = categoria fixada.
   const size = { shift: 0, set: null };
   const roll = {};
@@ -184,6 +186,9 @@ function combineReroll(a, b) {
  *           atributo na ficha NÃO muda. NEGATIVO reduz.
  *  - attr:  +valor no ATRIBUTO em si (reflete na ficha, nos secundários
  *           derivados e em tudo que usa o atributo). NEGATIVO reduz.
+ *  - dice:  +dados de melhoria no ATRIBUTO (aparecem na ficha).
+ *  - rollDice: +dados de melhoria SÓ NA ROLAGEM — não alteram o atributo,
+ *           então não mexem em PV/PM nem no que deriva dele.
  *  - dice:  +valor de dados de melhoria ao destino. NEGATIVO reduz/dá desvantagem.
  *  - stat:  +valor a um recurso/derivado (hp/mp/heroic/deslocamento). NEGATIVO reduz.
  *  - set:   define (sobrescreve) o valor de um atributo.
@@ -209,6 +214,10 @@ function applyEffectToMods(mods, effect, actor) {
     // secundários); em categorias de rolagem, cai como bônus de rolagem.
     if (mods.attr[t]) mods.attr[t].attrBonus += v;
     else if (mods.roll[t]) mods.roll[t].bonus += v;
+  } else if (effect.type === "rollDice") {
+    // Só rolagem: nunca altera os dados do atributo na ficha.
+    if (mods.attr[t]) mods.attr[t].rollDice += v;
+    else if (mods.roll[t]) mods.roll[t].dice += v;
   } else if (effect.type === "dice") {
     if (mods.attr[t]) mods.attr[t].dice += v;
     else if (mods.roll[t]) mods.roll[t].dice += v;

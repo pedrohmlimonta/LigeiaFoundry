@@ -31,6 +31,7 @@ async function rollEndForEffect(actor, ae) {
   const attrKey = ae.endRoll?.attr || "mente";
   const r = resolveAttr(actor, attrKey);
   const rBonus = r.rollBonus || 0;
+  const rDados = r.rollDice || 0;
   const rm = actor.system?.rollMods || {};
   const rr = rerollFor(actor, attrKey);
   const cr = critFor(actor, attrKey);
@@ -73,7 +74,7 @@ async function rollEndForEffect(actor, ae) {
 
   const result = await rollLigeia({
     attribute: r.value,
-    improvement: r.dice + (rm.all?.dice || 0),
+    improvement: r.dice + rDados + (rm.all?.dice || 0),
     bonus: (rm.all?.bonus || 0) + rBonus,
     difficulty: dc,
     reroll1: rr.reroll1,

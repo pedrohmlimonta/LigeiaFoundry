@@ -27,7 +27,7 @@ export class LigeiaActor extends Actor {
     const sec = sys.secondary || {};
     const value = sec.iniciativa || 0;
     // Dados de melhoria da iniciativa (já incluem efeitos via prepareDerivedData)
-    let dice = sec.iniciativaDice || 0;
+    let dice = (sec.iniciativaDice || 0) + (sys.secondaryRollDice?.iniciativa || 0);
     // Modificadores de categoria "all" (efeitos que afetam todas as rolagens)
     const rm = sys.rollMods || {};
     dice += rm.all?.dice || 0;

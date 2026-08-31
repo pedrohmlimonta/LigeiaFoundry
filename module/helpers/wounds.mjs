@@ -166,7 +166,7 @@ export async function processWoundRollAtTurnStart(actor) {
   const rm = actor.system?.rollMods || {};
   const result = await rollLigeia({
     attribute: vigor.value,
-    improvement: vigor.dice + (rm.all?.dice || 0),
+    improvement: vigor.dice + (vigor.rollDice || 0) + (rm.all?.dice || 0),
     bonus: (rm.all?.bonus || 0) + (vigor.rollBonus || 0),
     difficulty: dc,
   });
@@ -209,7 +209,7 @@ export async function performMedicalCare(healer, patient) {
   const rm = healer.system?.rollMods || {};
   const result = await rollLigeia({
     attribute: mente.value,
-    improvement: mente.dice + (rm.all?.dice || 0),
+    improvement: mente.dice + (mente.rollDice || 0) + (rm.all?.dice || 0),
     bonus: (rm.all?.bonus || 0) + (mente.rollBonus || 0),
     difficulty: level.care[level.care.length - 1].min,
   });

@@ -330,6 +330,7 @@ export function resolveAttr(actor, key) {
       value: prim.total ?? prim.value ?? 0,
       dice: prim.totalDice ?? prim.dice ?? 0,
       rollBonus: prim.rollBonus || 0,
+      rollDice: prim.rollDice || 0,
       key,
     };
   }
@@ -344,9 +345,15 @@ export function resolveAttr(actor, key) {
       conjuracao: sec.conjuracaoDice ?? sys.attributes?.mente?.dice ?? 0,
       iniciativa: sec.iniciativaDice || 0,
     };
-    return { value, dice: diceMap[key] || 0, rollBonus: sys.secondaryRollBonus?.[key] || 0, key };
+    return {
+      value,
+      dice: diceMap[key] || 0,
+      rollBonus: sys.secondaryRollBonus?.[key] || 0,
+      rollDice: sys.secondaryRollDice?.[key] || 0,
+      key,
+    };
   }
-  return { value: 0, dice: 0, rollBonus: 0, key };
+  return { value: 0, dice: 0, rollBonus: 0, rollDice: 0, key };
 }
 
 /**
@@ -1091,7 +1098,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
       attribute: atk.value,
       improvement: dlgImprovement != null
         ? dlgImprovement
-        : atk.dice + resolveEffectValue(action.rollDice, actor) + atkCond.atkDice + rmDice + attrCondDice + surpriseDice,
+        : atk.dice + (atk.rollDice || 0) + resolveEffectValue(action.rollDice, actor) + atkCond.atkDice + rmDice + attrCondDice + surpriseDice,
       bonus: (Number(action.rollBonus) || 0) + rmBonus + dlgBonus + (atk.rollBonus || 0),
       baseDice: dlgBaseDice,
       // Passa a CD fixa (quando houver) para marcar sucesso/falha e crítico.
@@ -1349,7 +1356,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
         const cands = keys.map((k) => {
           const r = resolveAttr(tActor, k);
           const penalty = k === "esquiva" ? defCond.esquivaMod : 0;
-          return { key: k, base: r.value, dice: r.dice, rollBonus: r.rollBonus || 0, penalty, eff: r.value + penalty };
+          return { key: k, base: r.value, dice: r.dice + (r.rollDice || 0), rollBonus: r.rollBonus || 0, penalty, eff: r.value + penalty };
         });
         let def = cands[0];
         for (let i = 1; i < cands.length; i++) if (cands[i].eff > def.eff) def = cands[i];
