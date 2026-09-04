@@ -725,7 +725,12 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     actions[ai].aaName = this.document.name;
     actions[ai].aaEnabled = true;
     await this._replaceActions(actions);
-    ui.notifications?.info("Animação do item copiada para esta ação.");
+    // Informa o que veio junto, para não restar dúvida se a secundária e a
+    // do alvo foram capturadas.
+    const partes = ["primária"];
+    if (cfg.secondary && (cfg.secondary.enable ?? true)) partes.push("secundária");
+    if (cfg.target && (cfg.target.enable ?? true)) partes.push("no alvo");
+    ui.notifications?.info(`Animação do item copiada para esta ação (${partes.join(", ")}).`);
   }
   static async _onClearAnim(event, target) {
     const ai = Number(target.dataset.actionIndex);

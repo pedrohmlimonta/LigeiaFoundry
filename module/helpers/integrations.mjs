@@ -108,6 +108,51 @@ export function playSequencerAnimation({ actor, action, targetActors = [], attac
   }
 }
 
+/* ==================================================================== */
+/*  EFEITOS VISUAIS PERSISTENTES (enquanto o efeito/habilidade durar)    */
+/* ==================================================================== */
+
+/** Nome único do efeito visual de um efeito aplicado / item ativo. */
+export function persistentFxName(chave) {
+  return `ligeia-fx-${chave}`;
+}
+
+/**
+ * Toca um efeito visual PRESO ao token e que PERMANECE até ser encerrado
+ * (usado por efeitos ativos e habilidades ligadas).
+ * @returns {boolean} true se começou a tocar
+ */
+export function playPersistentFx({ actor, file, scale = 1, name } = {}) {
+  try {
+    const caminho = (file || "").trim();
+    if (!caminho || !name) return false;
+    if (!isSequencerActive()) return false;
+    const token = activeTokenOf(actor);
+    if (!token) return false;
+    // Evita duplicar se já houver um efeito com este nome.
+    endPersistentFx(name);
+    const seq = new globalThis.Sequence();
+    const fx = seq.effect().file(caminho).scale(Number(scale) || 1);
+    try { fx.attachTo(token); } catch (e) { fx.atLocation(token); }
+    fx.persist().name(name);
+    seq.play();
+    return true;
+  } catch (e) {
+    console.warn("Ligeia | falha ao tocar efeito visual persistente:", e);
+    return false;
+  }
+}
+
+/** Encerra um efeito visual persistente pelo nome. */
+export function endPersistentFx(name) {
+  try {
+    if (!name) return;
+    globalThis.Sequencer?.EffectManager?.endEffects?.({ name });
+  } catch (e) {
+    console.warn("Ligeia | falha ao encerrar efeito visual persistente:", e);
+  }
+}
+
 /**
  * Dispara a animação de uma ação. Prioriza a animação PRÓPRIA da ação (via
  * Sequencer); se a ação não tiver uma, cai para a animação geral do item via
@@ -162,12 +207,22 @@ export async function playAutomatedAnimation({ actor, item, action = null, targe
       action?.aaEnabled !== false &&
       cfg && typeof cfg === "object" && Object.keys(cfg).length > 0;
     if (hasOwn) {
-      try {
-        // Clone em memória do item com a flag de animação da ação.
-        aaItem = item.clone({ "flags.autoanimations": foundry.utils.deepClone(cfg) }, { keepId: false });
-      } catch (e) {
-        console.warn("Ligeia | não foi possível montar a animação própria da ação; usando a do item:", e);
-        aaItem = item;
+      // Config puxada IGUAL à do item (o caso normal): entrega o item REAL.
+      // Um clone pode perder partes da configuração — como as animações
+      // secundária e no alvo —, então só clonamos quando é imprescindível.
+      const atual = item.flags?.autoanimations ?? null;
+      const mesma = JSON.stringify(cfg) === JSON.stringify(atual);
+      if (!mesma) {
+        try {
+          // Item temporário com a config EXATA que foi puxada (substitui a
+          // flag inteira, em vez de mesclar com a atual do item).
+          const dados = item.toObject();
+          dados.flags = { ...(dados.flags || {}), autoanimations: foundry.utils.deepClone(cfg) };
+          aaItem = new item.constructor(dados, { parent: item.parent });
+        } catch (e) {
+          console.warn("Ligeia | não foi possível montar a animação própria da ação; usando a do item:", e);
+          aaItem = item;
+        }
       }
     }
 

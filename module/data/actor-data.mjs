@@ -86,6 +86,10 @@ function appliedEffectsField() {
       tempHp: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
       // Id único para rastrear remoções (barreiras) entre atualizações.
       fxId: new fields.StringField({ blank: true, initial: "" }),
+      // Efeito visual PERSISTENTE preso ao token enquanto o efeito durar
+      // (caminho do Sequencer; some sozinho quando o efeito sai).
+      fxFile: new fields.StringField({ blank: true, initial: "" }),
+      fxScale: new fields.StringField({ blank: true, initial: "1" }),
       source: new fields.StringField({ blank: true, initial: "" }),
     }),
     { initial: [] },

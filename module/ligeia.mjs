@@ -17,6 +17,7 @@ import { registerGmProxySocket } from "./helpers/gm-proxy.mjs";
 import { registerTokenLinkSettings, registerTokenLinkHooks, migrateTokenLinks, registerTokenSizeHooks, syncTokenSize } from "./helpers/token-link.mjs";
 import { syncConditionEffects } from "./helpers/conditions.mjs";
 import { applyHealingToActor } from "./helpers/dice.mjs";
+import { playAutomatedAnimation, playPersistentFx, endPersistentFx, persistentFxName } from "./helpers/integrations.mjs";
 import { registerTurnEffectHooks } from "./helpers/turn-effects.mjs";
 import { registerBarrierHooks } from "./helpers/barrier.mjs";
 import { applyTempHpToActor } from "./helpers/dice.mjs";
@@ -490,6 +491,31 @@ Hooks.on("preUpdateItem", function (item, changes, options) {
   if (will === true && item.system?.active === false) options.ligeiaJustActivated = true;
 });
 
+/* ------------------------------------------------------------------ */
+/*  EFEITOS VISUAIS de habilidades ligadas/desligadas                  */
+/*  Ao LIGAR: toca a animação do Automated Animations do item e, se ele */
+/*  tiver um efeito visual persistente, prende-o ao token. Ao DESLIGAR: */
+/*  o efeito persistente é encerrado.                                   */
+/* ------------------------------------------------------------------ */
+Hooks.on("updateItem", async function (item, changes, options, userId) {
+  if (game.user.id !== userId) return;
+  const mudou = foundry.utils.getProperty(changes, "system.active");
+  if (mudou === undefined) return;
+  const actor = item.parent;
+  if (actor?.documentName !== "Actor") return;
+  const nome = persistentFxName(`item-${item.id}`);
+  if (mudou === true) {
+    if (item.system?.animOnActivate !== false) {
+      await playAutomatedAnimation({ actor, item, targetActors: [] });
+    }
+    if (item.system?.fxFile) {
+      playPersistentFx({ actor, file: item.system.fxFile, scale: item.system.fxScale, name: nome });
+    }
+  } else {
+    endPersistentFx(nome);
+  }
+});
+
 Hooks.on("updateItem", async function (item, changes, options, userId) {
   if (!options.ligeiaJustActivated) return;
   if (game.user.id !== userId) return; // só quem fez a mudança aplica
@@ -570,6 +596,41 @@ Hooks.on("updateActor", async function (actor, changes, options, userId) {
       speaker: ChatMessage.getSpeaker({ actor }),
       content: `<div class="ligeia-roll-flavor"><strong>${actor.name}</strong> — <span class="lig-atk-heal">${linhas.join(" · ")}</span></div>`,
     });
+  }
+});
+
+/* ------------------------------------------------------------------ */
+/*  EFEITOS VISUAIS de efeitos aplicados (Efeitos & Condições)         */
+/*  Um efeito com "efeito visual" preso ao token aparece quando ele é   */
+/*  aplicado e some quando é removido, desligado ou expira.             */
+/* ------------------------------------------------------------------ */
+Hooks.on("preUpdateActor", function (actor, changes, options) {
+  if (!foundry.utils.hasProperty(changes, "system.appliedEffects")) return;
+  options.ligeiaFxAntes = (actor.system?.appliedEffects || []).map((ae) => ({
+    fxId: ae.fxId, fxFile: ae.fxFile, fxScale: ae.fxScale, disabled: !!ae.disabled,
+  }));
+});
+
+Hooks.on("updateActor", function (actor, changes, options, userId) {
+  if (game.user.id !== userId) return;
+  if (!Array.isArray(options.ligeiaFxAntes)) return;
+  const antes = new Map(options.ligeiaFxAntes.filter((e) => e.fxId).map((e) => [e.fxId, e]));
+  const agora = new Map(
+    (actor.system?.appliedEffects || []).filter((ae) => ae.fxId).map((ae) => [ae.fxId, ae]),
+  );
+  // Sumiram ou foram desligados → encerra o visual.
+  for (const [id, ae] of antes) {
+    const atual = agora.get(id);
+    const saiu = !atual || (atual.disabled && !ae.disabled);
+    if (ae.fxFile && saiu) endPersistentFx(persistentFxName(id));
+  }
+  // Novos ou reativados → começa o visual.
+  for (const [id, ae] of agora) {
+    const anterior = antes.get(id);
+    const entrou = !anterior || (anterior.disabled && !ae.disabled);
+    if (ae.fxFile && !ae.disabled && entrou) {
+      playPersistentFx({ actor, file: ae.fxFile, scale: ae.fxScale, name: persistentFxName(id) });
+    }
   }
 });
 

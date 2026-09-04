@@ -794,6 +794,9 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
           // morrem juntos (ciclo de vida em helpers/barrier.mjs).
           tempHp: resolveEffectValue(ae.grantTempHp, caster),
           fxId: foundry.utils.randomID(),
+          // Efeito visual persistente enquanto durar (herdado da ação).
+          fxFile: ae.fxFile || "",
+          fxScale: ae.fxScale || "1",
           source: caster?.name || "",
         });
         names.push(ae.label || (isCondition ? condLabel : "Efeito"));

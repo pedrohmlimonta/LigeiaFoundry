@@ -16,3 +16,19 @@
   </label>
   {{/if}}
 </div>
+
+{{#if (eq system.mode "active")}}
+{{!-- Efeito visual enquanto o item estiver LIGADO --}}
+<div class="lig-item-row">
+  <label>Efeito visual enquanto ligado
+    <input type="text" name="system.fxFile" value="{{system.fxFile}}" placeholder="ex.: jb2a.energy_field.02.above.blue" title="Caminho de um efeito do Sequencer (ex.: jb2a.shield.01.complete.blue). Fica preso ao token enquanto o item estiver ligado."/>
+  </label>
+  <label>Escala
+    <input type="text" name="system.fxScale" value="{{system.fxScale}}" placeholder="1" title="Escala do efeito visual."/>
+  </label>
+</div>
+<label class="lig-inline-check" title="Ao LIGAR este item, toca a animação configurada nele no Automated Animations (primária, secundária e no alvo).">
+  <input type="checkbox" name="system.animOnActivate" {{checked system.animOnActivate}}/>
+  Animar ao ativar (Automated Animations)
+</label>
+{{/if}}

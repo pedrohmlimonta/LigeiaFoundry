@@ -461,6 +461,14 @@
           </label>
         </div>
         <div class="lig-item-row">
+          <label>Efeito visual enquanto durar
+            <input type="text" name="system.actions.{{i}}.appliesEffects.{{fi}}.fxFile" value="{{fx.fxFile}}" placeholder="ex.: jb2a.shield.01.complete.blue" title="Caminho de um efeito do Sequencer (ex.: jb2a.shield.01.complete.blue). Fica preso ao token enquanto durar."/>
+          </label>
+          <label>Escala
+            <input type="text" name="system.actions.{{i}}.appliesEffects.{{fi}}.fxScale" value="{{fx.fxScale}}" placeholder="1" title="Escala do efeito visual."/>
+          </label>
+        </div>
+        <div class="lig-item-row">
           <label title="Concede sobrevida ao aplicar. Vidas ligadas: se a sobrevida zerar, o efeito termina; se o efeito terminar, a sobrevida some.">Sobrevida vinculada
             <input type="text" value="{{fx.grantTempHp}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.actions.{{i}}.appliesEffects.{{fi}}.grantTempHp"/>
           </label>

@@ -72,6 +72,11 @@ export function costField() {
  */
 export function activatableFields() {
   return {
+    // Efeito visual PERSISTENTE enquanto o item estiver ligado (Sequencer)
+    fxFile: new fields.StringField({ blank: true, initial: "" }),
+    fxScale: new fields.StringField({ blank: true, initial: "1" }),
+    // Tocar a animação do Automated Animations ao LIGAR o item
+    animOnActivate: new fields.BooleanField({ initial: true }),
     // Por padrão os itens são ATIVÁVEIS (precisam ser ligados para valer) e
     // começam desligados (active=false). Use "passive" para efeitos sempre-on.
     mode: new fields.StringField({
@@ -275,6 +280,10 @@ export function actionEntryField() {
         // dano contínuo acima).
         tickHealAmount: new fields.StringField({ blank: true, initial: "0" }),
         tickHealResource: new fields.StringField({ initial: "hp", choices: ["hp", "mp", "heroic"] }),
+        // Efeito visual PERSISTENTE preso ao alvo enquanto o efeito durar
+        // (caminho do Sequencer; some sozinho quando o efeito acaba).
+        fxFile: new fields.StringField({ blank: true, initial: "" }),
+        fxScale: new fields.StringField({ blank: true, initial: "1" }),
         // SOBREVIDA VINCULADA (barreira): concede N de sobrevida ao aplicar.
         // O efeito e a sobrevida vivem e morrem juntos: sobrevida zerou →
         // o efeito termina; efeito terminou → a sobrevida some.

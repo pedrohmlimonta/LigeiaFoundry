@@ -210,6 +210,9 @@
           Todos
         </label>
         {{/if}}
+        <label>Efeito visual
+          <input type="text" name="system.appliedEffects.{{ae.index}}.fxFile" value="{{ae.fxFile}}" placeholder="ex.: jb2a.shield.01.complete.blue" title="Caminho de um efeito do Sequencer (ex.: jb2a.shield.01.complete.blue). Fica preso ao token enquanto durar."/>
+        </label>
         <label>Duração (rodadas)
           <input type="text" value="{{#if ae.duration.rounds}}{{ae.duration.rounds}}{{/if}}" placeholder="permanente" title="Vazio ou 0 = permanente (dura até ser removido). Um número = quantas rodadas o efeito dura, descontando 1 no início de cada turno do personagem." name="system.appliedEffects.{{ae.index}}.duration.rounds"/>
         </label>
