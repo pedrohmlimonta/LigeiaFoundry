@@ -226,11 +226,68 @@ function mergeReroll(a, b) {
   return (Number(a) || 0) + (Number(b) || 0);
 }
 
+/* ---------------------------------------------------------------------- */
+/*  Categorias de rolagem (ataque / defesa, corpo a corpo x à distância)    */
+/* ---------------------------------------------------------------------- */
+
+/**
+ * Categorias de rolagem que valem para um ATAQUE, conforme a ação.
+ * Sempre inclui "attack" (qualquer ataque) MAIS a variante correspondente:
+ * "attackMelee" se a ação está marcada como corpo a corpo, senão
+ * "attackRanged". Nunca as duas — é isso que faz um bônus "só corpo a corpo"
+ * não valer numa ação à distância, e vice-versa.
+ * @param {boolean} isMelee A ação tem "esta ação é corpo a corpo" marcado?
+ * @returns {string[]}
+ */
+export function attackCategories(isMelee) {
+  return ["attack", isMelee ? "attackMelee" : "attackRanged"];
+}
+
+/**
+ * Categorias de rolagem que valem para uma DEFESA. O que decide melee x
+ * ranged é o ATAQUE que está chegando (a ação do atacante), não o defensor.
+ * @param {boolean} isMelee O ataque recebido é corpo a corpo?
+ * @returns {string[]}
+ */
+export function defenseCategories(isMelee) {
+  return ["defense", isMelee ? "defenseMelee" : "defenseRanged"];
+}
+
+/**
+ * Normaliza um argumento de categoria (string, array ou nada) para array.
+ */
+function catList(category) {
+  if (Array.isArray(category)) return category.filter(Boolean);
+  return category ? [category] : [];
+}
+
+/**
+ * Soma os dados de melhoria e os bônus das categorias de rolagem informadas,
+ * já incluindo "all" (todas as rolagens). Usar isto em vez de ler
+ * `rollMods.attack` na mão garante que as variantes corpo a corpo / à
+ * distância entrem junto.
+ * @param {Actor} actor
+ * @param {string|string[]} category
+ * @returns {{dice:number, bonus:number}}
+ */
+export function categoryMods(actor, category = null) {
+  const rm = actor?.system?.rollMods || {};
+  let dice = rm.all?.dice || 0;
+  let bonus = rm.all?.bonus || 0;
+  for (const c of catList(category)) {
+    if (c === "all" || !rm[c]) continue;
+    dice += rm[c].dice || 0;
+    bonus += rm[c].bonus || 0;
+  }
+  return { dice, bonus };
+}
+
 /**
  * Calcula o reroll (1s e 6s) efetivo para uma rolagem de um ator, combinando:
  *  - o reroll do atributo/secundário (attrReroll[key])
  *  - o reroll da categoria "all" (todas as rolagens)
- *  - o reroll da categoria extra informada ("attack" ou "defense"), se houver
+ *  - o reroll das categorias extras informadas ("attack", "attackMelee"…).
+ *    Aceita uma string ou um array (ver attackCategories/defenseCategories).
  * @returns {{reroll1:(number|'all'), reroll6:(number|'all')}}
  */
 export function rerollFor(actor, key, category = null) {
@@ -238,9 +295,10 @@ export function rerollFor(actor, key, category = null) {
   const rm = actor?.system?.rollMods || {};
   let r1 = mergeReroll(ar.reroll1 || 0, rm.all?.reroll1 || 0);
   let r6 = mergeReroll(ar.reroll6 || 0, rm.all?.reroll6 || 0);
-  if (category && rm[category]) {
-    r1 = mergeReroll(r1, rm[category].reroll1 || 0);
-    r6 = mergeReroll(r6, rm[category].reroll6 || 0);
+  for (const c of catList(category)) {
+    if (c === "all" || !rm[c]) continue;
+    r1 = mergeReroll(r1, rm[c].reroll1 || 0);
+    r6 = mergeReroll(r6, rm[c].reroll6 || 0);
   }
   return { reroll1: r1 === Infinity ? "all" : r1, reroll6: r6 === Infinity ? "all" : r6 };
 }
@@ -248,7 +306,8 @@ export function rerollFor(actor, key, category = null) {
 /**
  * Calcula o crítico aprimorado (critBonus) e a falha piorada (failBonus)
  * efetivos para uma rolagem, combinando o atributo + categoria "all" +
- * categoria extra ("attack"/"defense").
+ * as categorias extras ("attack"/"attackMelee"/"defense"/…). Aceita uma
+ * string ou um array.
  * @returns {{critBonus:number, failBonus:number}}
  */
 export function critFor(actor, key, category = null) {
@@ -256,9 +315,10 @@ export function critFor(actor, key, category = null) {
   const rm = actor?.system?.rollMods || {};
   let critBonus = (ac.critBonus || 0) + (rm.all?.critBonus || 0);
   let failBonus = (ac.failBonus || 0) + (rm.all?.failBonus || 0);
-  if (category && rm[category]) {
-    critBonus += rm[category].critBonus || 0;
-    failBonus += rm[category].failBonus || 0;
+  for (const c of catList(category)) {
+    if (c === "all" || !rm[c]) continue;
+    critBonus += rm[c].critBonus || 0;
+    failBonus += rm[c].failBonus || 0;
   }
   return { critBonus, failBonus };
 }
@@ -786,6 +846,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
             reroll: !!ae.resistReroll,
             attackerUuid: ae.resistReroll ? (caster?.uuid || "") : "",
             attackerAttr: ae.resistReroll ? (action.rollAttr || "forca") : "",
+            attackerMelee: !!action.isMelee,
           },
           tickDamage: { amount: resolveEffectValue(ae.tickAmount, caster), type: ae.tickType || "", resource: ae.tickResource || "hp" },
           // Regeneração por rodada (contraparte do dano contínuo)
@@ -1063,10 +1124,11 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
   let defAttrOverride = "";
   if (rollsDice && !isFrozen && shouldPromptRoll(actor, action)) {
     const atkPre = resolveAttr(actor, atkKey);
-    const rmPre = actor.system?.rollMods || {};
+    // "attack" + a variante do alcance desta ação (corpo a corpo OU distância)
+    const rmPre = categoryMods(actor, attackCategories(action.isMelee));
     const impPre =
       atkPre.dice + resolveEffectValue(action.rollDice, actor) + atkCond.atkDice +
-      (rmPre.all?.dice || 0) + (rmPre.attack?.dice || 0) +
+      rmPre.dice +
       attributeConditionDice(actor, atkKey) +
       surpriseDiceFor(actor, action, overrideTargets);
     const cfg2 = await promptRollConfig({
@@ -1087,12 +1149,14 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
   let atkRoll = null;
   if (rollsDice && !isFrozen) {
     const atk = resolveAttr(actor, atkKey);
-    // Modificadores de categoria de rolagem do atacante (all + attack)
-    const rm = actor.system?.rollMods || {};
-    const rmDice = (rm.all?.dice || 0) + (rm.attack?.dice || 0);
-    const rmBonus = (rm.all?.bonus || 0) + (rm.attack?.bonus || 0);
-    const atkRr = rerollFor(actor, atkKey, "attack");
-    const atkCrit = critFor(actor, atkKey, "attack");
+    // Modificadores de categoria de rolagem do atacante: "all" + "attack" +
+    // "attackMelee" OU "attackRanged", conforme a ação seja corpo a corpo.
+    const atkCats = attackCategories(action.isMelee);
+    const rmCat = categoryMods(actor, atkCats);
+    const rmDice = rmCat.dice;
+    const rmBonus = rmCat.bonus;
+    const atkRr = rerollFor(actor, atkKey, atkCats);
+    const atkCrit = critFor(actor, atkKey, atkCats);
     // Surdo: -1D em rolagens de Conjuração.
     const attrCondDice = attributeConditionDice(actor, atkKey);
     // Surpreso: +1D para o atacante se o(s) alvo(s) diretos estão surpresos.
@@ -1368,17 +1432,20 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
           ? ` <span class="lig-def-choice">(melhor de ${cands.map((c) => cfg.defenseAttrs?.[c.key] || c.key).join(" / ")})</span>`
           : "";
 
-        const defRr = rerollFor(tActor, def.key, "defense");
-        const defCrit = critFor(tActor, def.key, "defense");
+        // "defense" + a variante conforme o ATAQUE recebido seja corpo a
+        // corpo ou à distância (quem decide é a ação do atacante).
+        const defCats = defenseCategories(action.isMelee);
+        const defRr = rerollFor(tActor, def.key, defCats);
+        const defCrit = critFor(tActor, def.key, defCats);
         // Surdo: -1D se a defesa usar Conjuração.
         const defAttrCondDice = attributeConditionDice(tActor, def.key);
         // Cobertura / ocultação / invisibilidade: +1D defensivo, anulados
         // quando o atacante tem a percepção correspondente.
         const cover = coverDefenseDice(tActor, actor);
+        const defCatMods = categoryMods(tActor, defCats);
         const defImpBase =
           def.dice + defCond.defDice + cover.dice +
-          (tActor.system?.rollMods?.all?.dice || 0) +
-          (tActor.system?.rollMods?.defense?.dice || 0) + defAttrCondDice;
+          defCatMods.dice + defAttrCondDice;
         // ---- Caixa de rolagem da DEFESA ----
         // Abre para quem CONTROLA o alvo (jogador dono; Mestre se for NPC),
         // a menos que esse personagem esteja com "sem caixa" marcado. Não
@@ -1405,7 +1472,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
           attribute: def.base,
           improvement: defImp,
           baseDice: defBaseDice,
-          bonus: def.penalty + (def.rollBonus || 0) + defDlgBonus + (tActor.system?.rollMods?.all?.bonus || 0) + (tActor.system?.rollMods?.defense?.bonus || 0),
+          bonus: def.penalty + (def.rollBonus || 0) + defDlgBonus + defCatMods.bonus,
           difficulty: atkTotal,
           reroll1: defRr.reroll1,
           reroll6: defRr.reroll6,

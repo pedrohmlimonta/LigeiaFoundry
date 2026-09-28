@@ -68,6 +68,9 @@ function appliedEffectsField() {
         reroll: new fields.BooleanField({ initial: false }),
         attackerUuid: new fields.StringField({ blank: true, initial: "" }),
         attackerAttr: new fields.StringField({ blank: true, initial: "" }),
+        // A ação que aplicou o efeito era corpo a corpo? Define quais
+        // categorias de ataque (attackMelee/attackRanged) entram na CD refeita.
+        attackerMelee: new fields.BooleanField({ initial: false }),
       }),
       // Dano contínuo por rodada aplicado ao portador (0 = nenhum).
       tickDamage: new fields.SchemaField({

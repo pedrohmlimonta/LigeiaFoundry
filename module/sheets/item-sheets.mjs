@@ -291,7 +291,12 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         forca: "Força", agilidade: "Agilidade", vigor: "Vigor", mente: "Mente",
         percepcao: "Percepção", conjuracao: "Conjuração",
         esquiva: "Esquiva", bloqueio: "Bloqueio", iniciativa: "Iniciativa",
+        // Categorias de ataque/defesa. As variantes "corpo a corpo" e
+        // "à distância" só valem em ações marcadas (ou não) com
+        // "esta ação é corpo a corpo"; as versões "(qualquer)" valem sempre.
         attack: "Ataque (qualquer)", defense: "Defesa (qualquer)",
+        attackMelee: "Ataque (corpo a corpo)", attackRanged: "Ataque (à distância)",
+        defenseMelee: "Defesa (corpo a corpo)", defenseRanged: "Defesa (à distância)",
       },
       stat: {
         hp: "PV máximo", mp: "PM máximo", heroic: "Pontos Heroicos máx.", deslocamento: "Deslocamento",

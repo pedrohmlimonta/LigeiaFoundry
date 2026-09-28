@@ -213,7 +213,11 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       forca: "Força", agilidade: "Agilidade", vigor: "Vigor", mente: "Mente",
       percepcao: "Percepção", conjuracao: "Conjuração",
       esquiva: "Esquiva", bloqueio: "Bloqueio", iniciativa: "Iniciativa",
+      // Ataque/defesa: além das versões "(qualquer)", as variantes que só
+      // valem conforme a ação seja corpo a corpo ou à distância.
       attack: "Ataque (qualquer)", defense: "Defesa (qualquer)",
+      attackMelee: "Ataque (corpo a corpo)", attackRanged: "Ataque (à distância)",
+      defenseMelee: "Defesa (corpo a corpo)", defenseRanged: "Defesa (à distância)",
     };
     const statTargets = { hp: "PV máximo", mp: "PM máximo", heroic: "Pontos Heroicos máx.", deslocamento: "Deslocamento" };
     const setTargets = {
@@ -313,6 +317,8 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       all: "todas", forca: "Força", agilidade: "Agilidade", vigor: "Vigor",
       mente: "Mente", percepcao: "Percepção", attack: "Ataque",
       defense: "Defesa", initiative: "Iniciativa", conjuracao: "Conjuração",
+      attackMelee: "Ataque (c. a corpo)", attackRanged: "Ataque (distância)",
+      defenseMelee: "Defesa (c. a corpo)", defenseRanged: "Defesa (distância)",
       max_hp: "PV máx", max_mp: "PM máx", max_heroic: "PH máx",
       deslocamento: "Deslocamento", bloqueio: "Bloqueio", esquiva: "Esquiva",
       iniciativa: "Iniciativa", percepcao_passiva: "Perc. Passiva",

@@ -11,7 +11,7 @@
  * rolagens/remoções duplicadas em mesa com vários jogadores.
  */
 
-import { rollLigeia, resolveAttr, rerollFor, critFor, applyHealingToActor, applyDamageToActor } from "./dice.mjs";
+import { rollLigeia, resolveAttr, rerollFor, critFor, applyHealingToActor, applyDamageToActor, attackCategories, categoryMods } from "./dice.mjs";
 import { processWoundRollAtTurnStart } from "./wounds.mjs";
 import { resolveEffectValue } from "./effects.mjs";
 
@@ -49,13 +49,15 @@ async function rollEndForEffect(actor, ae) {
     if (attacker) {
       const aKey = ae.endRoll.attackerAttr || "forca";
       const aR = resolveAttr(attacker, aKey);
-      const aRm = attacker.system?.rollMods || {};
-      const aRr = rerollFor(attacker, aKey, "attack");
-      const aCr = critFor(attacker, aKey, "attack");
+      // Mesmas categorias do ataque original (corpo a corpo x à distância).
+      const aCats = attackCategories(!!ae.endRoll.attackerMelee);
+      const aRm = categoryMods(attacker, aCats);
+      const aRr = rerollFor(attacker, aKey, aCats);
+      const aCr = critFor(attacker, aKey, aCats);
       const atkRoll = await rollLigeia({
         attribute: aR.value,
-        improvement: aR.dice + (aRm.all?.dice || 0) + (aRm.attack?.dice || 0),
-        bonus: (aRm.all?.bonus || 0) + (aRm.attack?.bonus || 0) + (aR.rollBonus || 0),
+        improvement: aR.dice + aRm.dice,
+        bonus: aRm.bonus + (aR.rollBonus || 0),
         reroll1: aRr.reroll1, reroll6: aRr.reroll6,
         critBonus: aCr.critBonus, failBonus: aCr.failBonus,
       });

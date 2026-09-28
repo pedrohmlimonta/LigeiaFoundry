@@ -146,7 +146,15 @@ export function resolveEffectValue(raw, actor) {
 const PRIMARY_ATTRS = ["forca", "agilidade", "vigor", "mente", "percepcao"];
 const SECONDARY_ATTRS = ["bloqueio", "esquiva", "conjuracao", "iniciativa"];
 // Alvos de rolagem que não são um atributo específico.
-const ROLL_CATEGORIES = ["all", "attack", "defense"];
+//  - all                : vale para toda e qualquer rolagem
+//  - attack / defense   : qualquer ataque / qualquer defesa (como antes)
+//  - attackMelee/Ranged : só ataques de ações marcadas (ou não) como
+//                         "esta ação é corpo a corpo"
+//  - defenseMelee/Ranged: só defesas CONTRA ataques corpo a corpo / à distância
+const ROLL_CATEGORIES = [
+  "all", "attack", "defense",
+  "attackMelee", "attackRanged", "defenseMelee", "defenseRanged",
+];
 // Recursos/derivados que aceitam +N via efeito "stat".
 const STAT_TARGETS = ["hp", "mp", "heroic", "deslocamento"];
 
