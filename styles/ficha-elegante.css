@@ -207,58 +207,67 @@
 .ligeia-fe .lig-bar-token-toggle {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-top: 5px;
+  gap: 5px;
+  margin-top: 7px;
   font-size: 10px;
+  line-height: 1;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  white-space: nowrap;
   color: var(--fe-ink-soft);
   cursor: pointer;
-  opacity: 0.65;
+  opacity: 0.55;
   transition: opacity 0.15s ease, color 0.15s ease;
 }
-.ligeia-fe .lig-bar-token-toggle:hover {
-  opacity: 1;
-  color: var(--fe-gold-soft);
-}
-.ligeia-fe .lig-bar-token-toggle input {
-  width: 11px;
-  height: 11px;
-  margin: 0;
-  flex: 0 0 auto;
-  accent-color: var(--fe-gold);
-  cursor: pointer;
-}
+.ligeia-fe .lig-bar-token-toggle:hover,
 .ligeia-fe .lig-bar-token-toggle:has(input:checked) {
   opacity: 1;
   color: var(--fe-gold-soft);
+}
+/* Tamanho fixo e sem margem: o Foundry estica checkboxes de formulário. */
+.ligeia-fe .lig-bar-token-toggle input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  min-width: 12px;
+  min-height: 12px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--fe-gold);
+  cursor: pointer;
 }
 
 /* Liberação das barras de um NPC para os jogadores (só o Narrador vê). */
 .ligeia-fe .lig-bars-players {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   margin-top: 10px;
-  padding: 5px 9px;
+  padding: 6px 10px;
   border: 1px dashed var(--fe-border);
   border-radius: 7px;
   font-size: 11px;
+  line-height: 1;
   color: var(--fe-ink-soft);
   cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
 .ligeia-fe .lig-bars-players:hover { color: var(--fe-gold-soft); }
-.ligeia-fe .lig-bars-players input {
-  width: 12px;
-  height: 12px;
-  margin: 0;
-  accent-color: var(--fe-gold);
-  cursor: pointer;
-}
 .ligeia-fe .lig-bars-players:has(input:checked) {
   border-style: solid;
   border-color: var(--fe-gold);
   color: var(--fe-ink);
+}
+.ligeia-fe .lig-bars-players input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  min-width: 13px;
+  min-height: 13px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--fe-gold);
+  cursor: pointer;
 }
 
 .ligeia-fe .lig-bar-top {

@@ -231,43 +231,66 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.25rem;
-  margin-top: 0.3rem;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
   font-size: 0.62rem;
+  line-height: 1;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  white-space: nowrap;
   color: var(--lig-ink-soft);
   cursor: pointer;
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 .lig-res-token-toggle:hover { opacity: 1; }
 
-.lig-res-token-toggle input {
-  width: 11px;
-  height: 11px;
+/* Tamanho fixo e sem margem: o Foundry estica checkboxes de formulário. */
+.lig-res-token-toggle input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  min-width: 12px;
+  min-height: 12px;
   margin: 0;
+  padding: 0;
+  accent-color: var(--lig-gold);
   cursor: pointer;
 }
 
+.lig-res-token-toggle:has(input:checked) { opacity: 1; }
+
+/* Liberação das barras de um NPC para os jogadores (só o Narrador vê). */
 .lig-bars-players {
   display: flex;
   align-items: center;
   gap: 0.4rem;
   margin-bottom: 0.5rem;
-  padding: 0.3rem 0.5rem;
+  padding: 0.35rem 0.6rem;
   border: 1px dashed var(--lig-border);
   border-radius: 4px;
   font-size: 0.7rem;
+  line-height: 1;
   color: var(--lig-ink-soft);
   cursor: pointer;
 }
 
-.lig-bars-players input {
-  width: 12px;
-  height: 12px;
+.lig-bars-players input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  min-width: 13px;
+  min-height: 13px;
   margin: 0;
+  padding: 0;
+  accent-color: var(--lig-gold);
   cursor: pointer;
+}
+
+.lig-bars-players:has(input:checked) {
+  border-style: solid;
+  border-color: var(--lig-gold);
+  color: var(--lig-ink);
 }
 
 /* ---- Atributos primários ---- */
