@@ -226,9 +226,19 @@
   font-size: 0.7rem;
 }
 
+/* ---- Checkboxes ---- */
+/* Tamanho único para as caixas de marcação. Vale para a interface toda —
+   se alguma janela de outro módulo ficar estranha, troque por
+   ".ligeia input[type=\"checkbox\"]" para limitar ao sistema. */
+input[type="checkbox"] {
+  height: 20px;
+  width: 20px;
+}
+
 /* ---- Barras no token (ficha clássica) ---- */
 .lig-res-token-toggle {
   display: inline-flex;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
   gap: 0.3rem;
@@ -245,13 +255,9 @@
 
 .lig-res-token-toggle:hover { opacity: 1; }
 
-/* Tamanho fixo e sem margem: o Foundry estica checkboxes de formulário. */
+/* Sem margem e sem encolher; o tamanho vem da regra global acima. */
 .lig-res-token-toggle input[type="checkbox"] {
   flex: 0 0 auto;
-  width: 12px;
-  height: 12px;
-  min-width: 12px;
-  min-height: 12px;
   margin: 0;
   padding: 0;
   accent-color: var(--lig-gold);
@@ -261,8 +267,9 @@
 .lig-res-token-toggle:has(input:checked) { opacity: 1; }
 
 /* Liberação das barras de um NPC para os jogadores (só o Narrador vê). */
-.lig-bars-players {
+label.lig-bars-players {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 0.4rem;
   margin-bottom: 0.5rem;
@@ -277,10 +284,6 @@
 
 .lig-bars-players input[type="checkbox"] {
   flex: 0 0 auto;
-  width: 13px;
-  height: 13px;
-  min-width: 13px;
-  min-height: 13px;
   margin: 0;
   padding: 0;
   accent-color: var(--lig-gold);
