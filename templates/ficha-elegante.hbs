@@ -65,6 +65,12 @@
     </header>
 
     {{!-- ===== Barras de recurso ===== --}}
+    {{#if isGM}}{{#if isNpc}}
+    <label class="lig-bars-players" title="Por padrão, só o Narrador enxerga as barras deste NPC no mapa. Marque para que os jogadores também as vejam.">
+      <input type="checkbox" name="system.tokenBars.players" {{#if system.tokenBars.players}}checked{{/if}}/>
+      👁 barras deste NPC visíveis aos jogadores
+    </label>
+    {{/if}}{{/if}}
     <div class="lig-bars">
       <div class="lig-bar-box hp {{#if bars.hp.low}}is-low{{/if}} {{#if bars.hp.negative}}is-negative{{/if}}">
         <div class="lig-bar-top">
@@ -81,6 +87,9 @@
           <div class="lig-bar-fill hp" style="width: {{bars.hp.pct}}%"></div>
           {{#if bars.hp.tempPct}}<div class="lig-bar-temp-fill" style="width: {{bars.hp.tempPct}}%"></div>{{/if}}
         </div>
+        <label class="lig-bar-token-toggle" title="Mostrar a barra de Pontos de Vida abaixo do token, no mapa.">\n          <input type="checkbox" name="system.tokenBars.hp" {{#if system.tokenBars.hp}}checked{{/if}}/>
+          <span>no token</span>
+        </label>
       </div>
 
       <div class="lig-bar-box mp">
@@ -94,6 +103,9 @@
         <div class="lig-bar-track">
           <div class="lig-bar-fill mp" style="width: {{bars.mp.pct}}%"></div>
         </div>
+        <label class="lig-bar-token-toggle" title="Mostrar a barra de Pontos de Magia abaixo do token, no mapa.">\n          <input type="checkbox" name="system.tokenBars.mp" {{#if system.tokenBars.mp}}checked{{/if}}/>
+          <span>no token</span>
+        </label>
       </div>
 
       <div class="lig-bar-box heroic">
@@ -107,6 +119,9 @@
         <div class="lig-bar-track">
           <div class="lig-bar-fill heroic" style="width: {{bars.heroic.pct}}%"></div>
         </div>
+        <label class="lig-bar-token-toggle" title="Mostrar a barra de Pontos Heroicos abaixo do token, no mapa.">\n          <input type="checkbox" name="system.tokenBars.heroic" {{#if system.tokenBars.heroic}}checked{{/if}}/>
+          <span>no token</span>
+        </label>
       </div>
     </div>
 

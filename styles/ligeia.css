@@ -226,6 +226,50 @@
   font-size: 0.7rem;
 }
 
+/* ---- Barras no token (ficha clássica) ---- */
+.lig-res-token-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  margin-top: 0.3rem;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--lig-ink-soft);
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.lig-res-token-toggle:hover { opacity: 1; }
+
+.lig-res-token-toggle input {
+  width: 11px;
+  height: 11px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.lig-bars-players {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px dashed var(--lig-border);
+  border-radius: 4px;
+  font-size: 0.7rem;
+  color: var(--lig-ink-soft);
+  cursor: pointer;
+}
+
+.lig-bars-players input {
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  cursor: pointer;
+}
+
 /* ---- Atributos primários ---- */
 .lig-attributes {
   display: grid;

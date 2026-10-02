@@ -15,6 +15,7 @@ import { registerMovementHooks, registerMovementSocket, registerForcedMovementAc
 import { registerRollRequestSocket } from "./helpers/roll-request.mjs";
 import { registerGmProxySocket } from "./helpers/gm-proxy.mjs";
 import { registerTokenLinkSettings, registerTokenLinkHooks, migrateTokenLinks, registerTokenSizeHooks, syncTokenSize } from "./helpers/token-link.mjs";
+import { registerTokenBarSettings, registerTokenBarHooks } from "./helpers/token-bars.mjs";
 import { syncConditionEffects } from "./helpers/conditions.mjs";
 import { applyHealingToActor } from "./helpers/dice.mjs";
 import { playAutomatedAnimation, playPersistentFx, endPersistentFx, persistentFxName } from "./helpers/integrations.mjs";
@@ -53,6 +54,9 @@ Hooks.once("init", function () {
   registerTokenLinkHooks();
   // O token acompanha a categoria de tamanho do personagem.
   registerTokenSizeHooks();
+  // Barras de PV/PM/PH desenhadas abaixo do token.
+  registerTokenBarSettings();
+  registerTokenBarHooks();
   console.log("Ligeia RPG | Inicializando sistema");
 
   // Namespace global para debug/macros

@@ -203,6 +203,64 @@
   padding: 6px 9px 7px;
 }
 
+/* "no token": liga/desliga esta barra abaixo do token, no mapa. */
+.ligeia-fe .lig-bar-token-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 5px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--fe-ink-soft);
+  cursor: pointer;
+  opacity: 0.65;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+.ligeia-fe .lig-bar-token-toggle:hover {
+  opacity: 1;
+  color: var(--fe-gold-soft);
+}
+.ligeia-fe .lig-bar-token-toggle input {
+  width: 11px;
+  height: 11px;
+  margin: 0;
+  flex: 0 0 auto;
+  accent-color: var(--fe-gold);
+  cursor: pointer;
+}
+.ligeia-fe .lig-bar-token-toggle:has(input:checked) {
+  opacity: 1;
+  color: var(--fe-gold-soft);
+}
+
+/* Liberação das barras de um NPC para os jogadores (só o Narrador vê). */
+.ligeia-fe .lig-bars-players {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 5px 9px;
+  border: 1px dashed var(--fe-border);
+  border-radius: 7px;
+  font-size: 11px;
+  color: var(--fe-ink-soft);
+  cursor: pointer;
+}
+.ligeia-fe .lig-bars-players:hover { color: var(--fe-gold-soft); }
+.ligeia-fe .lig-bars-players input {
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  accent-color: var(--fe-gold);
+  cursor: pointer;
+}
+.ligeia-fe .lig-bars-players:has(input:checked) {
+  border-style: solid;
+  border-color: var(--fe-gold);
+  color: var(--fe-ink);
+}
+
 .ligeia-fe .lig-bar-top {
   display: flex;
   align-items: baseline;

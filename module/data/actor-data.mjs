@@ -185,6 +185,17 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
         minorSpells: new fields.HTMLField({ blank: true, initial: "" }),
       }),
 
+
+      // Barras de recurso desenhadas abaixo do token. Cada caixinha liga ou
+      // desliga uma barra; "players" (só NPCs/veículos) libera as barras
+      // daquele ator para os jogadores — sem ela, só o Narrador as vê.
+      tokenBars: new fields.SchemaField({
+        hp: new fields.BooleanField({ initial: true }),
+        mp: new fields.BooleanField({ initial: true }),
+        heroic: new fields.BooleanField({ initial: true }),
+        players: new fields.BooleanField({ initial: false }),
+      }),
+
       // Rolagem oculta por ficha
       rollHidden: new fields.BooleanField({ initial: false }),
       // Não abrir a caixa de configuração antes das rolagens deste ator.
@@ -436,6 +447,16 @@ export class NpcData extends PersonagemData {
       // desmarcado = lado aliado — independente de quem conjura e da
       // disposição do token. Personagens contam sempre como aliados.
       isEnemy: new fields.BooleanField({ initial: true }),
+
+      // Barras de recurso desenhadas abaixo do token. Cada caixinha liga ou
+      // desliga uma barra; "players" (só NPCs/veículos) libera as barras
+      // daquele ator para os jogadores — sem ela, só o Narrador as vê.
+      tokenBars: new fields.SchemaField({
+        hp: new fields.BooleanField({ initial: true }),
+        mp: new fields.BooleanField({ initial: true }),
+        heroic: new fields.BooleanField({ initial: true }),
+        players: new fields.BooleanField({ initial: false }),
+      }),
 
       // NPCs rolam ocultamente por padrão
       rollHidden: new fields.BooleanField({ initial: true }),

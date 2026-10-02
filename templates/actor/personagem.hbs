@@ -80,6 +80,12 @@
   {{/unless}}
 
   {{!-- ===== Recursos ===== --}}
+  {{#if isGM}}{{#if isNpc}}
+  <label class="lig-bars-players" title="Por padrão, só o Narrador enxerga as barras deste NPC no mapa. Marque para que os jogadores também as vejam.">
+    <input type="checkbox" name="system.tokenBars.players" {{#if system.tokenBars.players}}checked{{/if}}/>
+    👁 barras deste NPC visíveis aos jogadores
+  </label>
+  {{/if}}{{/if}}
   <section class="lig-resources">
     <div class="lig-resource hp {{#if (lt system.resources.hp.value 0)}}is-negative{{/if}}">
       <div class="lig-res-label">Pontos de Vida</div>
@@ -96,6 +102,10 @@
         <input type="number" name="system.resources.hp.bonus" value="{{system.resources.hp.bonus}}"/>
       </div>
       {{/if}}
+      <label class="lig-res-token-toggle" title="Mostrar a barra de Pontos de Vida abaixo do token no mapa.">
+        <input type="checkbox" name="system.tokenBars.hp" {{#if system.tokenBars.hp}}checked{{/if}}/>
+        no token
+      </label>
     </div>
 
     <div class="lig-resource mp">
@@ -110,6 +120,10 @@
         <input type="number" name="system.resources.mp.bonus" value="{{system.resources.mp.bonus}}"/>
       </div>
       {{/if}}
+      <label class="lig-res-token-toggle" title="Mostrar a barra de Pontos de Magia abaixo do token no mapa.">
+        <input type="checkbox" name="system.tokenBars.mp" {{#if system.tokenBars.mp}}checked{{/if}}/>
+        no token
+      </label>
     </div>
 
     <div class="lig-resource heroic">
@@ -119,6 +133,10 @@
         <span class="lig-res-sep">/</span>
         <span class="lig-res-max">{{system.resources.heroic.max}}</span>
       </div>
+      <label class="lig-res-token-toggle" title="Mostrar a barra de Pontos Heroicos abaixo do token no mapa.">
+        <input type="checkbox" name="system.tokenBars.heroic" {{#if system.tokenBars.heroic}}checked{{/if}}/>
+        no token
+      </label>
     </div>
   </section>
 
