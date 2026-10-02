@@ -9,6 +9,7 @@ import { placeTemplateForAction, scheduleTransientCleanup } from "../helpers/tem
 import { computeXpSpent, computeXpGained } from "../helpers/xp.mjs";
 import { performRest, performMedicalCare, DEATH_HP } from "../helpers/wounds.mjs";
 import { effectIsActive, availableActionsOf, resolveEffectValue } from "../helpers/effects.mjs";
+import { artRowsFor, tokenArtFor, healthPercent } from "../helpers/token-art.mjs";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ActorSheetV2 } = foundry.applications.sheets;
@@ -149,6 +150,13 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     context.isNpc = actor.type === "npc" || context.isVehicle;
     // Carreira: personagens só no nível 6; NPCs não têm a restrição.
     context.canAddCareer = context.isNpc || (Number(sys.details?.level) || 1) >= 6;
+
+    // ---- Aba "Tokens e Teatro": arte do token por faixa de ferimento ----
+    // Cada linha já traz a imagem que a faixa usaria de verdade (depois da
+    // cascata) e de onde ela veio, para o campo vazio não parecer quebrado.
+    context.tokenArtRows = artRowsFor(actor);
+    context.tokenArtCurrent = tokenArtFor(actor);
+    context.tokenArtPercent = Math.round(healthPercent(actor));
 
     // Enriquece campos HTML para exibição
     context.enriched = {
@@ -488,8 +496,10 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     const defaultArtwork = this.document.constructor.getDefaultArtwork?.(this.document.toObject()) || {};
     const fallback = attr === "img" ? defaultArtwork.img : defaultArtwork.texture?.src;
     const FP = foundry.applications.apps.FilePicker?.implementation || FilePicker;
+    // Imagens de TOKEN aceitam vídeo (webm animado); o retrato da ficha, não.
+    const ehToken = attr.startsWith("prototypeToken") || attr.startsWith("system.tokenArt");
     const fp = new FP({
-      type: "image",
+      type: ehToken ? "imagevideo" : "image",
       current: current ?? fallback,
       callback: (path) => this.document.update({ [attr]: path }),
       top: (this.position.top ?? 0) + 40,

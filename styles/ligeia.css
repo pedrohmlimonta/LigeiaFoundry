@@ -1627,3 +1627,109 @@ label.lig-bars-players {
 .lig-bar-box.hp.is-negative .lig-bar-track {
   box-shadow: inset 0 0 0 1px rgba(226, 86, 74, 0.6);
 }
+
+/* =====================================================
+   TOKENS E TEATRO — arte do token por faixa de ferimento
+   (usado pela ficha clássica e pela Ficha Elegante)
+   ===================================================== */
+/* Seis faixas em duas fileiras de três; em ficha estreita, duas colunas. */
+.lig-art-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 620px) {
+  .lig-art-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.lig-art-card {
+  border: 1px solid var(--lig-border);
+  border-radius: 6px;
+  padding: 0.5rem;
+  background: var(--lig-bg-deep);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+/* A faixa que o personagem ocupa agora ganha destaque dourado. */
+.lig-art-card.is-active {
+  border-color: var(--lig-gold);
+  box-shadow: 0 0 0 1px rgba(184, 135, 10, 0.35);
+}
+
+.lig-art-thumb {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  max-height: 130px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: #0a0807 center/40% no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lig-art-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border: none;
+}
+
+.lig-art-empty {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--lig-ink-soft);
+  opacity: 0.5;
+}
+
+.lig-art-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--lig-gold);
+  color: #140f08;
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.lig-art-label {
+  font-size: 0.68rem;
+  line-height: 1.25;
+  min-height: 2.2em;
+  color: var(--lig-ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.lig-art-card.is-active .lig-art-label { color: var(--lig-gold-soft); }
+
+.lig-art-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.lig-art-row input[type="text"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.65rem;
+}
+
+.lig-art-row .lig-mini-btn {
+  flex: 0 0 auto;
+  min-width: 26px;
+  padding: 0.2rem 0.4rem;
+  text-align: center;
+}
+
+.lig-token-art { margin-top: 0.8rem; }

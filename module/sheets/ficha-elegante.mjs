@@ -36,6 +36,7 @@ const TAB_DEFS = [
   { id: "tracos", label: "Traços", icon: "fa-solid fa-fingerprint" },
   { id: "efeitos", label: "Efeitos & Condições", icon: "fa-solid fa-bolt" },
   { id: "notas", label: "Personalidade & Notas", icon: "fa-solid fa-feather" },
+  { id: "tokens", label: "Tokens e Teatro", icon: "fa-solid fa-masks-theater" },
 ];
 
 /** Tipos de item favoritáveis e seus rótulos na aba de favoritos. */

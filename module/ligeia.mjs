@@ -16,6 +16,7 @@ import { registerRollRequestSocket } from "./helpers/roll-request.mjs";
 import { registerGmProxySocket } from "./helpers/gm-proxy.mjs";
 import { registerTokenLinkSettings, registerTokenLinkHooks, migrateTokenLinks, registerTokenSizeHooks, syncTokenSize } from "./helpers/token-link.mjs";
 import { registerTokenBarSettings, registerTokenBarHooks } from "./helpers/token-bars.mjs";
+import { registerTokenArtHooks } from "./helpers/token-art.mjs";
 import { syncConditionEffects } from "./helpers/conditions.mjs";
 import { applyHealingToActor } from "./helpers/dice.mjs";
 import { playAutomatedAnimation, playPersistentFx, endPersistentFx, persistentFxName } from "./helpers/integrations.mjs";
@@ -57,6 +58,8 @@ Hooks.once("init", function () {
   // Barras de PV/PM/PH desenhadas abaixo do token.
   registerTokenBarSettings();
   registerTokenBarHooks();
+  // A arte do token acompanha o ferimento do personagem.
+  registerTokenArtHooks();
   console.log("Ligeia RPG | Inicializando sistema");
 
   // Namespace global para debug/macros

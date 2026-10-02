@@ -527,6 +527,40 @@
   </section>
   {{/if}}
 
+
+  {{!-- ===== Tokens e Teatro: arte do token por ferimento ===== --}}
+  <section class="lig-token-art">
+    <div class="lig-section-title">Tokens e Teatro</div>
+    <p class="lig-hint">
+      A imagem do token muda sozinha conforme os Pontos de Vida (a porcentagem vai
+      do máximo até zero; PV negativos já contam como <em>caído</em>).
+      Faixa sem imagem usa a faixa de cima, até chegar ao padrão.
+    </p>
+    <div class="lig-art-grid">
+      {{#each tokenArtRows as |row|}}
+      <div class="lig-art-card {{#if row.active}}is-active{{/if}}">
+        <div class="lig-art-thumb">
+          {{#if row.resolved}}
+          <img src="{{row.resolved}}" alt="{{row.label}}"/>
+          {{else}}
+          <span class="lig-art-empty">sem imagem</span>
+          {{/if}}
+          {{#if row.active}}<span class="lig-art-badge">em uso</span>{{/if}}
+        </div>
+        <div class="lig-art-label">{{row.label}}</div>
+        <div class="lig-art-row">
+          <input type="text" name="system.tokenArt.{{row.key}}" value="{{row.value}}"
+                 placeholder="{{#if row.inheritedFrom}}herda: {{row.inheritedFrom}}{{else}}caminho da imagem{{/if}}"/>
+          <button type="button" class="lig-mini-btn" data-action="editImage"
+                  data-target="system.tokenArt.{{row.key}}" title="Escolher a imagem desta faixa">
+            <i class="fa-solid fa-folder-open"></i>
+          </button>
+        </div>
+      </div>
+      {{/each}}
+    </div>
+  </section>
+
   <div class="lig-vars-row">
     <button type="button" class="lig-mini-btn" data-action="rest" title="Descanso de 8 horas: recupera PV (Vigor), PM (Mente) e todos os Pontos Heroicos, respeitando o nível de ferimento.">🛏 Descansar</button>
     <button type="button" class="lig-mini-btn" data-action="medicalCare" title="Cuidados médicos: rolagem de Mente que reduz o nível de ferimento do alvo mirado (ou de você mesmo).">⚕ Cuidados médicos</button>

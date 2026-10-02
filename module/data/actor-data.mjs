@@ -196,6 +196,18 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
         players: new fields.BooleanField({ initial: false }),
       }),
 
+      // Arte do token por faixa de ferimento (aba "Tokens e Teatro").
+      // Faixa vazia cai para a faixa ACIMA, até o padrão; o padrão vazio usa
+      // a imagem do token padrão do ator. Ver helpers/token-art.mjs.
+      tokenArt: new fields.SchemaField({
+        default: new fields.StringField({ blank: true, initial: "" }),
+        p75: new fields.StringField({ blank: true, initial: "" }),
+        p50: new fields.StringField({ blank: true, initial: "" }),
+        p25: new fields.StringField({ blank: true, initial: "" }),
+        down: new fields.StringField({ blank: true, initial: "" }),
+        dead: new fields.StringField({ blank: true, initial: "" }),
+      }),
+
       // Rolagem oculta por ficha
       rollHidden: new fields.BooleanField({ initial: false }),
       // Não abrir a caixa de configuração antes das rolagens deste ator.
@@ -456,6 +468,18 @@ export class NpcData extends PersonagemData {
         mp: new fields.BooleanField({ initial: true }),
         heroic: new fields.BooleanField({ initial: true }),
         players: new fields.BooleanField({ initial: false }),
+      }),
+
+      // Arte do token por faixa de ferimento (aba "Tokens e Teatro").
+      // Faixa vazia cai para a faixa ACIMA, até o padrão; o padrão vazio usa
+      // a imagem do token padrão do ator. Ver helpers/token-art.mjs.
+      tokenArt: new fields.SchemaField({
+        default: new fields.StringField({ blank: true, initial: "" }),
+        p75: new fields.StringField({ blank: true, initial: "" }),
+        p50: new fields.StringField({ blank: true, initial: "" }),
+        p25: new fields.StringField({ blank: true, initial: "" }),
+        down: new fields.StringField({ blank: true, initial: "" }),
+        dead: new fields.StringField({ blank: true, initial: "" }),
       }),
 
       // NPCs rolam ocultamente por padrão
