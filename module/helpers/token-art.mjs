@@ -86,18 +86,79 @@ export function tierIndexFor(actor) {
   return DOWN_INDEX - 1; // PV > 0 porém abaixo de 25%
 }
 
+/* ----------------------------------------------------------------------- */
+/*  Resolução genérica de faixa + cascata                                    */
+/*  (serve tanto para a arte do token quanto para o retrato do Theatre)      */
+/* ----------------------------------------------------------------------- */
+
 /**
- * A imagem configurada para uma faixa, ou "" se estiver vazia.
- * A faixa "default" cai para a imagem do token padrão do ator quando o campo
- * não foi preenchido, de modo que a cascata sempre termina em algo válido.
+ * A imagem configurada para uma faixa, ou "" se estiver vazia. A faixa
+ * "default" cai para `base` quando o campo não foi preenchido, de modo que a
+ * cascata sempre termina em algo válido.
+ * @param {object} mapa  { default, p75, p50, p25, down, dead }
+ * @param {number} index posição em ART_TIERS
+ * @param {string} base  imagem de último recurso (token padrão, retrato…)
  */
-function artFor(actor, index) {
-  const art = actor?.system?.tokenArt || {};
+function srcAt(mapa, index, base) {
   const key = ART_TIERS[index]?.key;
-  const src = String(art[key] || "").trim();
+  const src = String(mapa?.[key] || "").trim();
   if (src) return src;
-  if (index === 0) return String(actor?.prototypeToken?.texture?.src || "").trim();
+  if (index === 0) return String(base || "").trim();
   return "";
+}
+
+/**
+ * Resolve a imagem de uma faixa percorrendo a cascata: a própria faixa, depois
+ * as faixas ACIMA (menos feridas), terminando no padrão e em `base`.
+ * @param {object} mapa
+ * @param {number} index faixa de partida
+ * @param {string} base
+ * @returns {string} "" se nada estiver configurado
+ */
+export function resolveTierSrc(mapa, index, base) {
+  for (let i = index; i >= 0; i--) {
+    const src = srcAt(mapa, i, base);
+    if (src) return src;
+  }
+  return "";
+}
+
+/**
+ * Monta as linhas de uma grade de faixas (token ou teatro), cada uma com a
+ * imagem que de fato usaria e de onde ela veio quando o campo está vazio.
+ * @param {object} mapa
+ * @param {number} atual faixa ocupada agora
+ * @param {string} base  imagem de último recurso
+ * @param {string} baseLabel como chamar essa imagem na interface
+ */
+export function buildArtRows(mapa, atual, base, baseLabel) {
+  const rows = [];
+  for (let i = 0; i < ART_TIERS.length; i++) {
+    const t = ART_TIERS[i];
+    const value = String(mapa?.[t.key] || "").trim();
+    let resolved = value;
+    let inheritedFrom = "";
+    if (!resolved) {
+      for (let j = i - 1; j >= 0; j--) {
+        const v = srcAt(mapa, j, base);
+        if (v) {
+          resolved = v;
+          // Se a faixa de origem também estava vazia, o que ela devolveu já é
+          // a imagem de último recurso.
+          inheritedFrom = String(mapa?.[ART_TIERS[j].key] || "").trim() ? ART_TIERS[j].label : baseLabel;
+          break;
+        }
+      }
+      if (!resolved && base) { resolved = String(base).trim(); inheritedFrom = baseLabel; }
+    }
+    rows.push({ key: t.key, label: t.label, value, resolved, inheritedFrom, active: i === atual });
+  }
+  return rows;
+}
+
+/** A imagem de token de último recurso: o token padrão do ator. */
+function tokenBase(actor) {
+  return String(actor?.prototypeToken?.texture?.src || "").trim();
 }
 
 /**
@@ -108,47 +169,16 @@ function artFor(actor, index) {
  */
 export function tokenArtFor(actor) {
   if (!actor || !ACTOR_TYPES.includes(actor.type)) return "";
-  const idx = tierIndexFor(actor);
-  for (let i = idx; i >= 0; i--) {
-    const src = artFor(actor, i);
-    if (src) return src;
-  }
-  return "";
+  return resolveTierSrc(actor.system?.tokenArt, tierIndexFor(actor), tokenBase(actor));
 }
 
 /**
- * Linhas da aba "Tokens e Teatro": uma por faixa, já com a imagem que a faixa
- * usaria de verdade e de onde ela vem quando o campo está vazio.
+ * Linhas da grade de tokens na aba "Tokens e Teatro".
  * @param {Actor} actor
  * @returns {Array<{key, label, value, resolved, inheritedFrom, active}>}
  */
 export function artRowsFor(actor) {
-  const atual = tierIndexFor(actor);
-  const proto = String(actor?.prototypeToken?.texture?.src || "").trim();
-  const rows = [];
-  for (let i = 0; i < ART_TIERS.length; i++) {
-    const t = ART_TIERS[i];
-    const value = String(actor?.system?.tokenArt?.[t.key] || "").trim();
-    let resolved = value;
-    let inheritedFrom = "";
-    if (!resolved) {
-      for (let j = i - 1; j >= 0; j--) {
-        const v = artFor(actor, j);
-        if (v) {
-          resolved = v;
-          // Se a faixa de origem também estava vazia, o que ela devolveu já é
-          // o token padrão do ator.
-          inheritedFrom = String(actor?.system?.tokenArt?.[ART_TIERS[j].key] || "").trim()
-            ? ART_TIERS[j].label
-            : "token padrão do ator";
-          break;
-        }
-      }
-      if (!resolved && proto) { resolved = proto; inheritedFrom = "token padrão do ator"; }
-    }
-    rows.push({ key: t.key, label: t.label, value, resolved, inheritedFrom, active: i === atual });
-  }
-  return rows;
+  return buildArtRows(actor?.system?.tokenArt, tierIndexFor(actor), tokenBase(actor), "token padrão do ator");
 }
 
 /** Este ator tem alguma arte por ferimento configurada? */

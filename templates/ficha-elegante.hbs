@@ -682,6 +682,40 @@
         </div>
         {{/each}}
       </div>
+
+      {{#if theatreActive}}
+      <hr class="lig-art-sep"/>
+      <div class="lig-section-title">Retratos do Theatre Inserts</div>
+      <p class="lig-hint">
+        O retrato que aparece no palco muda pelas mesmas faixas e com a mesma
+        herança dos tokens. O campo <strong>Padrão</strong> passa a ser o retrato
+        normal do personagem no Theatre — se você já tinha um configurado por lá,
+        ele é copiado para cá na primeira troca, para não se perder.
+      </p>
+      <div class="lig-art-grid">
+        {{#each theatreArtRows as |row|}}
+        <div class="lig-art-card {{#if row.active}}is-active{{/if}}">
+          <div class="lig-art-thumb lig-art-thumb-tall">
+            {{#if row.resolved}}
+            <img src="{{row.resolved}}" alt="{{row.label}}"/>
+            {{else}}
+            <span class="lig-art-empty">sem imagem</span>
+            {{/if}}
+            {{#if row.active}}<span class="lig-art-badge">em uso</span>{{/if}}
+          </div>
+          <div class="lig-art-label">{{row.label}}</div>
+          <div class="lig-art-row">
+            <input type="text" name="system.theatreArt.{{row.key}}" value="{{row.value}}"
+                   placeholder="{{#if row.inheritedFrom}}herda: {{row.inheritedFrom}}{{else}}caminho da imagem{{/if}}"/>
+            <button type="button" class="lig-mini-btn" data-action="editImage"
+                    data-target="system.theatreArt.{{row.key}}" title="Escolher o retrato desta faixa">
+              <i class="fa-solid fa-folder-open"></i>
+            </button>
+          </div>
+        </div>
+        {{/each}}
+      </div>
+      {{/if}}
     </section>
 
   </div>

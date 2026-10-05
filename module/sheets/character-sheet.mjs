@@ -10,6 +10,7 @@ import { computeXpSpent, computeXpGained } from "../helpers/xp.mjs";
 import { performRest, performMedicalCare, DEATH_HP } from "../helpers/wounds.mjs";
 import { effectIsActive, availableActionsOf, resolveEffectValue } from "../helpers/effects.mjs";
 import { artRowsFor, tokenArtFor, healthPercent } from "../helpers/token-art.mjs";
+import { theatreRowsFor, theatreActive } from "../helpers/theatre-art.mjs";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ActorSheetV2 } = foundry.applications.sheets;
@@ -157,6 +158,9 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     context.tokenArtRows = artRowsFor(actor);
     context.tokenArtCurrent = tokenArtFor(actor);
     context.tokenArtPercent = Math.round(healthPercent(actor));
+    // Retratos do Theatre Inserts: a seção só existe com o módulo ativo.
+    context.theatreActive = theatreActive();
+    context.theatreArtRows = context.theatreActive ? theatreRowsFor(actor) : [];
 
     // Enriquece campos HTML para exibição
     context.enriched = {

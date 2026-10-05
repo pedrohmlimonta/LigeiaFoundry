@@ -1733,3 +1733,16 @@ label.lig-bars-players {
 }
 
 .lig-token-art { margin-top: 0.8rem; }
+
+/* Separador entre a grade de tokens e a de retratos do Theatre. */
+.lig-art-sep {
+  margin: 1.1rem 0 0.8rem;
+  border: none;
+  border-top: 1px solid var(--lig-border);
+}
+
+/* Retratos de teatro são de corpo inteiro: mais altos que largos. */
+.lig-art-thumb-tall {
+  aspect-ratio: 3 / 4;
+  max-height: 170px;
+}

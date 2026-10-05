@@ -208,6 +208,17 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
         dead: new fields.StringField({ blank: true, initial: "" }),
       }),
 
+      // Retrato do módulo Theatre Inserts por faixa de ferimento. Mesmas
+      // faixas e mesma cascata da arte do token; só vale com o módulo ativo.
+      theatreArt: new fields.SchemaField({
+        default: new fields.StringField({ blank: true, initial: "" }),
+        p75: new fields.StringField({ blank: true, initial: "" }),
+        p50: new fields.StringField({ blank: true, initial: "" }),
+        p25: new fields.StringField({ blank: true, initial: "" }),
+        down: new fields.StringField({ blank: true, initial: "" }),
+        dead: new fields.StringField({ blank: true, initial: "" }),
+      }),
+
       // Rolagem oculta por ficha
       rollHidden: new fields.BooleanField({ initial: false }),
       // Não abrir a caixa de configuração antes das rolagens deste ator.
@@ -474,6 +485,17 @@ export class NpcData extends PersonagemData {
       // Faixa vazia cai para a faixa ACIMA, até o padrão; o padrão vazio usa
       // a imagem do token padrão do ator. Ver helpers/token-art.mjs.
       tokenArt: new fields.SchemaField({
+        default: new fields.StringField({ blank: true, initial: "" }),
+        p75: new fields.StringField({ blank: true, initial: "" }),
+        p50: new fields.StringField({ blank: true, initial: "" }),
+        p25: new fields.StringField({ blank: true, initial: "" }),
+        down: new fields.StringField({ blank: true, initial: "" }),
+        dead: new fields.StringField({ blank: true, initial: "" }),
+      }),
+
+      // Retrato do módulo Theatre Inserts por faixa de ferimento. Mesmas
+      // faixas e mesma cascata da arte do token; só vale com o módulo ativo.
+      theatreArt: new fields.SchemaField({
         default: new fields.StringField({ blank: true, initial: "" }),
         p75: new fields.StringField({ blank: true, initial: "" }),
         p50: new fields.StringField({ blank: true, initial: "" }),
