@@ -106,19 +106,27 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         return submitData;
       }
 
+      // Converte um objeto indexado do form ({0:{...},1:{...}}) em array.
+      // Ignora chaves que não sejam índices inteiros: um `name` malformado no
+      // template (ex.: "system.actions..extraDamage.0.formula") vira a chave ""
+      // no expandObject e, somada ao índice 0 real, sobrescrevia a ação inteira
+      // com um objeto incompleto — que o DataModel então preenchia com os
+      // valores padrão, "zerando" a ação a cada digitada.
+      const indexedToArray = (obj) => {
+        if (Array.isArray(obj)) return obj;
+        if (!obj || typeof obj !== "object") return [];
+        return Object.keys(obj)
+          .filter((k) => /^\d+$/.test(k))
+          .sort((a, b) => Number(a) - Number(b))
+          .map((k) => obj[k]);
+      };
+
       // ----- Reconstrói o array system.actions a partir do form -----
       // Descobre quantas ações existem contando os campos .label.
       const actionLabels = form?.querySelectorAll?.('[name^="system.actions."][name$=".label"]');
       if (actionLabels && actionLabels.length) {
         // Converte o objeto indexado (expandObject) em array ordenado.
-        let arr = [];
-        if (sys.actions && !Array.isArray(sys.actions) && typeof sys.actions === "object") {
-          arr = Object.keys(sys.actions)
-            .sort((a, b) => Number(a) - Number(b))
-            .map((k) => sys.actions[k]);
-        } else if (Array.isArray(sys.actions)) {
-          arr = sys.actions;
-        }
+        let arr = indexedToArray(sys.actions);
         // Remove buracos ANTES de mexer (evita arr[i] undefined).
         arr = arr.filter((v) => v !== undefined && v !== null);
         // Campos que NÃO têm input no form (a macro é vinculada por
@@ -138,16 +146,12 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
           // vindo do form → converte para array.
           const fx = arr[i].appliesEffects;
           if (fx && !Array.isArray(fx) && typeof fx === "object") {
-            arr[i].appliesEffects = Object.keys(fx)
-              .sort((a, b) => Number(a) - Number(b))
-              .map((k) => fx[k]);
+            arr[i].appliesEffects = indexedToArray(fx);
           }
           // Idem para o dano extra (objeto indexado → array).
           const xd = arr[i].extraDamage;
           if (xd && !Array.isArray(xd) && typeof xd === "object") {
-            arr[i].extraDamage = Object.keys(xd)
-              .sort((a, b) => Number(a) - Number(b))
-              .map((k) => xd[k]);
+            arr[i].extraDamage = indexedToArray(xd);
           }
           // Movimento: os subcampos só aparecem no form quando visíveis, então
           // mesclamos com o que já está salvo para não perder configuração.

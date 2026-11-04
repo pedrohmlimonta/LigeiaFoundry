@@ -241,10 +241,10 @@
       {{#each act.extraDamage as |xd di|}}
       <div class="lig-item-row lig-xd-row">
         <label style="flex:1.4">Fórmula
-          <input type="text" name="system.actions.{{../i}}.extraDamage.{{di}}.formula" value="{{xd.formula}}" placeholder="ex.: 1d6" title="Aceita variáveis do personagem: @forca, @nivel... ex.: floor(@nivel/2)"/>
+          <input type="text" name="system.actions.{{i}}.extraDamage.{{di}}.formula" value="{{xd.formula}}" placeholder="ex.: 1d6" title="Aceita variáveis do personagem: @forca, @nivel... ex.: floor(@nivel/2)"/>
         </label>
         <label>Recurso
-          <select name="system.actions.{{../i}}.extraDamage.{{di}}.resource">
+          <select name="system.actions.{{i}}.extraDamage.{{di}}.resource">
             <option value="hp" {{#if (eq xd.resource "hp")}}selected{{/if}}>PV</option>
             <option value="mp" {{#if (eq xd.resource "mp")}}selected{{/if}}>PM</option>
             <option value="heroic" {{#if (eq xd.resource "heroic")}}selected{{/if}}>PH</option>
@@ -252,7 +252,7 @@
         </label>
         {{#if (eq xd.resource "hp")}}
         <label>Tipo
-          <select name="system.actions.{{../i}}.extraDamage.{{di}}.type" class="lig-dmgtype-select">
+          <select name="system.actions.{{i}}.extraDamage.{{di}}.type" class="lig-dmgtype-select">
             <option value="" {{#unless xd.type}}selected{{/unless}}>—</option>
             {{selectOptions ../../damageTypes selected=xd.type}}
             <option class="lig-dmg-sep" disabled>──────────</option>
@@ -261,10 +261,10 @@
         </label>
         {{/if}}
         <label class="lig-inline-check" title="Esta parcela também recebe o bônus de dano escalonado por superar a defesa.">
-          <input type="checkbox" name="system.actions.{{../i}}.extraDamage.{{di}}.scaling" {{checked xd.scaling}}/>
+          <input type="checkbox" name="system.actions.{{i}}.extraDamage.{{di}}.scaling" {{checked xd.scaling}}/>
           Escalonado
         </label>
-        <button type="button" class="lig-mini-btn danger" data-action="removeExtraDamage" data-action-index="{{../i}}" data-index="{{di}}" title="Remover este dano extra">✕</button>
+        <button type="button" class="lig-mini-btn danger" data-action="removeExtraDamage" data-action-index="{{i}}" data-index="{{di}}" title="Remover este dano extra">✕</button>
       </div>
       {{/each}}
       <button type="button" class="lig-mini-btn" data-action="addExtraDamage" data-action-index="{{i}}">+ dano extra</button>
