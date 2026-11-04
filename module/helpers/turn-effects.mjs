@@ -14,6 +14,7 @@
 import { rollLigeia, resolveAttr, rerollFor, critFor, applyHealingToActor, applyDamageToActor, attackCategories, categoryMods } from "./dice.mjs";
 import { processWoundRollAtTurnStart } from "./wounds.mjs";
 import { resolveEffectValue } from "./effects.mjs";
+import { privateResource } from "./chat-privacy.mjs";
 
 /** Detecta se ESTE cliente deve processar (apenas um GM ativo). */
 function isResponsibleClient() {
@@ -115,7 +116,7 @@ export async function processRegenAtTurnStart(actor) {
     const resLabel = { hp: "PV", mp: "PM", heroic: "PH" }[resource];
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor }),
-      content: `<div class="ligeia-roll-flavor"><strong>${actor.name}</strong> — <em>${ae.label}</em>: <span class="lig-atk-heal">regenera <strong>${amount}</strong> ${resLabel}</span>${applied.applied ? ` (${resLabel}: ${applied.newValue}/${applied.newMax})` : ""}</div>`,
+      content: `<div class="ligeia-roll-flavor"><strong>${actor.name}</strong> — <em>${ae.label}</em>: <span class="lig-atk-heal">regenera <strong>${amount}</strong> ${resLabel}</span>${applied.applied ? privateResource(actor, ` (${resLabel}: ${applied.newValue}/${applied.newMax})`, resource) : ""}</div>`,
     });
   }
 }
@@ -137,7 +138,7 @@ export async function processTickDamageAtTurnStart(actor) {
     const typeLabel = tick.type ? (CONFIG.LIGEIA?.damageTypes?.[tick.type] || tick.type) : "";
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor }),
-      content: `<div class="ligeia-roll-flavor"><strong>${actor.name}</strong> — <em>${ae.label}</em>: ${amount} de dano${typeLabel ? " " + typeLabel : ""}${applied.applied ? ` (${resLabel}: ${applied.newValue}/${applied.newMax})` : ""}</div>`,
+      content: `<div class="ligeia-roll-flavor"><strong>${actor.name}</strong> — <em>${ae.label}</em>: ${amount} de dano${typeLabel ? " " + typeLabel : ""}${applied.applied ? privateResource(actor, ` (${resLabel}: ${applied.newValue}/${applied.newMax})`, resource) : ""}</div>`,
     });
   }
 }

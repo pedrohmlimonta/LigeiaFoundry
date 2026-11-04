@@ -14,6 +14,8 @@
  * coberto sem precisar alterar cada um deles.
  */
 
+import { privateResource } from "./chat-privacy.mjs";
+
 /**
  * Compara o array de efeitos aplicados antes/depois de uma atualização e
  * devolve a soma de sobrevida vinculada dos efeitos que SUMIRAM.
@@ -76,7 +78,7 @@ export function registerBarrierHooks() {
         await actor.update({ "system.resources.hp.temp": temp }, { ligeiaBarrierOp: true });
         await ChatMessage.create({
           speaker: ChatMessage.getSpeaker({ actor }),
-          content: `<div class="ligeia-roll-flavor"><strong>${actor.name}</strong>: a sobrevida vinculada de <em>${labels.join(", ")}</em> se dissipa (sobrevida: ${temp}).</div>`,
+          content: `<div class="ligeia-roll-flavor"><strong>${actor.name}</strong>: a sobrevida vinculada de <em>${labels.join(", ")}</em> se dissipa${privateResource(actor, ` (sobrevida: ${temp})`, "hp")}.</div>`,
         });
       }
     }

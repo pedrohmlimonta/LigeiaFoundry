@@ -25,15 +25,13 @@
  */
 
 import { DEATH_HP } from "./wounds.mjs";
+import { barsVisibleFor, ACTOR_TYPES } from "./visibility.mjs";
+
+// Reexportada para quem já a importava daqui.
+export { barsVisibleFor };
 
 const SYSTEM = "ligeia-rpg";
 const BARS_SETTING = "tokenResourceBars";
-
-/** Tipos de ator deste sistema que recebem as barras. */
-const ACTOR_TYPES = ["personagem", "npc", "veiculo"];
-
-/** Tipos de ator cujas barras ficam escondidas dos jogadores por padrão. */
-const GM_ONLY_TYPES = ["npc", "veiculo"];
 
 /**
  * As três barras, na ordem em que são empilhadas (de cima para baixo).
@@ -76,26 +74,6 @@ function barsEnabled() {
 /* ======================================================================== */
 /*  Regras de visibilidade                                                  */
 /* ======================================================================== */
-
-/**
- * O usuário atual pode ver as barras deste ator?
- * @param {Actor} actor
- * @returns {boolean}
- */
-export function barsVisibleFor(actor) {
-  if (!actor) return false;
-  if (!ACTOR_TYPES.includes(actor.type)) return false;
-  // Narrador vê tudo.
-  if (game.user?.isGM) return true;
-  // O dono vê o próprio personagem (mesmo sendo um NPC entregue a ele).
-  if (actor.isOwner) return true;
-  // NPCs e veículos ficam escondidos até o Narrador liberar aquele ator.
-  if (GM_ONLY_TYPES.includes(actor.type)) {
-    return !!actor.system?.tokenBars?.players;
-  }
-  // Personagens do grupo: visíveis (para esconder, desmarque a barra).
-  return true;
-}
 
 /**
  * Lista das barras que devem ser desenhadas para este token, já filtradas

@@ -18,6 +18,7 @@ import { registerTokenLinkSettings, registerTokenLinkHooks, migrateTokenLinks, r
 import { registerTokenBarSettings, registerTokenBarHooks } from "./helpers/token-bars.mjs";
 import { registerTokenArtHooks } from "./helpers/token-art.mjs";
 import { registerTheatreArtHooks } from "./helpers/theatre-art.mjs";
+import { registerChatPrivacyHooks } from "./helpers/chat-privacy.mjs";
 import { syncConditionEffects } from "./helpers/conditions.mjs";
 import { applyHealingToActor } from "./helpers/dice.mjs";
 import { playAutomatedAnimation, playPersistentFx, endPersistentFx, persistentFxName } from "./helpers/integrations.mjs";
@@ -63,6 +64,8 @@ Hooks.once("init", function () {
   registerTokenArtHooks();
   // O mesmo para o retrato do Theatre Inserts, quando o módulo estiver ativo.
   registerTheatreArtHooks();
+  // Esconde do chat os PV/PM/PH de quem o jogador não pode ver pela barra.
+  registerChatPrivacyHooks();
   console.log("Ligeia RPG | Inicializando sistema");
 
   // Namespace global para debug/macros

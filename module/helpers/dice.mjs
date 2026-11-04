@@ -38,6 +38,7 @@ import { executeActionMovement } from "./movement.mjs";
 import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvailable, activeEffectsOf } from "./effects.mjs";
 import { DEATH_HP, WOUND_LEVELS, woundLevelFor, setWoundLevel } from "./wounds.mjs";
 import { updateActorAsGM, canAffectActor } from "./gm-proxy.mjs";
+import { privateResource } from "./chat-privacy.mjs";
 // Re-export: outros módulos importam estas funções daqui.
 export { actorRollData, resolveEffectValue };
 import { promptRollConfig, shouldPromptRoll } from "../apps/roll-dialog.mjs";
@@ -701,7 +702,13 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
         const resLabel = { hp: "PV", mp: "PM", heroic: "PH" }[resource];
         const parts = [];
         if (applied.fromTemp) parts.push(`${applied.fromTemp} do PV temp.`);
-        applyNote = `<div class="lig-dmg-applied">${resLabel}: ${applied.newValue}/${applied.newMax}${parts.length ? " — " + parts.join(", ") : ""}${applied.wound ? ` <span class="lig-wound lig-wound-${applied.wound.key}">⚠ ${applied.wound.label}</span>` : (applied.downed ? ' <span class="lig-downed">⚠ Caído!</span>' : "")}</div>`;
+        // Quanto SOBROU no alvo é informação privada (ver chat-privacy.mjs);
+        // o dano causado, logo abaixo, continua visível para todos.
+        const estado = `${resLabel}: ${applied.newValue}/${applied.newMax}${parts.length ? " — " + parts.join(", ") : ""}`;
+        const marca = applied.wound
+          ? ` <span class="lig-wound lig-wound-${applied.wound.key}">⚠ ${applied.wound.label}</span>`
+          : (applied.downed ? ' <span class="lig-downed">⚠ Caído!</span>' : "");
+        applyNote = `<div class="lig-dmg-applied">${privateResource(tActor, estado, resource)}${marca}</div>`;
       } else if (applied.noPermission) {
         applyNote = `<div class="lig-dmg-applied muted">${relayFailNote(applied)}</div>`;
       }
@@ -761,7 +768,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       const applied = await applyTempHpToActor(tActor, amount, { stack: !!action.tempStack });
       if (applied.applied) {
         const keptNote = applied.kept ? ` <span class="lig-cond-note">(manteve a atual, maior)</span>` : "";
-        applyNote = `<div class="lig-heal-applied">Sobrevida atual: ${applied.newTemp}${keptNote}</div>`;
+        applyNote = `<div class="lig-heal-applied">${privateResource(tActor, `Sobrevida atual: ${applied.newTemp}${keptNote}`, "hp")}</div>`;
       } else if (applied.noPermission) {
         applyNote = `<div class="lig-dmg-applied muted">${relayFailNote(applied)}</div>`;
       }
@@ -775,7 +782,8 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
         const woundNote = applied.woundTo
           ? ` <span class="lig-wound lig-wound-${applied.woundTo}">→ ${applied.woundLabel}</span>`
           : "";
-        applyNote = `<div class="lig-heal-applied">${resShort}: ${applied.newValue}/${applied.newMax}${overNote}${woundNote}</div>`;
+        const estadoCura = `${resShort}: ${applied.newValue}/${applied.newMax}${overNote}`;
+        applyNote = `<div class="lig-heal-applied">${privateResource(tActor, estadoCura, hResource)}${woundNote}</div>`;
       } else if (applied.dead) {
         applyNote = `<div class="lig-dmg-applied muted">O alvo está morto — a cura não tem efeito.</div>`;
       } else if (applied.noPermission) {
@@ -871,7 +879,8 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       if (maxBarrier > 0) {
         const curTemp = tActor.system?.resources?.hp?.temp || 0;
         if (maxBarrier > curTemp) update["system.resources.hp.temp"] = maxBarrier;
-        barrierNote = `<div class="lig-heal-applied">Sobrevida vinculada: ${Math.max(maxBarrier, curTemp)}${maxBarrier <= curTemp ? ' <span class="lig-cond-note">(manteve a atual, maior)</span>' : ""}</div>`;
+        const estadoBarreira = `Sobrevida vinculada: ${Math.max(maxBarrier, curTemp)}${maxBarrier <= curTemp ? ' <span class="lig-cond-note">(manteve a atual, maior)</span>' : ""}`;
+        barrierNote = `<div class="lig-heal-applied">${privateResource(tActor, estadoBarreira, "hp")}</div>`;
       }
       await updateActorAsGM(tActor, update);
       fxText = `<div class="lig-atk-fx">Efeitos aplicados: <strong>${names.join(", ")}</strong></div>${barrierNote}`;

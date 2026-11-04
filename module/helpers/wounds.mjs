@@ -15,6 +15,7 @@
  */
 import { rollLigeia, postRollToChat, resolveAttr } from "./dice.mjs";
 import { updateActorAsGM, canAffectActor } from "./gm-proxy.mjs";
+import { privateResource } from "./chat-privacy.mjs";
 
 /** PV em que o personagem morre automaticamente. */
 export const DEATH_HP = -7;
@@ -289,10 +290,12 @@ export async function performRest(actor, { proper = true } = {}) {
   const newLevel = woundLevelFor(hpAfter);
 
   // --- Relatório no chat ---
+  // Os valores de recurso são privados: só vê quem enxergaria a barra daquele
+  // ator no mapa (ver chat-privacy.mjs).
   const linhas = [
-    `<div>PV: ${hpBefore} → <strong>${hpAfter}</strong>/${hp.max || 0}${hpGain ? ` <span class="lig-atk-heal">(+${hpGain})</span>` : ""}</div>`,
-    `<div>PM: ${mp.value || 0} → <strong>${(mp.value || 0) + mpGain}</strong>/${mp.max || 0}${mpGain ? ` <span class="lig-atk-heal">(+${mpGain})</span>` : ""}</div>`,
-    `<div>Pontos Heroicos: ${ph.value || 0} → <strong>${(ph.value || 0) + phGain}</strong>/${ph.max || 0}${phGain ? ` <span class="lig-atk-heal">(+${phGain})</span>` : ""}</div>`,
+    `<div class="lig-heal-applied">${privateResource(actor, `PV: ${hpBefore} → <strong>${hpAfter}</strong>/${hp.max || 0}${hpGain ? ` <span class="lig-atk-heal">(+${hpGain})</span>` : ""}`, "hp")}</div>`,
+    `<div class="lig-heal-applied">${privateResource(actor, `PM: ${mp.value || 0} → <strong>${(mp.value || 0) + mpGain}</strong>/${mp.max || 0}${mpGain ? ` <span class="lig-atk-heal">(+${mpGain})</span>` : ""}`, "mp")}</div>`,
+    `<div class="lig-heal-applied">${privateResource(actor, `Pontos Heroicos: ${ph.value || 0} → <strong>${(ph.value || 0) + phGain}</strong>/${ph.max || 0}${phGain ? ` <span class="lig-atk-heal">(+${phGain})</span>` : ""}`, "heroic")}</div>`,
   ];
   const notas = [];
   if (!proper) notas.push("local inapropriado: metade da recuperação");
