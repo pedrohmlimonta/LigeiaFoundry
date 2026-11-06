@@ -354,6 +354,62 @@ export function endEffectFx(name) {
 }
 
 /**
+ * Nome que o Automated Animations dá aos visuais que ele põe num token
+ * quando chamado pela API: "spot <id do token>". Ele é o MESMO para todos os
+ * efeitos daquele token — não dá para encerrar um sem encerrar os outros.
+ */
+function nomeAaDoToken(token) {
+  return token?.id ? `spot ${token.id}` : "";
+}
+
+/**
+ * Derruba TODOS os visuais do Automated Animations que estejam neste token
+ * por nossa conta. Como o AA usa um nome só por token, esta é a única forma
+ * de garantir que o visual de um efeito encerrado saia da tela.
+ *
+ * Quem chama precisa reacender depois o que continua valendo — é o que
+ * `resyncEffectFx` faz.
+ * @param {Token} token
+ */
+export function endAllAaFxOnToken(token) {
+  const EM = globalThis.Sequencer?.EffectManager;
+  if (!EM?.endEffects || !token) return;
+  const nome = nomeAaDoToken(token);
+  try { EM.endEffects({ name: nome, object: token }); } catch (e) { /* nada a encerrar */ }
+  try { EM.endEffects({ name: nome }); } catch (e) { /* idem */ }
+}
+
+/**
+ * Põe os visuais de um ator exatamente no estado que a ficha dele pede.
+ *
+ * Por que apagar tudo e reacender: o Automated Animations batiza todo visual
+ * que coloca num token como "spot <id do token>", sem distinguir de qual
+ * efeito ele veio. Encerrar "só o efeito que saiu" é impossível por nome, e o
+ * `origin` nem sempre chega ao cliente que precisa encerrar. Então zeramos os
+ * nossos visuais naquele token e tocamos de novo os que continuam ativos.
+ *
+ * @param {Actor} actor
+ * @param {Array<{fx:object, name:string, item?:Item}>} ativos o que deve estar tocando
+ */
+export async function resyncEffectFx(actor, ativos = []) {
+  const token = activeTokenOf(actor);
+  if (!token) return;
+
+  // 1) Apaga os nossos: os do Automated Animations (nome por token) e os que
+  //    tocamos direto pelo Sequencer (nome por efeito).
+  endAllAaFxOnToken(token);
+  for (const nome of origemPorNome.keys()) {
+    if (typeof nome === "string" && nome.startsWith(persistentFxName(""))) endPersistentFx(nome);
+  }
+
+  // 2) Reacende o que continua valendo.
+  for (const { fx, name, item } of ativos) {
+    if (!fx || !name) continue;
+    await playEffectFx({ actor, fx, name, item: item ?? null });
+  }
+}
+
+/**
  * Encerra visuais de efeito que ficaram órfãos: animações persistentes
  * nossas (origin "ligeia-fx-…") cujo efeito já não existe mais em ninguém.
  *

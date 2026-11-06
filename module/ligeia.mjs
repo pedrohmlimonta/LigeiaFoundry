@@ -21,7 +21,7 @@ import { registerTheatreArtHooks } from "./helpers/theatre-art.mjs";
 import { registerChatPrivacyHooks } from "./helpers/chat-privacy.mjs";
 import { syncConditionEffects } from "./helpers/conditions.mjs";
 import { applyHealingToActor } from "./helpers/dice.mjs";
-import { persistentFxName, playEffectFx, endEffectFx, limparFxOrfaos } from "./helpers/integrations.mjs";
+import { persistentFxName, playEffectFx, endEffectFx, limparFxOrfaos, resyncEffectFx } from "./helpers/integrations.mjs";
 import { registerTurnEffectHooks } from "./helpers/turn-effects.mjs";
 import { registerBarrierHooks } from "./helpers/barrier.mjs";
 import { applyTempHpToActor } from "./helpers/dice.mjs";
@@ -524,6 +524,9 @@ Hooks.on("updateItem", async function (item, changes, options, userId) {
     await playEffectFx({ actor, fx: item.system, name: nome, item });
   } else {
     endEffectFx(nome);
+    // Mesmo motivo do hook dos efeitos: o visual do AA é nomeado por token,
+    // então reacendemos o que ainda vale depois de apagar.
+    await resyncEffectFx(actor, visuaisAtivosDe(actor));
   }
 });
 
@@ -614,8 +617,30 @@ Hooks.on("updateActor", async function (actor, changes, options, userId) {
 /*  EFEITOS VISUAIS de efeitos aplicados (Efeitos & Condições)         */
 /*  Um efeito com "efeito visual" preso ao token aparece quando ele é   */
 /*  aplicado e some quando é removido, desligado ou expira.             */
-/* Cena carregada: derruba visuais de efeito que já não têm dono. */
-Hooks.on("canvasReady", function () {
+/**
+ * Lista tudo o que deve estar tocando num ator agora: os efeitos aplicados
+ * ativos e os itens ligados que tenham visual.
+ */
+function visuaisAtivosDe(actor) {
+  const temVisual = (o) => !!(o?.fxFile || (o?.fxAaConfig && Object.keys(o.fxAaConfig).length > 0));
+  const lista = [];
+  for (const ae of actor?.system?.appliedEffects || []) {
+    if (!ae.disabled && ae.fxId && temVisual(ae)) {
+      lista.push({ fx: ae, name: persistentFxName(ae.fxId) });
+    }
+  }
+  for (const item of actor?.items || []) {
+    if (item.system?.active && temVisual(item.system)) {
+      lista.push({ fx: item.system, name: persistentFxName(`item-${item.id}`), item });
+    }
+  }
+  return lista;
+}
+
+/* Cena carregada: põe os visuais no estado que as fichas pedem. Isto também
+   derruba o que ficou preso de sessões anteriores — inclusive animações de
+   versões do sistema que não sabiam encerrá-las. */
+Hooks.on("canvasReady", async function () {
   // Só o Narrador faz a faxina, para os clientes não brigarem pela mesma
   // remoção; o Sequencer propaga o resultado.
   if (!game.user?.isGM) return;
@@ -623,22 +648,21 @@ Hooks.on("canvasReady", function () {
   for (const token of canvas?.tokens?.placeables || []) {
     const actor = token.actor;
     if (!actor) continue;
-    for (const ae of actor.system?.appliedEffects || []) {
-      if (!ae.disabled && ae.fxId) vivos.add(persistentFxName(ae.fxId));
-    }
-    for (const item of actor.items || []) {
-      if (item.system?.active) vivos.add(persistentFxName(`item-${item.id}`));
-    }
+    const ativos = visuaisAtivosDe(actor);
+    for (const v of ativos) vivos.add(v.name);
+    await resyncEffectFx(actor, ativos);
   }
+  // Rede final: visuais nossos que não pertencem a nenhum token em cena.
   const n = limparFxOrfaos(vivos);
   if (n) console.log(`Ligeia RPG | ${n} visual(is) de efeito sem dono encerrado(s).`);
 });
 
 /* Item apagado do personagem: o visual que ele mantinha vai junto. */
-Hooks.on("deleteItem", function (item) {
+Hooks.on("deleteItem", async function (item) {
   const actor = item?.parent;
   if (actor?.documentName !== "Actor") return;
   endEffectFx(persistentFxName(`item-${item.id}`));
+  await resyncEffectFx(actor, visuaisAtivosDe(actor));
 });
 
 /* ------------------------------------------------------------------ */
@@ -656,25 +680,36 @@ Hooks.on("preUpdateActor", function (actor, changes, options) {
   }));
 });
 
-Hooks.on("updateActor", function (actor, changes, options, userId) {
+Hooks.on("updateActor", async function (actor, changes, options, userId) {
   if (game.user.id !== userId) return;
   if (!Array.isArray(options.ligeiaFxAntes)) return;
   const antes = new Map(options.ligeiaFxAntes.filter((e) => e.fxId).map((e) => [e.fxId, e]));
   const agora = new Map(
     (actor.system?.appliedEffects || []).filter((ae) => ae.fxId).map((ae) => [ae.fxId, ae]),
   );
-  // Sumiram ou foram desligados → encerra o visual.
+
+  // Algum efeito COM visual saiu de cena (removido, desligado, expirado,
+  // dispensado por rolagem)?
+  let saiuAlgum = false;
   for (const [id, ae] of antes) {
     const atual = agora.get(id);
     const saiu = !atual || (atual.disabled && !ae.disabled);
-    const temVisual = !!(ae.fxFile || ae.temAnim);
-    if (temVisual && saiu) endEffectFx(persistentFxName(id));
+    if (saiu && (ae.fxFile || ae.temAnim)) { saiuAlgum = true; break; }
   }
-  // Novos ou reativados → começa o visual.
+
+  // O Automated Animations dá um nome só por token, então não dá para apagar
+  // o visual de um efeito sem apagar o dos outros: apagamos todos os nossos
+  // naquele token e reacendemos os que continuam valendo.
+  if (saiuAlgum) {
+    await resyncEffectFx(actor, visuaisAtivosDe(actor));
+    return;
+  }
+
+  // Ninguém saiu: só acende o que entrou ou foi reativado.
   for (const [id, ae] of agora) {
     const anterior = antes.get(id);
     const entrou = !anterior || (anterior.disabled && !ae.disabled);
-    const temVisual = !!(ae.fxFile || ae.fxAaConfig);
+    const temVisual = !!(ae.fxFile || (ae.fxAaConfig && Object.keys(ae.fxAaConfig).length > 0));
     if (temVisual && !ae.disabled && entrou) {
       playEffectFx({ actor, fx: ae, name: persistentFxName(id) });
     }
