@@ -21,7 +21,7 @@ import { registerTheatreArtHooks } from "./helpers/theatre-art.mjs";
 import { registerChatPrivacyHooks } from "./helpers/chat-privacy.mjs";
 import { syncConditionEffects } from "./helpers/conditions.mjs";
 import { applyHealingToActor } from "./helpers/dice.mjs";
-import { persistentFxName, playEffectFx, endEffectFx } from "./helpers/integrations.mjs";
+import { persistentFxName, playEffectFx, endEffectFx, limparFxOrfaos } from "./helpers/integrations.mjs";
 import { registerTurnEffectHooks } from "./helpers/turn-effects.mjs";
 import { registerBarrierHooks } from "./helpers/barrier.mjs";
 import { applyTempHpToActor } from "./helpers/dice.mjs";
@@ -614,11 +614,45 @@ Hooks.on("updateActor", async function (actor, changes, options, userId) {
 /*  EFEITOS VISUAIS de efeitos aplicados (Efeitos & Condições)         */
 /*  Um efeito com "efeito visual" preso ao token aparece quando ele é   */
 /*  aplicado e some quando é removido, desligado ou expira.             */
+/* Cena carregada: derruba visuais de efeito que já não têm dono. */
+Hooks.on("canvasReady", function () {
+  // Só o Narrador faz a faxina, para os clientes não brigarem pela mesma
+  // remoção; o Sequencer propaga o resultado.
+  if (!game.user?.isGM) return;
+  const vivos = new Set();
+  for (const token of canvas?.tokens?.placeables || []) {
+    const actor = token.actor;
+    if (!actor) continue;
+    for (const ae of actor.system?.appliedEffects || []) {
+      if (!ae.disabled && ae.fxId) vivos.add(persistentFxName(ae.fxId));
+    }
+    for (const item of actor.items || []) {
+      if (item.system?.active) vivos.add(persistentFxName(`item-${item.id}`));
+    }
+  }
+  const n = limparFxOrfaos(vivos);
+  if (n) console.log(`Ligeia RPG | ${n} visual(is) de efeito sem dono encerrado(s).`);
+});
+
+/* Item apagado do personagem: o visual que ele mantinha vai junto. */
+Hooks.on("deleteItem", function (item) {
+  const actor = item?.parent;
+  if (actor?.documentName !== "Actor") return;
+  endEffectFx(persistentFxName(`item-${item.id}`));
+});
+
 /* ------------------------------------------------------------------ */
 Hooks.on("preUpdateActor", function (actor, changes, options) {
   if (!foundry.utils.hasProperty(changes, "system.appliedEffects")) return;
   options.ligeiaFxAntes = (actor.system?.appliedEffects || []).map((ae) => ({
-    fxId: ae.fxId, fxFile: ae.fxFile, fxScale: ae.fxScale, disabled: !!ae.disabled,
+    fxId: ae.fxId,
+    fxFile: ae.fxFile,
+    fxScale: ae.fxScale,
+    // Sem isto, um efeito cuja animação veio do botão "puxar" não era
+    // reconhecido como tendo visual, e a animação persistente nunca era
+    // encerrada ao desligar/remover/expirar o efeito.
+    temAnim: !!(ae.fxAaConfig && typeof ae.fxAaConfig === "object" && Object.keys(ae.fxAaConfig).length > 0),
+    disabled: !!ae.disabled,
   }));
 });
 
@@ -633,7 +667,7 @@ Hooks.on("updateActor", function (actor, changes, options, userId) {
   for (const [id, ae] of antes) {
     const atual = agora.get(id);
     const saiu = !atual || (atual.disabled && !ae.disabled);
-    const temVisual = !!(ae.fxFile || ae.fxAaConfig);
+    const temVisual = !!(ae.fxFile || ae.temAnim);
     if (temVisual && saiu) endEffectFx(persistentFxName(id));
   }
   // Novos ou reativados → começa o visual.

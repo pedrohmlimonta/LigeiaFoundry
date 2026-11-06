@@ -197,14 +197,6 @@ export function aaConfigScale(cfg) {
   return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
-/** A config já pede permanência em algum dos seus ramos? */
-function configPersiste(cfg) {
-  for (const ramo of ["primary", "source", "target", "secondary", "data"]) {
-    if (cfg?.[ramo]?.options?.persistent) return true;
-  }
-  return false;
-}
-
 /**
  * Liga a persistência em todos os ramos de uma config do Automated Animations.
  * O menu "Active Effects" do AA tem a opção "Persistent"; forçando-a aqui, uma
@@ -262,12 +254,15 @@ async function playAaEffect({ actor, cfg, name, item = null, persistir = true })
 
     const atual = item?.flags?.autoanimations ?? null;
     const mesma = !!item && JSON.stringify(cfg) === JSON.stringify(atual);
-    // Para FORÇAR a permanência é preciso mexer na config, e mexer na config
-    // exige um item temporário — o item real não pode ser alterado. Sem
-    // forçar, usamos o item real sempre que der (animação mais fiel).
-    const jaPersiste = configPersiste(cfg);
 
-    if (mesma && (!persistir || jaPersiste)) {
+    // Quando o visual tem de PERMANECER, sempre montamos um item temporário
+    // cujo uuid é o nome do efeito. Isso serve a duas coisas: liga a
+    // persistência mesmo que ela não esteja marcada no menu do Automated
+    // Animations, e — principalmente — faz o AA gravar um `origin` que
+    // QUALQUER cliente consegue recalcular na hora de encerrar. Usar o item
+    // real aqui deixaria o origin dependendo do uuid dele, que o efeito
+    // aplicado não carrega, e a animação ficaria presa na tela.
+    if (mesma && !persistir) {
       // Caminho IDÊNTICO ao das ações: entrega o item REAL. É o que preserva
       // a configuração inteira — um clone pode perder partes dela.
       origemPorNome.set(name, item.uuid);
@@ -356,6 +351,39 @@ export function endEffectFx(name) {
     }
   }
   origemPorNome.delete(name);
+}
+
+/**
+ * Encerra visuais de efeito que ficaram órfãos: animações persistentes
+ * nossas (origin "ligeia-fx-…") cujo efeito já não existe mais em ninguém.
+ *
+ * Serve de rede de segurança para o que escapou — uma troca de cena no meio
+ * do caminho, um cliente que caiu, ou visuais presos por uma versão antiga do
+ * sistema, que não sabia encerrar as animações puxadas.
+ *
+ * @param {Iterable<string>} nomesVivos nomes que DEVEM continuar tocando
+ */
+export function limparFxOrfaos(nomesVivos = []) {
+  try {
+    const EM = globalThis.Sequencer?.EffectManager;
+    if (!EM?.getEffects) return 0;
+    const vivos = new Set(nomesVivos);
+    const prefixo = persistentFxName("");
+    const origens = new Set();
+    for (const efeito of EM.getEffects() || []) {
+      const origin = efeito?.data?.origin ?? efeito?.origin ?? "";
+      if (typeof origin !== "string" || !origin.startsWith(prefixo)) continue;
+      if (vivos.has(origin)) continue;
+      origens.add(origin);
+    }
+    for (const origin of origens) {
+      try { EM.endEffects({ origin }); } catch (e) { /* segue para os outros */ }
+    }
+    return origens.size;
+  } catch (e) {
+    console.warn("Ligeia | falha ao limpar visuais órfãos:", e);
+    return 0;
+  }
 }
 
 /**
