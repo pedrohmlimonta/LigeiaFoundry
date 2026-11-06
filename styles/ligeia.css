@@ -652,6 +652,14 @@ label.lig-bars-players {
   gap: 0.6rem;
 }
 
+/* "limpar animações" no cabeçalho do item: encostado à direita, discreto. */
+.lig-clear-anims {
+  margin-left: auto;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 0.7rem;
+}
+
 .lig-item-img {
   width: 48px;
   height: 48px;

@@ -80,7 +80,10 @@ export function activatableFields() {
     // partir dela e dura exatamente enquanto o efeito estiver ativo.
     fxAaConfig: new fields.ObjectField({ required: false, nullable: true, initial: null }),
     fxAaName: new fields.StringField({ blank: true, initial: "" }),
-    // Tocar a animação do Automated Animations ao LIGAR o item
+    // LEGADO: antes disparava a animação do Automated Animations ao ligar o
+    // item, o que tocava uma segunda animação junto da puxada. O campo fica
+    // para não invalidar fichas antigas, mas não é mais lido nem exibido —
+    // hoje existe só o botão "puxar animação do item".
     animOnActivate: new fields.BooleanField({ initial: true }),
     // Por padrão os itens são ATIVÁVEIS (precisam ser ligados para valer) e
     // começam desligados (active=false). Use "passive" para efeitos sempre-on.

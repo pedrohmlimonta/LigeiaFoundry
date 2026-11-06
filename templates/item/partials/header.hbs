@@ -2,4 +2,11 @@
 <header class="lig-item-header">
   <img class="lig-item-img" src="{{item.img}}" data-edit="img" alt="{{item.name}}"/>
   <input type="text" name="name" value="{{item.name}}" class="lig-item-name" placeholder="Nome"/>
+  {{!-- Só aparece quando há alguma animação guardada neste item --}}
+  {{#if animInventory.total}}
+  <button type="button" class="lig-mini-btn danger lig-clear-anims" data-action="clearAllAnims"
+          title="Remove as {{animInventory.total}} animações guardadas neste item: o visual do item ligado, as das ações e as dos efeitos aplicáveis. A animação configurada no Automated Animations do item não é apagada.">
+    🎞️ limpar animações ({{animInventory.total}})
+  </button>
+  {{/if}}
 </header>

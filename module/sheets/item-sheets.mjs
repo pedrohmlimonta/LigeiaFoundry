@@ -9,6 +9,37 @@ const { ItemSheetV2 } = foundry.applications.sheets;
 /* ================================================================== */
 /*  Base                                                              */
 /* ================================================================== */
+/**
+ * Inventário das animações que o SISTEMA guarda num item, para o botão
+ * "limpar todas". Conta tanto as puxadas do Automated Animations quanto os
+ * caminhos digitados do Sequencer.
+ *
+ * NÃO inclui `flags.autoanimations` (a animação configurada no módulo): ela é
+ * a FONTE de onde se puxa e continua intacta.
+ *
+ * @param {Item} item
+ * @returns {{total:number, itemFx:number, acoes:number, efeitos:number}}
+ */
+export function contarAnimacoes(item) {
+  const sys = item?.system || {};
+  const temCfg = (c) => !!(c && typeof c === "object" && Object.keys(c).length > 0);
+  const temTexto = (s) => !!String(s || "").trim();
+  let itemFx = 0, acoes = 0, efeitos = 0;
+
+  if (temCfg(sys.fxAaConfig)) itemFx++;
+  if (temTexto(sys.fxFile)) itemFx++;
+
+  for (const a of sys.actions || []) {
+    if (temCfg(a?.aaConfig)) acoes++;
+    if (temTexto(a?.animFile)) acoes++;
+    for (const fx of a?.appliesEffects || []) {
+      if (temCfg(fx?.fxAaConfig)) efeitos++;
+      if (temTexto(fx?.fxFile)) efeitos++;
+    }
+  }
+  return { total: itemFx + acoes + efeitos, itemFx, acoes, efeitos };
+}
+
 class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
   /** @override Preserva a rolagem (corpo + caixas de texto) entre re-renders
    *  — o submitOnChange re-renderiza a cada campo editado. */
@@ -70,6 +101,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       testAnim: LigeiaItemSheetBase._onTestAnim,
       pullAnim: LigeiaItemSheetBase._onPullAnim,
       pullFxAnim: LigeiaItemSheetBase._onPullFxAnim,
+      clearAllAnims: LigeiaItemSheetBase._onClearAllAnims,
       clearFxAnim: LigeiaItemSheetBase._onClearFxAnim,
       clearAnim: LigeiaItemSheetBase._onClearAnim,
       toggleAnim: LigeiaItemSheetBase._onToggleAnim,
@@ -363,6 +395,8 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     const seqActive = !!game.modules.get("sequencer")?.active;
     context.aaActive = aaActive;
     context.seqActive = seqActive;
+    // Botão "limpar todas as animações": só aparece quando há o que limpar.
+    context.animInventory = contarAnimacoes(item);
     context.animPlacements = {
       cast: "No conjurador",
       target: "No alvo",
@@ -631,9 +665,9 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
   }
 
   /** Reescreve o array inteiro de ações (preservando contra a corrida). */
-  async _replaceActions(actions) {
+  async _replaceActions(actions, extra = {}) {
     this.#arrayOpInProgress = true;
-    try { await this.document.update({ "system.actions": actions }); }
+    try { await this.document.update({ "system.actions": actions, ...extra }); }
     finally { this.#arrayOpInProgress = false; }
   }
 
@@ -786,6 +820,58 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     fx.fxAaName = this.document.name;
     await this._replaceActions(actions);
     ui.notifications?.info("Animação do item copiada para este efeito — dura enquanto o efeito durar.");
+  }
+
+  /**
+   * Limpa TODAS as animações que o sistema guarda neste item: o visual do item
+   * ligado, as de cada ação e as de cada efeito aplicável — tanto as puxadas
+   * do Automated Animations quanto os caminhos digitados.
+   *
+   * A configuração do próprio Automated Animations no item (flags) NÃO é
+   * tocada: é dela que se puxa, e apagá-la seria uma surpresa.
+   */
+  static async _onClearAllAnims() {
+    const inv = contarAnimacoes(this.document);
+    if (!inv.total) {
+      ui.notifications?.info("Este item não tem nenhuma animação guardada.");
+      return;
+    }
+    const linhas = [];
+    if (inv.itemFx) linhas.push("<li>visual do item ligado</li>");
+    if (inv.acoes) linhas.push(`<li>${inv.acoes} em ações</li>`);
+    if (inv.efeitos) linhas.push(`<li>${inv.efeitos} em efeitos aplicáveis</li>`);
+    const plural = inv.total > 1;
+    const ok = await foundry.applications.api.DialogV2.confirm({
+      window: { title: "Limpar todas as animações" },
+      content: `<p>Remover <strong>${inv.total}</strong> animaç${plural ? "ões" : "ão"} deste item?</p>
+        <ul class="lig-hint">${linhas.join("")}</ul>
+        <p class="lig-hint">Inclui as animações puxadas e os caminhos digitados à mão.
+        A animação configurada no <strong>Automated Animations</strong> do item continua
+        intacta — é dela que você puxa.</p>`,
+      rejectClose: false,
+      modal: true,
+    });
+    if (!ok) return;
+
+    const actions = foundry.utils.deepClone(this.document.system.actions || []);
+    for (const a of actions) {
+      a.aaConfig = null;
+      a.aaName = "";
+      a.animFile = "";
+      for (const fx of a.appliesEffects || []) {
+        fx.fxAaConfig = null;
+        fx.fxAaName = "";
+        fx.fxFile = "";
+      }
+    }
+    // Update único (visual do item + array de ações), com a trava que impede
+    // a ficha de reconstruir os arrays a partir do form durante a operação.
+    await this._replaceActions(actions, {
+      "system.fxAaConfig": null,
+      "system.fxAaName": "",
+      "system.fxFile": "",
+    });
+    ui.notifications?.info(`${inv.total} animaç${plural ? "ões removidas" : "ão removida"} deste item.`);
   }
 
   static async _onClearFxAnim(event, target) {

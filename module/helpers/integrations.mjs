@@ -198,23 +198,114 @@ export function aaConfigScale(cfg) {
 }
 
 /**
- * Toca o visual de um EFEITO (de item, aplicado por ação ou ativo na ficha),
- * preso ao token do portador e permanecendo até `endPersistentFx(name)`.
+ * Liga a persistência em todos os ramos de uma config do Automated Animations.
+ * O menu "Active Effects" do AA tem a opção "Persistent"; forçando-a aqui, uma
+ * animação puxada vale como visual contínuo mesmo que o usuário não a tenha
+ * marcado — e nós é que decidimos quando ela acaba.
+ */
+function forcarPersistencia(cfg) {
+  const copia = foundry.utils.deepClone(cfg);
+  for (const ramo of ["primary", "source", "target", "secondary", "data"]) {
+    const r = copia?.[ramo];
+    if (r && typeof r === "object") {
+      r.options = r.options || {};
+      r.options.persistent = true;
+    }
+  }
+  return copia;
+}
+
+/**
+ * Toca a animação PUXADA pelo próprio Automated Animations, para que venha
+ * com tudo o que foi configurado nele (cor, tamanho, opacidade, secundária,
+ * no alvo), e a prende a um "origin" que nós escolhemos — é por ele que a
+ * encerramos quando o efeito sair.
+ *
+ * O AA grava `origin: item.uuid` em toda animação persistente. Entregamos a
+ * ele um item temporário cujo uuid É o nome do nosso efeito, de modo que
+ * `endEffectFx(nome)` consiga encerrar exatamente esta animação.
+ *
+ * @returns {Promise<boolean>} true se a animação foi disparada
+ */
+/**
+ * De que `origin` o Automated Animations marcou cada visual de efeito que
+ * começamos. O AA grava `origin: item.uuid` nas animações persistentes; como
+ * às vezes entregamos o item REAL (para a animação vir perfeita) e às vezes um
+ * temporário, guardamos aqui qual foi, para encerrar a certa depois.
+ */
+const origemPorNome = new Map();
+
+/**
+ * Toca a animação PUXADA pelo próprio Automated Animations — exatamente pelo
+ * mesmo caminho das ações, que é o que faz a animação vir completa (cor,
+ * tamanho, opacidade, secundária e no alvo).
+ *
+ * A única diferença para uma ação é que aqui o portador do efeito é o
+ * conjurador E o alvo (allowSelfTarget), e que forçamos a persistência quando
+ * precisamos montar um item temporário de qualquer jeito.
+ *
+ * @returns {Promise<boolean>} true se a animação foi disparada
+ */
+async function playAaEffect({ actor, cfg, name, item = null }) {
+  try {
+    if (!isAutomatedAnimationsActive()) return false;
+    const token = activeTokenOf(actor);
+    if (!token) return false;
+
+    const atual = item?.flags?.autoanimations ?? null;
+    const mesma = !!item && JSON.stringify(cfg) === JSON.stringify(atual);
+
+    if (mesma) {
+      // Caminho IDÊNTICO ao das ações: entrega o item REAL. É o que preserva
+      // a configuração inteira — um clone pode perder partes dela.
+      origemPorNome.set(name, item.uuid);
+      await playAutomatedAnimation({
+        actor, item, action: null, targetActors: [actor], allowSelfTarget: true,
+      });
+      return true;
+    }
+
+    // A config puxada já não é a do item (ou não há item): monta um
+    // temporário com ela, como a ação faz, e aproveita para ligar a
+    // persistência e fixar o `origin` pelo qual vamos encerrar.
+    const base = item?.toObject?.() ?? { name: "Efeito", type: "traco" };
+    base.flags = { ...(base.flags || {}), autoanimations: forcarPersistencia(cfg) };
+    const Classe = item?.constructor ?? CONFIG?.Item?.documentClass;
+    if (!Classe) return false;
+    const temp = new Classe(base, { parent: actor });
+    try {
+      Object.defineProperty(temp, "uuid", { value: name, configurable: true });
+      origemPorNome.set(name, name);
+    } catch (e) {
+      origemPorNome.set(name, temp.uuid);
+    }
+
+    const AA = globalThis.AutomatedAnimations;
+    if (!AA?.playAnimation) return false;
+    await AA.playAnimation(token, temp, { targets: [token] });
+    return true;
+  } catch (e) {
+    console.warn("Ligeia | falha ao tocar a animação puxada do efeito:", e);
+    return false;
+  }
+}
+
+/**
+ * Toca o visual de um EFEITO (de item, aplicado por ação ou ativo na ficha).
+ * Ele permanece até `endEffectFx(name)`.
  *
  * Fontes, em ordem:
- *  1. animação PUXADA do item (fxAaConfig) — tocada pelo Sequencer a partir do
- *     caminho extraído, para que dure exatamente enquanto o efeito durar;
- *  2. caminho digitado à mão (fxFile);
- *  3. se a config foi puxada mas o caminho não pôde ser extraído, dispara o
- *     Automated Animations uma vez, com o portador como conjurador E alvo —
- *     some sozinha, mas é melhor do que nada.
+ *  1. animação PUXADA do item (fxAaConfig) — tocada pelo próprio Automated
+ *     Animations, com todas as configurações dele, e com a persistência
+ *     forçada para durar o que o efeito durar;
+ *  2. caminho digitado à mão (fxFile) — tocado direto pelo Sequencer.
  *
  * @param {object} p
- * @param {Actor}  p.actor    portador do efeito
- * @param {object} p.fx       o efeito ({fxFile, fxScale, fxAaConfig})
- * @param {string} p.name     nome do visual persistente (para encerrar depois)
- * @param {Item}   [p.item]   item de origem, usado no caminho 3
- * @returns {Promise<boolean>} true se algo começou a tocar de forma persistente
+ * @param {Actor}  p.actor  portador do efeito
+ * @param {object} p.fx     o efeito ({fxFile, fxScale, fxAaConfig})
+ * @param {string} p.name   nome do visual (para encerrar depois)
+ * @param {Item}   [p.item] item de origem, quando houver
+ * @returns {Promise<boolean>} true se algo começou a tocar
  */
 export async function playEffectFx({ actor, fx, name, item = null } = {}) {
   if (!actor || !fx || !name) return false;
@@ -222,31 +313,34 @@ export async function playEffectFx({ actor, fx, name, item = null } = {}) {
   const temCfg = cfg && typeof cfg === "object" && Object.keys(cfg).length > 0;
 
   if (temCfg) {
-    const caminho = aaConfigFilePath(cfg);
-    if (caminho) {
-      const escala = fx.fxScale && String(fx.fxScale).trim() && String(fx.fxScale) !== "1"
-        ? fx.fxScale
-        : aaConfigScale(cfg);
-      return playPersistentFx({ actor, file: caminho, scale: escala, name });
-    }
+    const tocou = await playAaEffect({ actor, cfg, name, item });
+    if (tocou) return true;
   }
-
   if (fx.fxFile) {
     return playPersistentFx({ actor, file: fx.fxFile, scale: fx.fxScale, name });
   }
+  return false;
+}
 
-  if (temCfg) {
-    // Último recurso: o portador faz os dois papéis (conjurador e alvo).
-    const fonte = item || null;
-    if (fonte) {
-      await playAutomatedAnimation({
-        actor, item: fonte,
-        action: { aaConfig: cfg, aaEnabled: true },
-        targetActors: [actor], allowSelfTarget: true,
-      });
+/**
+ * Encerra o visual de um efeito, qualquer que tenha sido a fonte: o nome cobre
+ * o que tocamos pelo Sequencer, e o origin cobre o que o Automated Animations
+ * tocou por nossa conta.
+ */
+export function endEffectFx(name) {
+  if (!name) return;
+  endPersistentFx(name);
+  const fim = globalThis.Sequencer?.EffectManager?.endEffects;
+  if (!fim) return;
+  const origens = new Set([name]);
+  const registrada = origemPorNome.get(name);
+  if (registrada) origens.add(registrada);
+  for (const origin of origens) {
+    try { fim({ origin }); } catch (e) {
+      console.warn("Ligeia | falha ao encerrar a animação do efeito:", e);
     }
   }
-  return false;
+  origemPorNome.delete(name);
 }
 
 /**

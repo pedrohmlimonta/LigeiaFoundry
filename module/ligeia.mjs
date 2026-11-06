@@ -21,7 +21,7 @@ import { registerTheatreArtHooks } from "./helpers/theatre-art.mjs";
 import { registerChatPrivacyHooks } from "./helpers/chat-privacy.mjs";
 import { syncConditionEffects } from "./helpers/conditions.mjs";
 import { applyHealingToActor } from "./helpers/dice.mjs";
-import { playAutomatedAnimation, playPersistentFx, endPersistentFx, persistentFxName, playEffectFx } from "./helpers/integrations.mjs";
+import { persistentFxName, playEffectFx, endEffectFx } from "./helpers/integrations.mjs";
 import { registerTurnEffectHooks } from "./helpers/turn-effects.mjs";
 import { registerBarrierHooks } from "./helpers/barrier.mjs";
 import { applyTempHpToActor } from "./helpers/dice.mjs";
@@ -518,14 +518,12 @@ Hooks.on("updateItem", async function (item, changes, options, userId) {
   if (actor?.documentName !== "Actor") return;
   const nome = persistentFxName(`item-${item.id}`);
   if (mudou === true) {
-    if (item.system?.animOnActivate !== false) {
-      await playAutomatedAnimation({ actor, item, targetActors: [] });
-    }
-    // Visual que dura enquanto o item estiver ligado: a animação puxada do
-    // próprio item ou o caminho digitado à mão (ver playEffectFx).
+    // UMA animação só: a puxada do item (ou o caminho digitado). Ela já vem
+    // com tudo o que foi configurado no Automated Animations e fica no token
+    // enquanto o item estiver ligado.
     await playEffectFx({ actor, fx: item.system, name: nome, item });
   } else {
-    endPersistentFx(nome);
+    endEffectFx(nome);
   }
 });
 
@@ -636,7 +634,7 @@ Hooks.on("updateActor", function (actor, changes, options, userId) {
     const atual = agora.get(id);
     const saiu = !atual || (atual.disabled && !ae.disabled);
     const temVisual = !!(ae.fxFile || ae.fxAaConfig);
-    if (temVisual && saiu) endPersistentFx(persistentFxName(id));
+    if (temVisual && saiu) endEffectFx(persistentFxName(id));
   }
   // Novos ou reativados → começa o visual.
   for (const [id, ae] of agora) {
