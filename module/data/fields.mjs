@@ -75,6 +75,11 @@ export function activatableFields() {
     // Efeito visual PERSISTENTE enquanto o item estiver ligado (Sequencer)
     fxFile: new fields.StringField({ blank: true, initial: "" }),
     fxScale: new fields.StringField({ blank: true, initial: "1" }),
+    // Animação PUXADA do item (Automated Animations), como nas ações: um
+    // instantâneo de flags.autoanimations. O visual é tocado pelo Sequencer a
+    // partir dela e dura exatamente enquanto o efeito estiver ativo.
+    fxAaConfig: new fields.ObjectField({ required: false, nullable: true, initial: null }),
+    fxAaName: new fields.StringField({ blank: true, initial: "" }),
     // Tocar a animação do Automated Animations ao LIGAR o item
     animOnActivate: new fields.BooleanField({ initial: true }),
     // Por padrão os itens são ATIVÁVEIS (precisam ser ligados para valer) e
@@ -284,6 +289,10 @@ export function actionEntryField() {
         // (caminho do Sequencer; some sozinho quando o efeito acaba).
         fxFile: new fields.StringField({ blank: true, initial: "" }),
         fxScale: new fields.StringField({ blank: true, initial: "1" }),
+        // Animação puxada do item para ESTE efeito (cada efeito da ação pode
+        // ter a sua). O portador do efeito é conjurador e alvo ao mesmo tempo.
+        fxAaConfig: new fields.ObjectField({ required: false, nullable: true, initial: null }),
+        fxAaName: new fields.StringField({ blank: true, initial: "" }),
         // SOBREVIDA VINCULADA (barreira): concede N de sobrevida ao aplicar.
         // O efeito e a sobrevida vivem e morrem juntos: sobrevida zerou →
         // o efeito termina; efeito terminou → a sobrevida some.

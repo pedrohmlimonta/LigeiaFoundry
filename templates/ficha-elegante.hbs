@@ -583,6 +583,15 @@
               <input type="text" value="{{#if ae.duration.rounds}}{{ae.duration.rounds}}{{/if}}" placeholder="permanente" title="Vazio ou 0 = permanente (dura até ser removido). Um número = quantas rodadas o efeito dura, descontando 1 no início de cada turno do personagem." name="system.appliedEffects.{{ae.index}}.duration.rounds"/>
             </label>
           </div>
+          {{#if ae.fxAaName}}
+          <div class="lig-macro-bound">
+            <span class="lig-macro-name">🎞️ {{ae.fxAaName}} — enquanto o efeito durar</span>
+            <button type="button" class="lig-mini-btn danger" data-action="clearEffectAnim" data-index="{{ae.index}}" title="Remover a animação puxada">✕</button>
+          </div>
+          {{else}}
+          <button type="button" class="lig-mini-btn" data-action="pullEffectAnim" data-index="{{ae.index}}"
+                    title="Copia para este efeito a animação do Automated Animations de um item deste personagem. O personagem é conjurador e alvo, e o visual dura enquanto o efeito durar.">🎞️ Puxar animação de um item</button>
+          {{/if}}
           <div class="lig-applied-config">
             <label class="lig-inline-check">
               <input type="checkbox" name="system.appliedEffects.{{ae.index}}.endRoll.enabled" {{checked ae.endRoll.enabled}}/>

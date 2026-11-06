@@ -21,7 +21,7 @@ import { registerTheatreArtHooks } from "./helpers/theatre-art.mjs";
 import { registerChatPrivacyHooks } from "./helpers/chat-privacy.mjs";
 import { syncConditionEffects } from "./helpers/conditions.mjs";
 import { applyHealingToActor } from "./helpers/dice.mjs";
-import { playAutomatedAnimation, playPersistentFx, endPersistentFx, persistentFxName } from "./helpers/integrations.mjs";
+import { playAutomatedAnimation, playPersistentFx, endPersistentFx, persistentFxName, playEffectFx } from "./helpers/integrations.mjs";
 import { registerTurnEffectHooks } from "./helpers/turn-effects.mjs";
 import { registerBarrierHooks } from "./helpers/barrier.mjs";
 import { applyTempHpToActor } from "./helpers/dice.mjs";
@@ -521,9 +521,9 @@ Hooks.on("updateItem", async function (item, changes, options, userId) {
     if (item.system?.animOnActivate !== false) {
       await playAutomatedAnimation({ actor, item, targetActors: [] });
     }
-    if (item.system?.fxFile) {
-      playPersistentFx({ actor, file: item.system.fxFile, scale: item.system.fxScale, name: nome });
-    }
+    // Visual que dura enquanto o item estiver ligado: a animação puxada do
+    // próprio item ou o caminho digitado à mão (ver playEffectFx).
+    await playEffectFx({ actor, fx: item.system, name: nome, item });
   } else {
     endPersistentFx(nome);
   }
@@ -635,14 +635,16 @@ Hooks.on("updateActor", function (actor, changes, options, userId) {
   for (const [id, ae] of antes) {
     const atual = agora.get(id);
     const saiu = !atual || (atual.disabled && !ae.disabled);
-    if (ae.fxFile && saiu) endPersistentFx(persistentFxName(id));
+    const temVisual = !!(ae.fxFile || ae.fxAaConfig);
+    if (temVisual && saiu) endPersistentFx(persistentFxName(id));
   }
   // Novos ou reativados → começa o visual.
   for (const [id, ae] of agora) {
     const anterior = antes.get(id);
     const entrou = !anterior || (anterior.disabled && !ae.disabled);
-    if (ae.fxFile && !ae.disabled && entrou) {
-      playPersistentFx({ actor, file: ae.fxFile, scale: ae.fxScale, name: persistentFxName(id) });
+    const temVisual = !!(ae.fxFile || ae.fxAaConfig);
+    if (temVisual && !ae.disabled && entrou) {
+      playEffectFx({ actor, fx: ae, name: persistentFxName(id) });
     }
   }
 });

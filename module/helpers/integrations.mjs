@@ -153,6 +153,102 @@ export function endPersistentFx(name) {
   }
 }
 
+/* ==================================================================== */
+/*  ANIMAÇÃO DE EFEITO (puxada do item, presa ao portador)               */
+/* ==================================================================== */
+
+/**
+ * Extrai de uma config do Automated Animations o caminho que o Sequencer
+ * entende, para podermos tocá-la nós mesmos — e assim controlar quando ela
+ * começa e quando acaba (o AA só oferece disparo avulso).
+ *
+ * A config guarda a escolha em `primary.video` como
+ * {dbSection, menuType, animation, variant, color} ou um `customPath`; o
+ * caminho da base é "autoanimations.<seção>.<tipo>.<animação>.<variante>[.<cor>]".
+ *
+ * @param {object} cfg conteúdo de flags.autoanimations
+ * @returns {string} caminho, ou "" se não der para montar
+ */
+export function aaConfigFilePath(cfg) {
+  try {
+    const v = cfg?.primary?.video || cfg?.data?.video || {};
+    if (v.enableCustom && v.customPath) return String(v.customPath).trim();
+    const { dbSection, menuType, animation, variant, color } = v;
+    if (!dbSection || !menuType || !animation || !variant) return "";
+    const base = `autoanimations.${dbSection}.${menuType}.${animation}.${variant}`;
+    const comCor = color && color !== "random" ? `${base}.${color}` : base;
+    // Se o Sequencer estiver presente, confirma que a entrada existe; sem ele,
+    // devolve o caminho mesmo assim (quem toca decide o que fazer).
+    const db = globalThis.Sequencer?.Database;
+    if (db?.getEntry) {
+      if (db.getEntry(comCor, { softFail: true })) return comCor;
+      if (db.getEntry(base, { softFail: true })) return base;
+      return "";
+    }
+    return comCor;
+  } catch (e) {
+    return "";
+  }
+}
+
+/** Escala guardada na config do Automated Animations (1 se não houver). */
+export function aaConfigScale(cfg) {
+  const n = Number(cfg?.primary?.options?.size ?? cfg?.data?.options?.size);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+/**
+ * Toca o visual de um EFEITO (de item, aplicado por ação ou ativo na ficha),
+ * preso ao token do portador e permanecendo até `endPersistentFx(name)`.
+ *
+ * Fontes, em ordem:
+ *  1. animação PUXADA do item (fxAaConfig) — tocada pelo Sequencer a partir do
+ *     caminho extraído, para que dure exatamente enquanto o efeito durar;
+ *  2. caminho digitado à mão (fxFile);
+ *  3. se a config foi puxada mas o caminho não pôde ser extraído, dispara o
+ *     Automated Animations uma vez, com o portador como conjurador E alvo —
+ *     some sozinha, mas é melhor do que nada.
+ *
+ * @param {object} p
+ * @param {Actor}  p.actor    portador do efeito
+ * @param {object} p.fx       o efeito ({fxFile, fxScale, fxAaConfig})
+ * @param {string} p.name     nome do visual persistente (para encerrar depois)
+ * @param {Item}   [p.item]   item de origem, usado no caminho 3
+ * @returns {Promise<boolean>} true se algo começou a tocar de forma persistente
+ */
+export async function playEffectFx({ actor, fx, name, item = null } = {}) {
+  if (!actor || !fx || !name) return false;
+  const cfg = fx.fxAaConfig;
+  const temCfg = cfg && typeof cfg === "object" && Object.keys(cfg).length > 0;
+
+  if (temCfg) {
+    const caminho = aaConfigFilePath(cfg);
+    if (caminho) {
+      const escala = fx.fxScale && String(fx.fxScale).trim() && String(fx.fxScale) !== "1"
+        ? fx.fxScale
+        : aaConfigScale(cfg);
+      return playPersistentFx({ actor, file: caminho, scale: escala, name });
+    }
+  }
+
+  if (fx.fxFile) {
+    return playPersistentFx({ actor, file: fx.fxFile, scale: fx.fxScale, name });
+  }
+
+  if (temCfg) {
+    // Último recurso: o portador faz os dois papéis (conjurador e alvo).
+    const fonte = item || null;
+    if (fonte) {
+      await playAutomatedAnimation({
+        actor, item: fonte,
+        action: { aaConfig: cfg, aaEnabled: true },
+        targetActors: [actor], allowSelfTarget: true,
+      });
+    }
+  }
+  return false;
+}
+
 /**
  * Dispara a animação de uma ação. Prioriza a animação PRÓPRIA da ação (via
  * Sequencer); se a ação não tiver uma, cai para a animação geral do item via
@@ -183,7 +279,7 @@ export async function playActionAnimation({ actor, item, action = null, targetAc
  * clone do item com essa config na flag `flags.autoanimations`. Sem isso, usa
  * a animação configurada no próprio item.
  */
-export async function playAutomatedAnimation({ actor, item, action = null, targetActors = [] } = {}) {
+export async function playAutomatedAnimation({ actor, item, action = null, targetActors = [], allowSelfTarget = false } = {}) {
   try {
     if (!isAutomatedAnimationsActive()) return;
     const AA = globalThis.AutomatedAnimations;
@@ -196,7 +292,9 @@ export async function playAutomatedAnimation({ actor, item, action = null, targe
     const targets = [];
     for (const ta of targetActors) {
       const tk = activeTokenOf(ta);
-      if (tk && tk !== sourceToken) targets.push(tk);
+      // Normalmente o conjurador não é alvo de si mesmo; nos EFEITOS ele é,
+      // porque quem carrega o efeito faz os dois papéis.
+      if (tk && (allowSelfTarget || tk !== sourceToken)) targets.push(tk);
     }
 
     // Decide qual "item" entregar ao módulo: o item real (animação geral) ou

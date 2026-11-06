@@ -69,6 +69,8 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       openAnimDb: LigeiaItemSheetBase._onOpenAnimDb,
       testAnim: LigeiaItemSheetBase._onTestAnim,
       pullAnim: LigeiaItemSheetBase._onPullAnim,
+      pullFxAnim: LigeiaItemSheetBase._onPullFxAnim,
+      clearFxAnim: LigeiaItemSheetBase._onClearFxAnim,
       clearAnim: LigeiaItemSheetBase._onClearAnim,
       toggleAnim: LigeiaItemSheetBase._onToggleAnim,
     },
@@ -147,6 +149,19 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
           const fx = arr[i].appliesEffects;
           if (fx && !Array.isArray(fx) && typeof fx === "object") {
             arr[i].appliesEffects = indexedToArray(fx);
+          }
+          // A animação puxada de cada efeito NÃO tem input no form (vem do
+          // botão), então precisa ser preservada do documento — senão sumiria
+          // na primeira digitada em qualquer outro campo.
+          if (Array.isArray(arr[i].appliesEffects)) {
+            const fxAtuais = cur.appliesEffects || [];
+            for (let j = 0; j < arr[i].appliesEffects.length; j++) {
+              const novo = arr[i].appliesEffects[j];
+              const velho = fxAtuais[j] || {};
+              if (!novo) continue;
+              if (novo.fxAaConfig === undefined) novo.fxAaConfig = velho.fxAaConfig ?? null;
+              if (novo.fxAaName === undefined) novo.fxAaName = velho.fxAaName || "";
+            }
           }
           // Idem para o dano extra (objeto indexado → array).
           const xd = arr[i].extraDamage;
@@ -741,6 +756,53 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     if (cfg.target && (cfg.target.enable ?? true)) partes.push("no alvo");
     ui.notifications?.info(`Animação do item copiada para esta ação (${partes.join(", ")}).`);
   }
+  /* ---- Puxar a animação do item para um EFEITO ---- */
+  // Sem data-action-index: é o visual do item ligado (system.fxAaConfig).
+  // Com data-action-index + data-index: é um efeito aplicável de uma ação.
+  // Em ambos os casos guardamos um INSTANTÂNEO da config do Automated
+  // Animations; o visual é tocado pelo Sequencer e dura exatamente enquanto
+  // o efeito estiver ativo (ver helpers/integrations.mjs → playEffectFx).
+  static async _onPullFxAnim(event, target) {
+    if (!game.modules.get("autoanimations")?.active) {
+      ui.notifications?.warn("O módulo Automated Animations não está ativo.");
+      return;
+    }
+    const cfg = foundry.utils.deepClone(this.document.flags?.autoanimations ?? null);
+    if (!(cfg && typeof cfg === "object" && Object.keys(cfg).length > 0)) {
+      ui.notifications?.warn("O item ainda não tem animação. Configure-a no menu do Automated Animations (na ficha do item) e depois puxe.");
+      return;
+    }
+    const ai = target.dataset.actionIndex;
+    if (ai === undefined || ai === "") {
+      await this.document.update({ "system.fxAaConfig": cfg, "system.fxAaName": this.document.name });
+      ui.notifications?.info("Animação do item copiada — ela fica no token enquanto o item estiver ligado.");
+      return;
+    }
+    const fi = Number(target.dataset.index);
+    const actions = foundry.utils.deepClone(this.document.system.actions || []);
+    const fx = actions[Number(ai)]?.appliesEffects?.[fi];
+    if (!fx) return;
+    fx.fxAaConfig = cfg;
+    fx.fxAaName = this.document.name;
+    await this._replaceActions(actions);
+    ui.notifications?.info("Animação do item copiada para este efeito — dura enquanto o efeito durar.");
+  }
+
+  static async _onClearFxAnim(event, target) {
+    const ai = target.dataset.actionIndex;
+    if (ai === undefined || ai === "") {
+      await this.document.update({ "system.fxAaConfig": null, "system.fxAaName": "" });
+      return;
+    }
+    const fi = Number(target.dataset.index);
+    const actions = foundry.utils.deepClone(this.document.system.actions || []);
+    const fx = actions[Number(ai)]?.appliesEffects?.[fi];
+    if (!fx) return;
+    fx.fxAaConfig = null;
+    fx.fxAaName = "";
+    await this._replaceActions(actions);
+  }
+
   static async _onClearAnim(event, target) {
     const ai = Number(target.dataset.actionIndex);
     const actions = foundry.utils.deepClone(this.document.system.actions || []);

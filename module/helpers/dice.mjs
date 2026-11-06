@@ -866,6 +866,9 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
           // Efeito visual persistente enquanto durar (herdado da ação).
           fxFile: ae.fxFile || "",
           fxScale: ae.fxScale || "1",
+          // A animação puxada acompanha o efeito até o alvo.
+          fxAaConfig: ae.fxAaConfig ?? null,
+          fxAaName: ae.fxAaName || "",
           source: caster?.name || "",
         });
         names.push(ae.label || (isCondition ? condLabel : "Efeito"));

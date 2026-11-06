@@ -40,6 +40,8 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       showRollVars: LigeiaCharacterSheet.#onShowRollVars,
       rest: LigeiaCharacterSheet.#onRest,
       medicalCare: LigeiaCharacterSheet.#onMedicalCare,
+      pullEffectAnim: LigeiaCharacterSheet.#onPullEffectAnim,
+      clearEffectAnim: LigeiaCharacterSheet.#onClearEffectAnim,
     },
     form: {
       submitOnChange: true,
@@ -796,6 +798,65 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
         });
       },
     });
+  }
+
+  /**
+   * Copia para um EFEITO ATIVO a animação do Automated Animations de um item
+   * deste personagem. O visual é tocado pelo Sequencer, preso ao token, e
+   * dura exatamente enquanto o efeito estiver ativo — com o portador fazendo
+   * os papéis de conjurador e de alvo.
+   */
+  static async #onPullEffectAnim(event, target) {
+    const actor = this.document;
+    if (!game.modules.get("autoanimations")?.active) {
+      ui.notifications?.warn("O módulo Automated Animations não está ativo.");
+      return;
+    }
+    const idx = Number(target.dataset.index);
+    const efeitos = foundry.utils.deepClone(actor.system?.appliedEffects || []);
+    if (!efeitos[idx]) return;
+
+    // Só itens que realmente têm animação configurada.
+    const comAnim = actor.items.filter((it) => {
+      const c = it.flags?.autoanimations;
+      return c && typeof c === "object" && Object.keys(c).length > 0;
+    });
+    if (!comAnim.length) {
+      ui.notifications?.warn("Nenhum item deste personagem tem animação configurada no Automated Animations.");
+      return;
+    }
+
+    const opcoes = comAnim
+      .map((it) => `<option value="${it.id}">${foundry.utils.escapeHTML?.(it.name) ?? it.name}</option>`)
+      .join("");
+    const escolhido = await foundry.applications.api.DialogV2.wait({
+      window: { title: "Puxar animação de um item" },
+      content: `<p class="lig-hint">A animação é copiada como instantâneo e fica presa ao token enquanto este efeito durar.</p>
+        <label>Item<select name="itemId" style="width:100%">${opcoes}</select></label>`,
+      buttons: [
+        { action: "ok", label: "Puxar", default: true, callback: (ev, btn) => btn.form.elements.itemId.value },
+        { action: "cancel", label: "Cancelar" },
+      ],
+      rejectClose: false,
+    });
+    if (!escolhido || escolhido === "cancel") return;
+
+    const item = actor.items.get(escolhido);
+    if (!item) return;
+    efeitos[idx].fxAaConfig = foundry.utils.deepClone(item.flags.autoanimations);
+    efeitos[idx].fxAaName = item.name;
+    await actor.update({ "system.appliedEffects": efeitos });
+    ui.notifications?.info(`Animação de "${item.name}" copiada para este efeito.`);
+  }
+
+  /** Remove a animação puxada de um efeito ativo. */
+  static async #onClearEffectAnim(event, target) {
+    const idx = Number(target.dataset.index);
+    const efeitos = foundry.utils.deepClone(this.document.system?.appliedEffects || []);
+    if (!efeitos[idx]) return;
+    efeitos[idx].fxAaConfig = null;
+    efeitos[idx].fxAaName = "";
+    await this.document.update({ "system.appliedEffects": efeitos });
   }
 
   /** Botão DESCANSAR: pergunta o local e aplica os efeitos do descanso. */

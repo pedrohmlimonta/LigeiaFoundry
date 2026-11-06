@@ -468,6 +468,16 @@
             <input type="text" name="system.actions.{{i}}.appliesEffects.{{fi}}.fxScale" value="{{fx.fxScale}}" placeholder="1" title="Escala do efeito visual."/>
           </label>
         </div>
+        {{#if fx.fxAaName}}
+        <div class="lig-macro-bound">
+          <span class="lig-macro-name">🎞️ {{fx.fxAaName}} — enquanto o efeito durar</span>
+          <button type="button" class="lig-mini-btn" data-action="pullFxAnim" data-action-index="{{i}}" data-index="{{fi}}" title="Atualizar: copiar de novo a animação atual do item">↻</button>
+          <button type="button" class="lig-mini-btn danger" data-action="clearFxAnim" data-action-index="{{i}}" data-index="{{fi}}" title="Remover a animação puxada">✕</button>
+        </div>
+        {{else}}
+        <button type="button" class="lig-mini-btn" data-action="pullFxAnim" data-action-index="{{i}}" data-index="{{fi}}">🎞️ Puxar animação do item para este efeito</button>
+        <p class="lig-hint">Cada efeito pode ter a sua: configure o item no <strong>Automated Animations</strong> e puxe. Quem recebe o efeito é <strong>conjurador e alvo</strong>, e o visual dura enquanto o efeito durar.</p>
+        {{/if}}
         <div class="lig-item-row">
           <label title="Concede sobrevida ao aplicar. Vidas ligadas: se a sobrevida zerar, o efeito termina; se o efeito terminar, a sobrevida some.">Sobrevida vinculada
             <input type="text" value="{{fx.grantTempHp}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.actions.{{i}}.appliesEffects.{{fi}}.grantTempHp"/>

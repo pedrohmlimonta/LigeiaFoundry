@@ -27,6 +27,18 @@
     <input type="text" name="system.fxScale" value="{{system.fxScale}}" placeholder="1" title="Escala do efeito visual."/>
   </label>
 </div>
+{{!-- Puxar a animação do Automated Animations deste item como visual contínuo --}}
+{{#if system.fxAaName}}
+<div class="lig-macro-bound">
+  <span class="lig-macro-name">🎞️ {{system.fxAaName}} — enquanto ligado</span>
+  <button type="button" class="lig-mini-btn" data-action="pullFxAnim" title="Atualizar: copiar de novo a animação atual do item">↻</button>
+  <button type="button" class="lig-mini-btn danger" data-action="clearFxAnim" title="Remover a animação puxada">✕</button>
+</div>
+<p class="lig-hint">O visual vem da animação do <strong>Automated Animations</strong> deste item e fica preso ao token <strong>enquanto o item estiver ligado</strong>.</p>
+{{else}}
+<button type="button" class="lig-mini-btn" data-action="pullFxAnim">🎞️ Puxar animação do item como visual contínuo</button>
+<p class="lig-hint">Em vez de digitar o caminho acima, configure a animação no menu do <strong>Automated Animations</strong> e puxe: ela fica presa ao token enquanto o item estiver ligado.</p>
+{{/if}}
 <label class="lig-inline-check" title="Ao LIGAR este item, toca a animação configurada nele no Automated Animations (primária, secundária e no alvo).">
   <input type="checkbox" name="system.animOnActivate" {{checked system.animOnActivate}}/>
   Animar ao ativar (Automated Animations)

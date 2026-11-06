@@ -93,6 +93,10 @@ function appliedEffectsField() {
       // (caminho do Sequencer; some sozinho quando o efeito sai).
       fxFile: new fields.StringField({ blank: true, initial: "" }),
       fxScale: new fields.StringField({ blank: true, initial: "1" }),
+      // Animação puxada de um item (Automated Animations): instantâneo da
+      // config, tocada pelo Sequencer enquanto o efeito durar.
+      fxAaConfig: new fields.ObjectField({ required: false, nullable: true, initial: null }),
+      fxAaName: new fields.StringField({ blank: true, initial: "" }),
       source: new fields.StringField({ blank: true, initial: "" }),
     }),
     { initial: [] },
