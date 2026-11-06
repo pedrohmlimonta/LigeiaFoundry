@@ -283,12 +283,14 @@ async function playAaEffect({ actor, cfg, name, item = null, persistir = true })
     const Classe = item?.constructor ?? CONFIG?.Item?.documentClass;
     if (!Classe) return false;
     const temp = new Classe(base, { parent: actor });
+    // O AA marca TODAS as animações (primária, source, secundária e no alvo)
+    // com `origin: item.uuid`. Tentamos fixar esse uuid no nome do efeito; se
+    // o documento não deixar, lemos o que ficou de fato — é por ele que vamos
+    // encerrar depois, e errar aqui deixava as animações presas na tela.
     try {
       Object.defineProperty(temp, "uuid", { value: name, configurable: true });
-      origemPorNome.set(name, name);
-    } catch (e) {
-      origemPorNome.set(name, temp.uuid);
-    }
+    } catch (e) { /* o documento não permite; usamos o uuid que ele tiver */ }
+    origemPorNome.set(name, temp.uuid || name);
 
     const AA = globalThis.AutomatedAnimations;
     if (!AA?.playAnimation) return false;
@@ -359,29 +361,67 @@ export function endEffectFx(name) {
 }
 
 /**
- * Nome que o Automated Animations dá aos visuais que ele põe num token
- * quando chamado pela API: "spot <id do token>". Ele é o MESMO para todos os
- * efeitos daquele token — não dá para encerrar um sem encerrar os outros.
+ * Nome que o Automated Animations dá ao visual que ele põe num token quando
+ * chamado pela API: "spot <id do token>". Só a animação primária recebe esse
+ * nome — as de origem, secundária e no alvo ficam SEM nome, e por isso não
+ * podem ser encerradas por ele. O que todas têm em comum é o `origin`.
  */
 function nomeAaDoToken(token) {
   return token?.id ? `spot ${token.id}` : "";
 }
 
+/** O origin aponta para um documento que ainda existe? */
+function originTemDono(origin) {
+  if (!origin || typeof origin !== "string") return false;
+  try { return !!globalThis.fromUuidSync?.(origin); } catch (e) { return false; }
+}
+
 /**
- * Derruba TODOS os visuais do Automated Animations que estejam neste token
- * por nossa conta. Como o AA usa um nome só por token, esta é a única forma
- * de garantir que o visual de um efeito encerrado saia da tela.
+ * Derruba TODOS os visuais que o sistema pôs num token, venham eles de qual
+ * ramo vierem (primária, origem, secundária, no alvo).
  *
- * Quem chama precisa reacender depois o que continua valendo — é o que
- * `resyncEffectFx` faz.
+ * Por que não basta o nome: o Automated Animations só batiza a primária
+ * ("spot <token>"); as demais ficam anônimas. O denominador comum é o
+ * `origin`, que ele copia do uuid do item usado — por isso varremos os
+ * efeitos presos ao token e encerramos os que são nossos:
+ *   - os que levam um origin que registramos ao tocar;
+ *   - os nomeados "spot <token>" ou "ligeia-fx-…";
+ *   - os de origin órfão (item temporário que já não existe), que só este
+ *     sistema cria.
+ * Efeitos de outros módulos, cujo origin aponta para um documento real que
+ * não é nosso, ficam intactos.
+ *
  * @param {Token} token
+ * @param {Set<string>} [origensConhecidas] origins que sabemos ser nossos
  */
-export function endAllAaFxOnToken(token) {
+export function endAllAaFxOnToken(token, origensConhecidas = new Set()) {
   const EM = globalThis.Sequencer?.EffectManager;
   if (!EM?.endEffects || !token) return;
   const nome = nomeAaDoToken(token);
+  const prefixo = persistentFxName("");
+
+  // 1) O que dá para encerrar direto pelo nome.
   try { EM.endEffects({ name: nome, object: token }); } catch (e) { /* nada a encerrar */ }
-  try { EM.endEffects({ name: nome }); } catch (e) { /* idem */ }
+
+  // 2) O resto, pelo origin — é o que alcança origem, secundária e no alvo.
+  const alvos = new Set(origensConhecidas);
+  try {
+    for (const efeito of EM.getEffects?.({ object: token }) || []) {
+      const origin = efeito?.data?.origin ?? efeito?.origin ?? "";
+      const nomeFx = efeito?.data?.name ?? efeito?.name ?? "";
+      if (!origin) continue;
+      const nosso =
+        origensConhecidas.has(origin) ||
+        (typeof origin === "string" && origin.startsWith(prefixo)) ||
+        (typeof nomeFx === "string" && (nomeFx === nome || nomeFx.startsWith(prefixo))) ||
+        !originTemDono(origin); // item temporário: ninguém mais cria isso aqui
+      if (nosso) alvos.add(origin);
+    }
+  } catch (e) { /* sem getEffects, fica só o que o nome alcançou */ }
+
+  for (const origin of alvos) {
+    try { EM.endEffects({ origin }); } catch (e) { /* segue para os outros */ }
+  }
 }
 
 /**
@@ -400,12 +440,13 @@ export async function resyncEffectFx(actor, ativos = []) {
   const token = activeTokenOf(actor);
   if (!token) return;
 
-  // 1) Apaga os nossos: os do Automated Animations (nome por token) e os que
-  //    tocamos direto pelo Sequencer (nome por efeito).
-  endAllAaFxOnToken(token);
+  // 1) Apaga os nossos: os do Automated Animations (todos os ramos, via
+  //    origin) e os que tocamos direto pelo Sequencer (nome por efeito).
+  endAllAaFxOnToken(token, new Set(origemPorNome.values()));
   for (const nome of origemPorNome.keys()) {
     if (typeof nome === "string" && nome.startsWith(persistentFxName(""))) endPersistentFx(nome);
   }
+  origemPorNome.clear();
 
   // 2) Reacende o que continua valendo.
   for (const { fx, name, item } of ativos) {
