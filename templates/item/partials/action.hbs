@@ -474,14 +474,14 @@
           <button type="button" class="lig-mini-btn" data-action="pullFxAnim" data-action-index="{{i}}" data-index="{{fi}}" title="Atualizar: copiar de novo a animação atual do item">↻</button>
           <button type="button" class="lig-mini-btn danger" data-action="clearFxAnim" data-action-index="{{i}}" data-index="{{fi}}" title="Remover a animação puxada">✕</button>
         </div>
-        <label class="lig-inline-check" title="Mantém a animação no token o tempo todo, enquanto o efeito estiver ativo (liga a permanência do Automated Animations mesmo que ela não esteja marcada no menu dele). Desmarcada, a animação toca uma vez só, como numa ação.">
+        {{else}}
+        <button type="button" class="lig-mini-btn" data-action="pullFxAnim" data-action-index="{{i}}" data-index="{{fi}}">🎞️ Puxar animação do item para este efeito</button>
+        <p class="lig-hint">Cada efeito pode ter a sua: configure o item no <strong>Automated Animations</strong> e puxe. Quem recebe o efeito é <strong>conjurador e alvo</strong>.</p>
+        {{/if}}
+        <label class="lig-inline-check" title="Mantém o visual no token enquanto o efeito estiver ativo, e o retira quando ele sai. Vale tanto para a animação puxada quanto para o caminho digitado. Desmarcada, o visual toca uma vez só, como numa ação.">
           <input type="checkbox" name="system.actions.{{i}}.appliesEffects.{{fi}}.fxAaPersist" {{checked fx.fxAaPersist}}/>
           Manter enquanto o efeito durar
         </label>
-        {{else}}
-        <button type="button" class="lig-mini-btn" data-action="pullFxAnim" data-action-index="{{i}}" data-index="{{fi}}">🎞️ Puxar animação do item para este efeito</button>
-        <p class="lig-hint">Cada efeito pode ter a sua: configure o item no <strong>Automated Animations</strong> e puxe. Quem recebe o efeito é <strong>conjurador e alvo</strong>, e o visual dura enquanto o efeito durar.</p>
-        {{/if}}
         <div class="lig-item-row">
           <label title="Concede sobrevida ao aplicar. Vidas ligadas: se a sobrevida zerar, o efeito termina; se o efeito terminar, a sobrevida some.">Sobrevida vinculada
             <input type="text" value="{{fx.grantTempHp}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.actions.{{i}}.appliesEffects.{{fi}}.grantTempHp"/>

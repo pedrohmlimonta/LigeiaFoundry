@@ -122,7 +122,7 @@ export function persistentFxName(chave) {
  * (usado por efeitos ativos e habilidades ligadas).
  * @returns {boolean} true se começou a tocar
  */
-export function playPersistentFx({ actor, file, scale = 1, name } = {}) {
+export function playPersistentFx({ actor, file, scale = 1, name, persistir = true } = {}) {
   try {
     const caminho = (file || "").trim();
     if (!caminho || !name) return false;
@@ -134,7 +134,9 @@ export function playPersistentFx({ actor, file, scale = 1, name } = {}) {
     const seq = new globalThis.Sequence();
     const fx = seq.effect().file(caminho).scale(Number(scale) || 1);
     try { fx.attachTo(token); } catch (e) { fx.atLocation(token); }
-    fx.persist().name(name);
+    // Sem permanência, toca uma vez e some — a caixinha "manter enquanto o
+    // efeito durar" vale também para o caminho digitado.
+    if (persistir) fx.persist().name(name);
     seq.play();
     return true;
   } catch (e) {
@@ -327,7 +329,10 @@ export async function playEffectFx({ actor, fx, name, item = null } = {}) {
     if (tocou) return true;
   }
   if (fx.fxFile) {
-    return playPersistentFx({ actor, file: fx.fxFile, scale: fx.fxScale, name });
+    return playPersistentFx({
+      actor, file: fx.fxFile, scale: fx.fxScale, name,
+      persistir: fx.fxAaPersist !== false,
+    });
   }
   return false;
 }
