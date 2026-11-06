@@ -237,9 +237,13 @@
       </div>
       {{#if ae.fxAaName}}
       <div class="lig-macro-bound">
-        <span class="lig-macro-name">🎞️ {{ae.fxAaName}} — enquanto o efeito durar</span>
+        <span class="lig-macro-name">🎞️ {{ae.fxAaName}}</span>
         <button type="button" class="lig-mini-btn danger" data-action="clearEffectAnim" data-index="{{ae.index}}" title="Remover a animação puxada">✕</button>
       </div>
+      <label class="lig-inline-check" title="Mantém a animação no token o tempo todo, enquanto o efeito estiver ativo (liga a permanência do Automated Animations mesmo que ela não esteja marcada no menu dele). Desmarcada, a animação toca uma vez só, como numa ação.">
+        <input type="checkbox" name="system.appliedEffects.{{ae.index}}.fxAaPersist" {{checked ae.fxAaPersist}}/>
+        Manter enquanto o efeito durar
+      </label>
       {{else}}
       <button type="button" class="lig-mini-btn" data-action="pullEffectAnim" data-index="{{ae.index}}"
                 title="Copia para este efeito a animação do Automated Animations de um item deste personagem. O personagem é conjurador e alvo, e o visual dura enquanto o efeito durar.">🎞️ Puxar animação de um item</button>

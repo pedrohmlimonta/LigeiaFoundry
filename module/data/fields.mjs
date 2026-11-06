@@ -80,6 +80,11 @@ export function activatableFields() {
     // partir dela e dura exatamente enquanto o efeito estiver ativo.
     fxAaConfig: new fields.ObjectField({ required: false, nullable: true, initial: null }),
     fxAaName: new fields.StringField({ blank: true, initial: "" }),
+    // Força a animação puxada a FICAR no token enquanto o efeito durar
+    // (liga a persistência do Automated Animations, mesmo que ela não
+    // esteja marcada no menu dele). Desmarcada, a animação segue o que
+    // estiver configurado lá — normalmente um disparo único.
+    fxAaPersist: new fields.BooleanField({ initial: true }),
     // LEGADO: antes disparava a animação do Automated Animations ao ligar o
     // item, o que tocava uma segunda animação junto da puxada. O campo fica
     // para não invalidar fichas antigas, mas não é mais lido nem exibido —
@@ -296,6 +301,8 @@ export function actionEntryField() {
         // ter a sua). O portador do efeito é conjurador e alvo ao mesmo tempo.
         fxAaConfig: new fields.ObjectField({ required: false, nullable: true, initial: null }),
         fxAaName: new fields.StringField({ blank: true, initial: "" }),
+        // Mantém a animação no alvo enquanto o efeito durar (ver fields.mjs).
+        fxAaPersist: new fields.BooleanField({ initial: true }),
         // SOBREVIDA VINCULADA (barreira): concede N de sobrevida ao aplicar.
         // O efeito e a sobrevida vivem e morrem juntos: sobrevida zerou →
         // o efeito termina; efeito terminou → a sobrevida some.

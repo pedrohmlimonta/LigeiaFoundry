@@ -197,6 +197,14 @@ export function aaConfigScale(cfg) {
   return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
+/** A config já pede permanência em algum dos seus ramos? */
+function configPersiste(cfg) {
+  for (const ramo of ["primary", "source", "target", "secondary", "data"]) {
+    if (cfg?.[ramo]?.options?.persistent) return true;
+  }
+  return false;
+}
+
 /**
  * Liga a persistência em todos os ramos de uma config do Automated Animations.
  * O menu "Active Effects" do AA tem a opção "Persistent"; forçando-a aqui, uma
@@ -246,7 +254,7 @@ const origemPorNome = new Map();
  *
  * @returns {Promise<boolean>} true se a animação foi disparada
  */
-async function playAaEffect({ actor, cfg, name, item = null }) {
+async function playAaEffect({ actor, cfg, name, item = null, persistir = true }) {
   try {
     if (!isAutomatedAnimationsActive()) return false;
     const token = activeTokenOf(actor);
@@ -254,8 +262,12 @@ async function playAaEffect({ actor, cfg, name, item = null }) {
 
     const atual = item?.flags?.autoanimations ?? null;
     const mesma = !!item && JSON.stringify(cfg) === JSON.stringify(atual);
+    // Para FORÇAR a permanência é preciso mexer na config, e mexer na config
+    // exige um item temporário — o item real não pode ser alterado. Sem
+    // forçar, usamos o item real sempre que der (animação mais fiel).
+    const jaPersiste = configPersiste(cfg);
 
-    if (mesma) {
+    if (mesma && (!persistir || jaPersiste)) {
       // Caminho IDÊNTICO ao das ações: entrega o item REAL. É o que preserva
       // a configuração inteira — um clone pode perder partes dela.
       origemPorNome.set(name, item.uuid);
@@ -269,7 +281,8 @@ async function playAaEffect({ actor, cfg, name, item = null }) {
     // temporário com ela, como a ação faz, e aproveita para ligar a
     // persistência e fixar o `origin` pelo qual vamos encerrar.
     const base = item?.toObject?.() ?? { name: "Efeito", type: "traco" };
-    base.flags = { ...(base.flags || {}), autoanimations: forcarPersistencia(cfg) };
+    const cfgFinal = persistir ? forcarPersistencia(cfg) : foundry.utils.deepClone(cfg);
+    base.flags = { ...(base.flags || {}), autoanimations: cfgFinal };
     const Classe = item?.constructor ?? CONFIG?.Item?.documentClass;
     if (!Classe) return false;
     const temp = new Classe(base, { parent: actor });
@@ -313,7 +326,9 @@ export async function playEffectFx({ actor, fx, name, item = null } = {}) {
   const temCfg = cfg && typeof cfg === "object" && Object.keys(cfg).length > 0;
 
   if (temCfg) {
-    const tocou = await playAaEffect({ actor, cfg, name, item });
+    // A caixinha "manter enquanto durar" decide se forçamos a permanência.
+    const persistir = fx.fxAaPersist !== false;
+    const tocou = await playAaEffect({ actor, cfg, name, item, persistir });
     if (tocou) return true;
   }
   if (fx.fxFile) {

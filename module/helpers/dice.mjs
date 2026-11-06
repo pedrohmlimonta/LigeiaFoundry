@@ -869,6 +869,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
           // A animação puxada acompanha o efeito até o alvo.
           fxAaConfig: ae.fxAaConfig ?? null,
           fxAaName: ae.fxAaName || "",
+          fxAaPersist: ae.fxAaPersist !== false,
           source: caster?.name || "",
         });
         names.push(ae.label || (isCondition ? condLabel : "Efeito"));

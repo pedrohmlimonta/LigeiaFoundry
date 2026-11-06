@@ -97,6 +97,8 @@ function appliedEffectsField() {
       // config, tocada pelo Sequencer enquanto o efeito durar.
       fxAaConfig: new fields.ObjectField({ required: false, nullable: true, initial: null }),
       fxAaName: new fields.StringField({ blank: true, initial: "" }),
+      // Mantém a animação no token enquanto o efeito durar.
+      fxAaPersist: new fields.BooleanField({ initial: true }),
       source: new fields.StringField({ blank: true, initial: "" }),
     }),
     { initial: [] },

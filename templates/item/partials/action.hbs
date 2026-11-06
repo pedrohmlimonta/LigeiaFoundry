@@ -470,10 +470,14 @@
         </div>
         {{#if fx.fxAaName}}
         <div class="lig-macro-bound">
-          <span class="lig-macro-name">🎞️ {{fx.fxAaName}} — enquanto o efeito durar</span>
+          <span class="lig-macro-name">🎞️ {{fx.fxAaName}}</span>
           <button type="button" class="lig-mini-btn" data-action="pullFxAnim" data-action-index="{{i}}" data-index="{{fi}}" title="Atualizar: copiar de novo a animação atual do item">↻</button>
           <button type="button" class="lig-mini-btn danger" data-action="clearFxAnim" data-action-index="{{i}}" data-index="{{fi}}" title="Remover a animação puxada">✕</button>
         </div>
+        <label class="lig-inline-check" title="Mantém a animação no token o tempo todo, enquanto o efeito estiver ativo (liga a permanência do Automated Animations mesmo que ela não esteja marcada no menu dele). Desmarcada, a animação toca uma vez só, como numa ação.">
+          <input type="checkbox" name="system.actions.{{i}}.appliesEffects.{{fi}}.fxAaPersist" {{checked fx.fxAaPersist}}/>
+          Manter enquanto o efeito durar
+        </label>
         {{else}}
         <button type="button" class="lig-mini-btn" data-action="pullFxAnim" data-action-index="{{i}}" data-index="{{fi}}">🎞️ Puxar animação do item para este efeito</button>
         <p class="lig-hint">Cada efeito pode ter a sua: configure o item no <strong>Automated Animations</strong> e puxe. Quem recebe o efeito é <strong>conjurador e alvo</strong>, e o visual dura enquanto o efeito durar.</p>
