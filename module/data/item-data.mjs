@@ -101,8 +101,11 @@ export class ComplicacaoData extends foundry.abstract.TypeDataModel {
 export class MagiaData extends foundry.abstract.TypeDataModel {
   static defineSchema() {
     return {
-      // Palavra arcana principal (id, ex: "ignis")
+      // Palavras arcanas da magia. Quantas valem depende do círculo:
+      // Menor = 1, Intermediária = 2, Maior = 3 (ver arcaneWordsOf).
       wordId: new fields.StringField({ blank: true, initial: "" }),
+      wordId2: new fields.StringField({ blank: true, initial: "" }),
+      wordId3: new fields.StringField({ blank: true, initial: "" }),
       // Círculo: Menor / Intermediária / Maior
       tier: new fields.StringField({
         required: true,
@@ -206,7 +209,7 @@ export class RacaData extends foundry.abstract.TypeDataModel {
       // e, por ele, o deslocamento base (coluna bípede da tabela).
       size: new fields.StringField({ blank: true, initial: "medio" }),
       // Ajuste de deslocamento por cima do que o tamanho já concede
-      moveBonus: new fields.NumberField({ initial: 0, integer: true }),
+      moveBonus: new fields.StringField({ blank: true, initial: "0" }),
     };
   }
 }
@@ -222,8 +225,9 @@ export class VocacaoData extends foundry.abstract.TypeDataModel {
     return {
       ...definitionBaseFields(),
       // Bônus de PV e PM concedidos pela vocação
-      hpBonus: new fields.NumberField({ initial: 0, integer: true }),
-      mpBonus: new fields.NumberField({ initial: 0, integer: true }),
+      // Aceitam fórmula com @variáveis, como os demais campos numéricos.
+      hpBonus: new fields.StringField({ blank: true, initial: "0" }),
+      mpBonus: new fields.StringField({ blank: true, initial: "0" }),
     };
   }
 }

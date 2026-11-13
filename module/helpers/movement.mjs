@@ -33,6 +33,8 @@ function gridSize() { return canvas?.grid?.size || 100; }
 function gridDistance() { return canvas?.grid?.distance || 1; }
 
 /** Metros → pixels da cena. */
+
+import { resolveEffectValue } from "./effects.mjs";
 function metersToPx(m) { return (Number(m) || 0) / gridDistance() * gridSize(); }
 /** Pixels → metros da cena. */
 function pxToMeters(px) { return (px / gridSize()) * gridDistance(); }
@@ -379,8 +381,11 @@ function directionalDestination(mv, moverC, refC) {
  * @returns {Promise<string>} HTML com as linhas para o chat
  */
 export async function executeActionMovement({ caster, action, hits = [], actionOk = true, onBeforeMove = null }) {
-  const mv = action?.movement;
-  if (!mv?.enabled) return "";
+  const mvRaw = action?.movement;
+  if (!mvRaw?.enabled) return "";
+  // A distância aceita fórmula com @variáveis, como os demais campos da ação;
+  // resolvemos uma vez e seguimos com o número.
+  const mv = { ...mvRaw, distance: resolveEffectValue(mvRaw.distance, caster) };
   if (!canvas?.ready) return "";
   // Sem sucesso na ação (CD e/ou rolagem de defesa), nada se move.
   if (!actionOk) return "";

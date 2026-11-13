@@ -32,6 +32,9 @@ export function effectField() {
       vulnPercent: new fields.BooleanField({ required: false, initial: false }),
       label: new fields.StringField({ required: false, blank: true, initial: "" }),
       enabled: new fields.BooleanField({ initial: true }),
+      // ENCANTAR: em vez de valer para o personagem, este efeito é gravado
+      // num ITEM escolhido na hora e passa a valer nas ações dele.
+      enchant: new fields.BooleanField({ required: false, initial: false }),
       // Nível em que o efeito passa a valer (SÓ habilidades usam isto):
       //   "all" = sempre; "B" = a partir de Básico; "A" = a partir de
       //   Avançado; "E" = só no Épico/Especial.
@@ -61,7 +64,9 @@ export function costField() {
         initial: "mp",
         choices: ["mp", "hp", "hpTemp", "heroic"],
       }),
-      value: new fields.NumberField({ required: true, initial: 0, integer: true }),
+      // Número OU fórmula com @variáveis ("ceil(@nivel/2)"), como os demais
+      // custos do sistema.
+      value: new fields.StringField({ required: true, blank: true, initial: "0" }),
       label: new fields.StringField({ required: false, blank: true, initial: "" }),
     }),
   );
@@ -72,6 +77,21 @@ export function costField() {
  */
 export function activatableFields() {
   return {
+    // ENCANTAMENTOS recebidos: efeitos gravados NESTE item que valem nas
+    // ações dele (ver helpers/enchant.mjs). Cada um tem a mesma forma dos
+    // demais efeitos, mais duração e procedência.
+    enchantments: new fields.ArrayField(
+      new fields.SchemaField({
+        id: new fields.StringField({ blank: true, initial: "" }),
+        label: new fields.StringField({ blank: true, initial: "Encantamento" }),
+        effects: effectField(),
+        rounds: new fields.StringField({ blank: true, initial: "0" }),
+        remaining: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+        source: new fields.StringField({ blank: true, initial: "" }),
+        disabled: new fields.BooleanField({ initial: false }),
+      }),
+      { initial: [] },
+    ),
     // Efeito visual PERSISTENTE enquanto o item estiver ligado (Sequencer)
     fxFile: new fields.StringField({ blank: true, initial: "" }),
     fxScale: new fields.StringField({ blank: true, initial: "1" }),
@@ -303,6 +323,9 @@ export function actionEntryField() {
         fxAaName: new fields.StringField({ blank: true, initial: "" }),
         // Mantém a animação no alvo enquanto o efeito durar (ver fields.mjs).
         fxAaPersist: new fields.BooleanField({ initial: true }),
+        // ENCANTAR: ao aplicar, pergunta qual ITEM do alvo encantar e grava o
+        // efeito nele, valendo nas ações daquele item.
+        fxEnchant: new fields.BooleanField({ initial: false }),
         // SOBREVIDA VINCULADA (barreira): concede N de sobrevida ao aplicar.
         // O efeito e a sobrevida vivem e morrem juntos: sobrevida zerou →
         // o efeito termina; efeito terminou → a sobrevida some.

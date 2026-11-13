@@ -4,7 +4,7 @@
 import { expandConditions } from "../helpers/conditions.mjs";
 import { actorRollData } from "../helpers/dice.mjs";
 import { DEATH_HP } from "../helpers/wounds.mjs";
-import { aggregateEffectModifiers } from "../helpers/effects.mjs";
+import { aggregateEffectModifiers, resolveEffectValue } from "../helpers/effects.mjs";
 import { effectField } from "./fields.mjs";
 import { migrateEffectTargets } from "./fields.mjs";
 
@@ -22,10 +22,10 @@ function definitionBonuses(actor) {
   if (!actor?.items) return out;
   for (const item of actor.items) {
     if (item.type === "vocacao") {
-      out.hp += Number(item.system?.hpBonus) || 0;
-      out.mp += Number(item.system?.mpBonus) || 0;
+      out.hp += resolveEffectValue(item.system?.hpBonus, actor);
+      out.mp += resolveEffectValue(item.system?.mpBonus, actor);
     } else if (item.type === "raca") {
-      out.move += Number(item.system?.moveBonus) || 0;
+      out.move += resolveEffectValue(item.system?.moveBonus, actor);
     }
   }
   return out;
@@ -89,6 +89,11 @@ function appliedEffectsField() {
       tempHp: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
       // Id único para rastrear remoções (barreiras) entre atualizações.
       fxId: new fields.StringField({ blank: true, initial: "" }),
+      // ENCANTAR: quando marcado, este efeito não vale para o personagem —
+      // ele é gravado num ITEM escolhido e passa a valer nas ações dele.
+      enchant: new fields.BooleanField({ initial: false }),
+      // Id do item encantado por este efeito (para desfazer ao removê-lo).
+      enchantItemId: new fields.StringField({ blank: true, initial: "" }),
       // Efeito visual PERSISTENTE preso ao token enquanto o efeito durar
       // (caminho do Sequencer; some sozinho quando o efeito sai).
       fxFile: new fields.StringField({ blank: true, initial: "" }),
@@ -247,6 +252,8 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
     // rolagem (all/attack/defense) em this.rollMods, para uso nas rolagens.
     const mods = aggregateEffectModifiers(this.parent);
     this.rollMods = mods.roll;
+    // Bônus de conjuração restritos a palavras arcanas (palavra → modificadores).
+    this.wordMods = mods.word;
     // Reroll por atributo (primários + secundários) para as rolagens.
     this.attrReroll = {};
     this.attrCrit = {};

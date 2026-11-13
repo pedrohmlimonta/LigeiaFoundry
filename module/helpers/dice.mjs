@@ -35,9 +35,10 @@ async function waitForDiceAnimation(fallbackMs = 1100) {
 import { conditionModifiers, attributeConditionDice, actorHasCondition, coverDefenseDice, hasFullCover } from "./conditions.mjs";
 import { playActionAnimation } from "./integrations.mjs";
 import { executeActionMovement } from "./movement.mjs";
-import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvailable, activeEffectsOf } from "./effects.mjs";
+import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvailable, activeEffectsOf, arcaneWordsOf } from "./effects.mjs";
 import { DEATH_HP, WOUND_LEVELS, woundLevelFor, setWoundLevel } from "./wounds.mjs";
 import { updateActorAsGM, canAffectActor } from "./gm-proxy.mjs";
+import { enchantmentMods, applyEnchantment, pedirItemParaEncantar } from "./enchant.mjs";
 import { privateResource } from "./chat-privacy.mjs";
 // Re-export: outros módulos importam estas funções daqui.
 export { actorRollData, resolveEffectValue };
@@ -174,8 +175,11 @@ async function applyLimitedReroll(dieTerm, { ones = 0, sixes = 0 } = {}) {
   const faces = dieTerm.faces || 6;
   const newResults = [];
   for (const res of dieTerm.results) {
-    // Só rerrola dados ainda válidos (não descartados/já rerrolados).
-    if (res.rerolled || res.discarded) { newResults.push(res); continue; }
+    // Rerrola QUALQUER dado que tenha caído no valor alvo, inclusive os que
+    // o "manter os 2 maiores" (kh2/kl2) já havia descartado — um 1 continua
+    // sendo um 1, mesmo que não fosse entrar na soma. Só ficam de fora os
+    // que já foram rerrolados nesta passagem.
+    if (res.rerolled) { newResults.push(res); continue; }
     let doReroll = false;
     if (res.result === 1 && remainingOnes > 0) { doReroll = true; if (remainingOnes !== Infinity) remainingOnes--; }
     else if (res.result === 6 && remainingSixes > 0) { doReroll = true; if (remainingSixes !== Infinity) remainingSixes--; }
@@ -209,7 +213,13 @@ function recomputeKeep(dieTerm, keepMode) {
   const sorted = [...live].sort((a, b) => a.result - b.result);
   const keep = low ? sorted.slice(0, n) : sorted.slice(-n);
   const keepSet = new Set(keep);
-  for (const r of live) r.active = keepSet.has(r);
+  for (const r of live) {
+    r.active = keepSet.has(r);
+    // Mantém o "descartado" coerente com o que ficou ativo: um dado que era
+    // descartado e, depois do reroll, passou a contar não pode continuar
+    // riscado na mensagem do chat (e vice-versa).
+    r.discarded = !r.active;
+  }
 }
 
 /** Soma os resultados ativos de um termo de dados. */
@@ -225,6 +235,52 @@ function mergeReroll(a, b) {
   const bAll = b === "all" || b === Infinity;
   if (aAll || bAll) return Infinity;
   return (Number(a) || 0) + (Number(b) || 0);
+}
+
+/**
+ * Soma os bônus de conjuração restritos às PALAVRAS ARCANAS desta magia.
+ *
+ * Um efeito pode mirar "Conjuração (todas)" ou uma palavra específica. Aqui
+ * juntamos o que vale para ESTA magia: cada palavra dela que tenha bônus
+ * entra na conta, então uma magia Maior com três palavras pode acumular três
+ * bônus diferentes. Magias sem a palavra não recebem nada.
+ *
+ * Só vale quando a rolagem é de Conjuração e o item é uma magia.
+ *
+ * @param {Actor} actor
+ * @param {Item}  item     a magia sendo conjurada
+ * @param {string} attrKey atributo da rolagem
+ * @returns {{bonus:number, dice:number, rollDice:number, critBonus:number,
+ *            failBonus:number, reroll1:(number|string), reroll6:(number|string),
+ *            palavras:string[]}}
+ */
+export function arcaneWordMods(actor, item, attrKey) {
+  const vazio = {
+    bonus: 0, dice: 0, rollDice: 0, critBonus: 0, failBonus: 0,
+    reroll1: 0, reroll6: 0, palavras: [],
+  };
+  if (attrKey !== "conjuracao") return vazio;
+  const mapa = actor?.system?.wordMods;
+  if (!mapa) return vazio;
+  const palavras = arcaneWordsOf(item);
+  if (!palavras.length) return vazio;
+
+  const out = { ...vazio, palavras: [] };
+  for (const palavra of palavras) {
+    const m = mapa[palavra];
+    if (!m) continue;
+    out.bonus += m.bonus || 0;
+    out.dice += m.dice || 0;
+    out.rollDice += m.rollDice || 0;
+    out.critBonus += m.critBonus || 0;
+    out.failBonus += m.failBonus || 0;
+    out.reroll1 = mergeReroll(out.reroll1, m.reroll1 || 0);
+    out.reroll6 = mergeReroll(out.reroll6, m.reroll6 || 0);
+    out.palavras.push(palavra);
+  }
+  if (out.reroll1 === Infinity) out.reroll1 = "all";
+  if (out.reroll6 === Infinity) out.reroll6 = "all";
+  return out;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -681,7 +737,10 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       // ARMA: bônus (ou penalidade) de dano da categoria de tamanho de quem
       // ataca. Só vale para ações marcadas como arma.
       const sizeDmg = (isMain && action.isWeapon) ? (caster?.system?.size?.weaponBonus || 0) : 0;
-      let amount = (total + (scaling || 0) + sizeDmg) * dealtMult;
+      // ENCANTAMENTO do item: soma de dano, só na parcela principal (as
+      // parcelas extras têm fórmula própria).
+      const enchDmg = (isMain && isHp) ? (enchantmentMods(item, caster).damage || 0) : 0;
+      let amount = (total + (scaling || 0) + sizeDmg + enchDmg) * dealtMult;
       amount = amount - rd;
       amount = (amount + vuln.flat) * vuln.mult;
       amount = amount * takenMult;
@@ -690,6 +749,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       const scaleNote = scaling ? ` <span class="lig-scale">(+${scaling} escalonado)</span>` : "";
       const typeNote = isHp && typeLabel ? " " + typeLabel : "";
       const sizeNote = sizeDmg ? ` <span class="lig-scale">(${sizeDmg > 0 ? "+" : ""}${sizeDmg} por tamanho)</span>` : "";
+      const enchNote = enchDmg ? ` <span class="lig-scale">(${enchDmg > 0 ? "+" : ""}${enchDmg} por encantamento)</span>` : "";
       const rdNote = rd ? ` <span class="lig-rd">(RD ${rd})</span>` : "";
       const vulnBits = [];
       if (vuln.flat) vulnBits.push(`+${vuln.flat}`);
@@ -713,7 +773,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
         applyNote = `<div class="lig-dmg-applied muted">${relayFailNote(applied)}</div>`;
       }
       const tag = isMain ? "" : ' <span class="lig-extra-tag">extra</span>';
-      return `<div class="lig-atk-dmg">${resWord}: <strong>${dealt}</strong>${typeNote}${tag}${scaleNote}${sizeNote}${rdNote}${vulnNote}${isMain ? multNote : ""}</div>${applyNote}`;
+      return `<div class="lig-atk-dmg">${resWord}: <strong>${dealt}</strong>${typeNote}${tag}${scaleNote}${sizeNote}${enchNote}${rdNote}${vulnNote}${isMain ? multNote : ""}</div>${applyNote}`;
     };
 
     // Valor do escalonamento (bônus por superar a defesa) — calculado uma vez;
@@ -799,6 +859,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
   if (acertou && fxList.length) {
     if (canAffectActor(tActor)) {
       const cur = foundry.utils.deepClone(tActor.system?.appliedEffects || []);
+      const encantados = [];
       const conds = foundry.utils.deepClone(tActor.system?.conditions || []);
       const condsBefore = conds.length;
       const names = [];
@@ -833,6 +894,25 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
         }
         // Ativa a condição no alvo (marcador), se for o caso.
         if (isCondition && condId && !conds.includes(condId)) conds.push(condId);
+
+        // ENCANTAR: em vez de ir para a ficha do alvo, o efeito é gravado num
+        // ITEM dele, escolhido agora, e passa a valer nas ações daquele item.
+        if (ae.fxEnchant && effects.length) {
+          const alvoItem = await pedirItemParaEncantar(
+            tActor, `${item.name} — encantar um item de ${tActor.name}`,
+          );
+          if (alvoItem) {
+            const rodadasEnc = ae.durationMode === "rounds" ? resolveEffectValue(ae.durationRounds, caster) : 0;
+            const ok = await applyEnchantment(alvoItem, {
+              label: ae.label || "Encantamento",
+              effects,
+              rounds: String(rodadasEnc),
+              source: caster?.name || "",
+            });
+            if (ok) encantados.push(`${ae.label || "Encantamento"} → ${alvoItem.name}`);
+          }
+          continue; // não vai para os efeitos do personagem
+        }
 
         const rounds = ae.durationMode === "rounds" ? resolveEffectValue(ae.durationRounds, caster) : 0;
         const condLabel = CONFIG.LIGEIA?.conditions?.[condId]?.label || condId;
@@ -887,7 +967,12 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
         barrierNote = `<div class="lig-heal-applied">${privateResource(tActor, estadoBarreira, "hp")}</div>`;
       }
       await updateActorAsGM(tActor, update);
-      fxText = `<div class="lig-atk-fx">Efeitos aplicados: <strong>${names.join(", ")}</strong></div>${barrierNote}`;
+      const encText = encantados.length
+        ? `<div class="lig-atk-fx">Encantou: <strong>${encantados.join(", ")}</strong></div>`
+        : "";
+      fxText = (names.length
+        ? `<div class="lig-atk-fx">Efeitos aplicados: <strong>${names.join(", ")}</strong></div>`
+        : "") + encText + barrierNote;
     } else {
       fxText = `<div class="lig-atk-fx muted">Efeitos a aplicar: ${fxList.map((e) => e.label || "Efeito").join(", ")} — nenhum Mestre conectado para aplicar no alvo.</div>`;
     }
@@ -939,14 +1024,15 @@ export async function spendItemCosts(actor, item) {
   const costs = (item.system?.costs || []).filter((c) => (Number(c.value) || 0) > 0);
   if (!costs.length) return { text: "", insufficient: false, spent: false };
   if (!actor?.isOwner) {
-    return { text: costs.map((c) => `${c.value} ${resLabel(c.resource)}`).join(", "), insufficient: false, spent: false };
+    return { text: costs.map((c) => `${resolveEffectValue(c.value, actor)} ${resLabel(c.resource)}`).join(", "), insufficient: false, spent: false };
   }
 
   const update = {};
   const parts = [];
   let insufficient = false;
   for (const c of costs) {
-    const val = Number(c.value) || 0;
+    // O custo aceita fórmula com @variáveis do próprio personagem.
+    const val = resolveEffectValue(c.value, actor);
     if (c.resource === "hpTemp") {
       const cur = actor.system?.resources?.hp?.temp || 0;
       if (cur < val) insufficient = true;
@@ -1139,9 +1225,13 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     const atkPre = resolveAttr(actor, atkKey);
     // "attack" + a variante do alcance desta ação (corpo a corpo OU distância)
     const rmPre = categoryMods(actor, attackCategories(action.isMelee));
+    // Os dados das palavras arcanas também entram na caixa, senão o número
+    // que ela mostra não bate com o da rolagem.
+    const wordPre = arcaneWordMods(actor, item, atkKey);
+    const enchPre = enchantmentMods(item, actor, atkKey);
     const impPre =
       atkPre.dice + resolveEffectValue(action.rollDice, actor) + atkCond.atkDice +
-      rmPre.dice +
+      rmPre.dice + wordPre.dice + wordPre.rollDice + enchPre.dice + enchPre.rollDice +
       attributeConditionDice(actor, atkKey) +
       surpriseDiceFor(actor, action, overrideTargets);
     const cfg2 = await promptRollConfig({
@@ -1170,6 +1260,10 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     const rmBonus = rmCat.bonus;
     const atkRr = rerollFor(actor, atkKey, atkCats);
     const atkCrit = critFor(actor, atkKey, atkCats);
+    // Bônus que valem só para as palavras arcanas DESTA magia (acumulam).
+    const wordM = arcaneWordMods(actor, item, atkKey);
+    // O que os ENCANTAMENTOS gravados neste item somam às ações dele.
+    const enchM = enchantmentMods(item, actor, atkKey);
     // Surdo: -1D em rolagens de Conjuração.
     const attrCondDice = attributeConditionDice(actor, atkKey);
     // Surpreso: +1D para o atacante se o(s) alvo(s) diretos estão surpresos.
@@ -1178,15 +1272,18 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
       attribute: atk.value,
       improvement: dlgImprovement != null
         ? dlgImprovement
-        : atk.dice + (atk.rollDice || 0) + resolveEffectValue(action.rollDice, actor) + atkCond.atkDice + rmDice + attrCondDice + surpriseDice,
-      bonus: (Number(action.rollBonus) || 0) + rmBonus + dlgBonus + (atk.rollBonus || 0),
+        : atk.dice + (atk.rollDice || 0) + resolveEffectValue(action.rollDice, actor) + atkCond.atkDice + rmDice + attrCondDice + surpriseDice + wordM.dice + wordM.rollDice + enchM.dice + enchM.rollDice,
+      // O bônus da ação aceita fórmula com @variáveis ("2+ceil(@nivel/2)"),
+      // como os demais campos — Number() sozinho devolvia NaN → 0.
+      bonus: resolveEffectValue(action.rollBonus, actor) + rmBonus + dlgBonus + (atk.rollBonus || 0) + wordM.bonus + enchM.bonus,
       baseDice: dlgBaseDice,
       // Passa a CD fixa (quando houver) para marcar sucesso/falha e crítico.
       difficulty: fixedDC,
-      reroll1: atkRr.reroll1,
-      reroll6: atkRr.reroll6,
-      critBonus: atkCrit.critBonus,
-      failBonus: atkCrit.failBonus,
+      // Rerrolagem: atributo/categorias + palavras arcanas + encantamentos.
+      reroll1: (() => { const v = mergeReroll(mergeReroll(atkRr.reroll1, wordM.reroll1), enchM.reroll1); return v === Infinity ? "all" : v; })(),
+      reroll6: (() => { const v = mergeReroll(mergeReroll(atkRr.reroll6, wordM.reroll6), enchM.reroll6); return v === Infinity ? "all" : v; })(),
+      critBonus: atkCrit.critBonus + wordM.critBonus + enchM.critBonus,
+      failBonus: atkCrit.failBonus + wordM.failBonus + enchM.failBonus,
     });
     atkRolls.push(atkRoll.roll);
   }

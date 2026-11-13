@@ -482,6 +482,10 @@
           <input type="checkbox" name="system.actions.{{i}}.appliesEffects.{{fi}}.fxAaPersist" {{checked fx.fxAaPersist}}/>
           Manter enquanto o efeito durar
         </label>
+        <label class="lig-inline-check" title="Em vez de valer para o personagem, este efeito ENCANTA um item escolhido na hora e passa a valer nas ações daquele item. Ao executar a ação, uma lista dos itens do alvo aparece para você escolher.">
+          <input type="checkbox" name="system.actions.{{i}}.appliesEffects.{{fi}}.fxEnchant" {{checked fx.fxEnchant}}/>
+          Encantar um item do alvo
+        </label>
         <div class="lig-item-row">
           <label title="Concede sobrevida ao aplicar. Vidas ligadas: se a sobrevida zerar, o efeito termina; se o efeito terminar, a sobrevida some.">Sobrevida vinculada
             <input type="text" value="{{fx.grantTempHp}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.actions.{{i}}.appliesEffects.{{fi}}.grantTempHp"/>

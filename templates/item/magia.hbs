@@ -8,6 +8,23 @@
         {{selectOptions arcaneWords selected=system.wordId}}
       </select>
     </label>
+    {{!-- Intermediária usa 2 palavras; Maior usa 3. --}}
+    {{#if wordSlots.second}}
+    <label>2ª palavra
+      <select name="system.wordId2">
+        <option value="">—</option>
+        {{selectOptions arcaneWords selected=system.wordId2}}
+      </select>
+    </label>
+    {{/if}}
+    {{#if wordSlots.third}}
+    <label>3ª palavra
+      <select name="system.wordId3">
+        <option value="">—</option>
+        {{selectOptions arcaneWords selected=system.wordId3}}
+      </select>
+    </label>
+    {{/if}}
     <label>Círculo
       <select name="system.tier">
         {{selectOptions tierChoices selected=system.tier}}

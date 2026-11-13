@@ -3,6 +3,9 @@
  *
  * Uma classe base genérica + uma PARTS/template por tipo de item.
  */
+import { WORDS_BY_TIER, WORD_TARGET_PREFIX } from "../helpers/effects.mjs";
+import { removeEnchantment } from "../helpers/enchant.mjs";
+
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const { ItemSheetV2 } = foundry.applications.sheets;
 
@@ -20,6 +23,18 @@ const { ItemSheetV2 } = foundry.applications.sheets;
  * @param {Item} item
  * @returns {{total:number, itemFx:number, acoes:number, efeitos:number}}
  */
+/**
+ * Palavras arcanas como alvos de efeito ("conjuracao:ignis"), para o seletor.
+ * O alvo "conjuracao" puro continua valendo para TODAS as magias.
+ */
+export function palavrasComoAlvos() {
+  const out = {};
+  for (const w of CONFIG.LIGEIA?.arcaneWords || []) {
+    out[`${WORD_TARGET_PREFIX}${w}`] = `Conjuração — ${w.charAt(0).toUpperCase() + w.slice(1)}`;
+  }
+  return out;
+}
+
 export function contarAnimacoes(item) {
   const sys = item?.system || {};
   const temCfg = (c) => !!(c && typeof c === "object" && Object.keys(c).length > 0);
@@ -102,6 +117,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       pullAnim: LigeiaItemSheetBase._onPullAnim,
       pullFxAnim: LigeiaItemSheetBase._onPullFxAnim,
       clearAllAnims: LigeiaItemSheetBase._onClearAllAnims,
+      removeEnchantment: LigeiaItemSheetBase._onRemoveEnchantment,
       clearFxAnim: LigeiaItemSheetBase._onClearFxAnim,
       clearAnim: LigeiaItemSheetBase._onClearAnim,
       toggleAnim: LigeiaItemSheetBase._onToggleAnim,
@@ -299,6 +315,9 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       acc[w] = w.charAt(0).toUpperCase() + w.slice(1);
       return acc;
     }, {});
+    // Quantos campos de palavra arcana mostrar: o círculo decide.
+    const limitePalavras = WORDS_BY_TIER[item.system?.tier] ?? 1;
+    context.wordSlots = { second: limitePalavras >= 2, third: limitePalavras >= 3 };
 
     // Opções para o bloco de AÇÃO (ataque/defesa/dano)
     context.attackAttrs = CONFIG.LIGEIA?.attackAttrs || {};
@@ -348,6 +367,9 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         attack: "Ataque (qualquer)", defense: "Defesa (qualquer)",
         attackMelee: "Ataque (corpo a corpo)", attackRanged: "Ataque (à distância)",
         defenseMelee: "Defesa (corpo a corpo)", defenseRanged: "Defesa (à distância)",
+        // Conjuração restrita a uma palavra arcana: só as magias que tenham
+        // aquela palavra recebem o bônus (e acumulam, se tiverem mais de uma).
+        ...palavrasComoAlvos(),
       },
       stat: {
         hp: "PV máximo", mp: "PM máximo", heroic: "Pontos Heroicos máx.", deslocamento: "Deslocamento",
@@ -397,6 +419,14 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     context.seqActive = seqActive;
     // Botão "limpar todas as animações": só aparece quando há o que limpar.
     context.animInventory = contarAnimacoes(item);
+    // Encantamentos recebidos, com um resumo legível do que cada um faz.
+    context.enchantments = (item.system?.enchantments || []).map((e) => ({
+      ...e,
+      duracaoTexto: (e.remaining > 0) ? `${e.remaining} rodada(s)` : "",
+      resumo: (e.effects || [])
+        .map((x) => `${x.type} ${Number(x.value) >= 0 ? "+" : ""}${x.value} ${x.target || ""}`.trim())
+        .join(", "),
+    }));
     context.animPlacements = {
       cast: "No conjurador",
       target: "No alvo",
@@ -872,6 +902,11 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       "system.fxFile": "",
     });
     ui.notifications?.info(`${inv.total} animaç${plural ? "ões removidas" : "ão removida"} deste item.`);
+  }
+
+  /** Remove um encantamento gravado neste item. */
+  static async _onRemoveEnchantment(event, target) {
+    await removeEnchantment(this.document, target.dataset.id);
   }
 
   static async _onClearFxAnim(event, target) {

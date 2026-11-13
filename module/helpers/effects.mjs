@@ -139,6 +139,37 @@ export function resolveEffectValue(raw, actor) {
 }
 
 /* ======================================================================== */
+/*  Palavras arcanas                                                        */
+/* ======================================================================== */
+
+/** Quantas palavras arcanas cada círculo de magia comporta. */
+export const WORDS_BY_TIER = { "Menor": 1, "Intermediária": 2, "Maior": 3 };
+
+/** Prefixo dos alvos de efeito que valem só para uma palavra arcana. */
+export const WORD_TARGET_PREFIX = "conjuracao:";
+
+/**
+ * Palavras arcanas VÁLIDAS de uma magia: as preenchidas, até o limite do
+ * círculo (Menor 1, Intermediária 2, Maior 3), sem repetições nem vazias.
+ * Baixar o círculo de uma magia deixa de contar as palavras excedentes, em
+ * vez de manter um bônus invisível.
+ * @param {Item} item
+ * @returns {string[]}
+ */
+export function arcaneWordsOf(item) {
+  if (item?.type !== "magia") return [];
+  const sys = item.system || {};
+  const limite = WORDS_BY_TIER[sys.tier] ?? 1;
+  const todas = [sys.wordId, sys.wordId2, sys.wordId3];
+  const out = [];
+  for (let i = 0; i < limite; i++) {
+    const w = String(todas[i] || "").trim();
+    if (w && !out.includes(w)) out.push(w);
+  }
+  return out;
+}
+
+/* ======================================================================== */
 /*  Agregação e aplicação de modificadores                                  */
 /* ======================================================================== */
 
@@ -174,7 +205,10 @@ function emptyMods() {
   for (const k of ROLL_CATEGORIES) roll[k] = { bonus: 0, dice: 0, reroll1: 0, reroll6: 0, critBonus: 0, failBonus: 0 };
   const stat = {};
   for (const k of STAT_TARGETS) stat[k] = 0;
-  return { attr, roll, stat, size };
+  // Bônus de conjuração restritos a uma PALAVRA ARCANA. Preenchido sob
+  // demanda: palavra → mesmos campos de uma categoria de rolagem.
+  const word = {};
+  return { attr, roll, stat, size, word };
 }
 
 /**
@@ -207,6 +241,28 @@ function applyEffectToMods(mods, effect, actor) {
   const t = effect.target || "all";
   // Valor: número ou fórmula com as @variáveis do dono do efeito.
   const v = resolveEffectValue(effect.value, actor);
+
+  // Alvo "conjuracao:<palavra>": vale só para magias que tenham aquela
+  // palavra arcana. Vive num balde à parte, somado na hora da rolagem
+  // (ver dice.mjs), e acumula quando a magia casa com mais de um efeito.
+  if (t.startsWith(WORD_TARGET_PREFIX)) {
+    const palavra = t.slice(WORD_TARGET_PREFIX.length);
+    if (!palavra) return;
+    const alvo = (mods.word[palavra] ||= {
+      bonus: 0, dice: 0, rollDice: 0, reroll1: 0, reroll6: 0, critBonus: 0, failBonus: 0,
+    });
+    switch (effect.type) {
+      case "bonus": case "attr": alvo.bonus += v; break;
+      case "dice": alvo.dice += v; break;
+      case "rollDice": alvo.rollDice += v; break;
+      case "reroll1": alvo.reroll1 = combineReroll(alvo.reroll1, effect.rerollAll ? "all" : v); break;
+      case "reroll6": alvo.reroll6 = combineReroll(alvo.reroll6, effect.rerollAll ? "all" : v); break;
+      case "crit": alvo.critBonus += v; break;
+      case "fumble": alvo.failBonus += v; break;
+      default: break; // os demais tipos não fazem sentido por palavra
+    }
+    return;
+  }
 
   if (effect.type === "bonus") {
     // SÓ rolagem: nunca altera o valor do atributo (ver prepareDerivedData).

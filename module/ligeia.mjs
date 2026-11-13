@@ -22,6 +22,7 @@ import { registerChatPrivacyHooks } from "./helpers/chat-privacy.mjs";
 import { syncConditionEffects } from "./helpers/conditions.mjs";
 import { applyHealingToActor } from "./helpers/dice.mjs";
 import { persistentFxName, playEffectFx, endEffectFx, limparFxOrfaos, resyncEffectFx } from "./helpers/integrations.mjs";
+import { pedirItemParaEncantar, applyEnchantment, removeEnchantment } from "./helpers/enchant.mjs";
 import { registerTurnEffectHooks } from "./helpers/turn-effects.mjs";
 import { registerBarrierHooks } from "./helpers/barrier.mjs";
 import { applyTempHpToActor } from "./helpers/dice.mjs";
@@ -517,6 +518,27 @@ Hooks.on("updateItem", async function (item, changes, options, userId) {
   const actor = item.parent;
   if (actor?.documentName !== "Actor") return;
   const nome = persistentFxName(`item-${item.id}`);
+  // Efeitos marcados como ENCANTAR: ao ligar o item, escolhe-se o item a
+  // encantar; ao desligar, o encantamento sai junto.
+  const encEfeitos = (item.system?.effects || []).filter((e) => e?.enchant && e.enabled !== false);
+  if (encEfeitos.length) {
+    if (mudou === true) {
+      const alvo = await pedirItemParaEncantar(actor, `${item.name} — encantar um item`);
+      if (alvo) {
+        await applyEnchantment(alvo, {
+          id: `item-${item.id}`,
+          label: item.name,
+          effects: encEfeitos,
+          rounds: "0",
+          source: item.name,
+        });
+        ui.notifications?.info(`"${alvo.name}" encantado por ${item.name}.`);
+      }
+    } else {
+      for (const outro of actor.items || []) await removeEnchantment(outro, `item-${item.id}`);
+    }
+  }
+
   if (mudou === true) {
     // UMA animação só: a puxada do item (ou o caminho digitado). Ela já vem
     // com tudo o que foi configurado no Automated Animations e fica no token

@@ -9,7 +9,7 @@
     <select name="system.costs.{{i}}.resource">
       {{selectOptions ../costResources selected=cost.resource}}
     </select>
-    <input type="number" name="system.costs.{{i}}.value" value="{{cost.value}}" class="lig-narrow"/>
+    <input type="text" name="system.costs.{{i}}.value" value="{{cost.value}}" class="lig-narrow"/>
     <input type="text" name="system.costs.{{i}}.label" value="{{cost.label}}" placeholder="nota"/>
     <button type="button" class="lig-mini-btn danger" data-action="removeCost" data-index="{{i}}">✕</button>
   </div>

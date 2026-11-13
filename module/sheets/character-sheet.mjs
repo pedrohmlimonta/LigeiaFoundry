@@ -8,8 +8,9 @@ import { requestRollConfig } from "../helpers/roll-request.mjs";
 import { placeTemplateForAction, scheduleTransientCleanup } from "../helpers/template.mjs";
 import { computeXpSpent, computeXpGained } from "../helpers/xp.mjs";
 import { performRest, performMedicalCare, DEATH_HP } from "../helpers/wounds.mjs";
-import { effectIsActive, availableActionsOf, resolveEffectValue } from "../helpers/effects.mjs";
+import { effectIsActive, availableActionsOf, resolveEffectValue, WORD_TARGET_PREFIX } from "../helpers/effects.mjs";
 import { artRowsFor, tokenArtFor, healthPercent } from "../helpers/token-art.mjs";
+import { pedirItemParaEncantar, applyEnchantment, removeEnchantment } from "../helpers/enchant.mjs";
 import { theatreRowsFor, theatreActive } from "../helpers/theatre-art.mjs";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -41,6 +42,8 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       rest: LigeiaCharacterSheet.#onRest,
       medicalCare: LigeiaCharacterSheet.#onMedicalCare,
       pullEffectAnim: LigeiaCharacterSheet.#onPullEffectAnim,
+      enchantItem: LigeiaCharacterSheet.#onEnchantItem,
+      unenchantItem: LigeiaCharacterSheet.#onUnenchantItem,
       clearEffectAnim: LigeiaCharacterSheet.#onClearEffectAnim,
     },
     form: {
@@ -232,6 +235,12 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       attack: "Ataque (qualquer)", defense: "Defesa (qualquer)",
       attackMelee: "Ataque (corpo a corpo)", attackRanged: "Ataque (à distância)",
       defenseMelee: "Defesa (corpo a corpo)", defenseRanged: "Defesa (à distância)",
+      // Conjuração restrita a uma palavra arcana: vale só para as magias que
+      // tenham aquela palavra, e acumula quando a magia tem mais de uma.
+      ...(CONFIG.LIGEIA?.arcaneWords || []).reduce((acc, w) => {
+        acc[`${WORD_TARGET_PREFIX}${w}`] = `Conjuração — ${w.charAt(0).toUpperCase() + w.slice(1)}`;
+        return acc;
+      }, {}),
     };
     const statTargets = { hp: "PV máximo", mp: "PM máximo", heroic: "Pontos Heroicos máx.", deslocamento: "Deslocamento" };
     const setTargets = {
@@ -274,6 +283,8 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
         fx0TargetChoices: targetsFor(type0),
         fx0IsReroll: type0 === "reroll1" || type0 === "reroll6",
         fx0IsVuln: type0 === "vuln",
+        // Nome do item que este efeito encantou (para mostrar na ficha).
+        enchantItemName: ae.enchantItemId ? (actor.items.get(ae.enchantItemId)?.name || "") : "",
         fx0NoValue: false,
         summary: [
           (ae.effects || [])
@@ -857,6 +868,54 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     efeitos[idx].fxAaConfig = null;
     efeitos[idx].fxAaName = "";
     await this.document.update({ "system.appliedEffects": efeitos });
+  }
+
+  /**
+   * Escolhe um item deste personagem e grava nele os efeitos deste efeito
+   * ativo — a partir daí eles valem nas ações daquele item.
+   */
+  static async #onEnchantItem(event, target) {
+    const actor = this.document;
+    const idx = Number(target.dataset.index);
+    const efeitos = foundry.utils.deepClone(actor.system?.appliedEffects || []);
+    const ae = efeitos[idx];
+    if (!ae) return;
+    if (!(ae.effects || []).length) {
+      ui.notifications?.warn("Este efeito não tem nenhum modificador para encantar.");
+      return;
+    }
+    const alvo = await pedirItemParaEncantar(actor, `Encantar com "${ae.label || "efeito"}"`);
+    if (!alvo) return;
+
+    // Troca de item: tira o encantamento do anterior.
+    if (ae.enchantItemId && ae.enchantItemId !== alvo.id) {
+      const antigo = actor.items.get(ae.enchantItemId);
+      if (antigo) await removeEnchantment(antigo, ae.fxId);
+    }
+    const ok = await applyEnchantment(alvo, {
+      id: ae.fxId,
+      label: ae.label || "Encantamento",
+      effects: ae.effects,
+      rounds: String(ae.duration?.rounds ?? "0"),
+      source: actor.name,
+    });
+    if (!ok) return;
+    efeitos[idx].enchantItemId = alvo.id;
+    await actor.update({ "system.appliedEffects": efeitos });
+    ui.notifications?.info(`"${alvo.name}" encantado.`);
+  }
+
+  /** Desfaz o encantamento deste efeito. */
+  static async #onUnenchantItem(event, target) {
+    const actor = this.document;
+    const idx = Number(target.dataset.index);
+    const efeitos = foundry.utils.deepClone(actor.system?.appliedEffects || []);
+    const ae = efeitos[idx];
+    if (!ae?.enchantItemId) return;
+    const item = actor.items.get(ae.enchantItemId);
+    if (item) await removeEnchantment(item, ae.fxId);
+    efeitos[idx].enchantItemId = "";
+    await actor.update({ "system.appliedEffects": efeitos });
   }
 
   /** Botão DESCANSAR: pergunta o local e aplica os efeitos do descanso. */

@@ -47,12 +47,27 @@
     </select>
     {{/if}}
     <input type="text" name="system.effects.{{i}}.label" value="{{eff.label}}" placeholder="nota"/>
+    <label class="lig-inline-check" title="Em vez de valer para o personagem, este efeito ENCANTA um item escolhido na hora e passa a valer nas ações daquele item.">
+      <input type="checkbox" name="system.effects.{{i}}.enchant" {{checked eff.enchant}}/> encantar
+    </label>
     <label class="lig-inline-check" title="Ativo">
       <input type="checkbox" name="system.effects.{{i}}.enabled" {{checked eff.enabled}}/>
     </label>
     <button type="button" class="lig-mini-btn danger" data-action="removeEffect" data-index="{{i}}">✕</button>
   </div>
   {{/each}}
+
+  {{!-- Encantamentos gravados NESTE item: valem nas ações dele --}}
+  {{#if enchantments.length}}
+  <div class="lig-section-title">Encantamentos recebidos</div>
+  {{#each enchantments as |ench|}}
+  <div class="lig-macro-bound">
+    <span class="lig-macro-name">✨ {{ench.label}}{{#if ench.source}} — de {{ench.source}}{{/if}}{{#if ench.duracaoTexto}} ({{ench.duracaoTexto}}){{/if}}</span>
+    <span class="lig-hint">{{ench.resumo}}</span>
+    <button type="button" class="lig-mini-btn danger" data-action="removeEnchantment" data-id="{{ench.id}}" title="Remover este encantamento">✕</button>
+  </div>
+  {{/each}}
+  {{/if}}
   {{#unless effects.length}}
   <div class="lig-empty">Sem efeitos.</div>
   {{/unless}}

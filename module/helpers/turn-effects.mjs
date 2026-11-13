@@ -15,6 +15,7 @@ import { rollLigeia, resolveAttr, rerollFor, critFor, applyHealingToActor, apply
 import { processWoundRollAtTurnStart } from "./wounds.mjs";
 import { resolveEffectValue } from "./effects.mjs";
 import { privateResource } from "./chat-privacy.mjs";
+import { tickEnchantmentsAtTurnStart } from "./enchant.mjs";
 
 /** Detecta se ESTE cliente deve processar (apenas um GM ativo). */
 function isResponsibleClient() {
@@ -270,6 +271,14 @@ export function registerTurnEffectHooks() {
     await processRegenAtTurnStart(actor);
     await processEndRollsAtTurnStart(actor);
     await processDurationAtTurnStart(actor);
+    // Encantamentos com duração nos itens deste personagem.
+    const encFim = await tickEnchantmentsAtTurnStart(actor);
+    if (encFim.length) {
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: `<div class="ligeia-roll-flavor"><strong>${actor.name}</strong>: ${encFim.length > 1 ? "terminaram" : "terminou"} <em>${encFim.join(", ")}</em>.</div>`,
+      });
+    }
     // Ferimentos graves / à beira da morte: Vigor no começo do turno.
     await processWoundRollAtTurnStart(actor);
   });

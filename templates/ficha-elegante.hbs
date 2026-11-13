@@ -596,6 +596,17 @@
             <input type="checkbox" name="system.appliedEffects.{{ae.index}}.fxAaPersist" {{checked ae.fxAaPersist}}/>
             Manter enquanto o efeito durar
           </label>
+          <label class="lig-inline-check" title="Em vez de valer para o personagem, este efeito ENCANTA um item escolhido na hora e passa a valer nas ações daquele item.">
+            <input type="checkbox" name="system.appliedEffects.{{ae.index}}.enchant" {{checked ae.enchant}}/>
+            Encantar um item
+          </label>
+          {{#if ae.enchant}}
+          <div class="lig-macro-bound">
+            <span class="lig-macro-name">{{#if ae.enchantItemName}}✨ {{ae.enchantItemName}}{{else}}nenhum item encantado ainda{{/if}}</span>
+            <button type="button" class="lig-mini-btn" data-action="enchantItem" data-index="{{ae.index}}" title="Escolher o item a encantar">✨</button>
+            <button type="button" class="lig-mini-btn danger" data-action="unenchantItem" data-index="{{ae.index}}" title="Desfazer o encantamento">✕</button>
+          </div>
+          {{/if}}
           <div class="lig-applied-config">
             <label class="lig-inline-check">
               <input type="checkbox" name="system.appliedEffects.{{ae.index}}.endRoll.enabled" {{checked ae.endRoll.enabled}}/>
