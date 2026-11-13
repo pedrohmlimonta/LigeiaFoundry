@@ -245,6 +245,10 @@ function mergeReroll(a, b) {
  * entra na conta, então uma magia Maior com três palavras pode acumular três
  * bônus diferentes. Magias sem a palavra não recebem nada.
  *
+ * REPETIÇÃO CONTA DE NOVO: a magia é percorrida palavra por palavra, então uma
+ * magia com "ácida, ácida" soma o bônus de ácida duas vezes (+1 vira +2). Vale
+ * para tudo — bônus, dados, crítico e rerrolagem.
+ *
  * Só vale quando a rolagem é de Conjuração e o item é uma magia.
  *
  * @param {Actor} actor

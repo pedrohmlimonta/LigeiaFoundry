@@ -150,11 +150,15 @@ export const WORD_TARGET_PREFIX = "conjuracao:";
 
 /**
  * Palavras arcanas VÁLIDAS de uma magia: as preenchidas, até o limite do
- * círculo (Menor 1, Intermediária 2, Maior 3), sem repetições nem vazias.
- * Baixar o círculo de uma magia deixa de contar as palavras excedentes, em
- * vez de manter um bônus invisível.
+ * círculo (Menor 1, Intermediária 2, Maior 3). Baixar o círculo deixa de
+ * contar as palavras excedentes, em vez de manter um bônus invisível.
+ *
+ * REPETIÇÕES CONTAM: uma magia com "ácida, ácida" usa a palavra duas vezes,
+ * então um bônus de +1 em conjurações de ácida rende +2. Por isso a lista
+ * sai com as repetições, e não como um conjunto.
+ *
  * @param {Item} item
- * @returns {string[]}
+ * @returns {string[]} pode conter a mesma palavra mais de uma vez
  */
 export function arcaneWordsOf(item) {
   if (item?.type !== "magia") return [];
@@ -164,7 +168,7 @@ export function arcaneWordsOf(item) {
   const out = [];
   for (let i = 0; i < limite; i++) {
     const w = String(todas[i] || "").trim();
-    if (w && !out.includes(w)) out.push(w);
+    if (w) out.push(w);
   }
   return out;
 }

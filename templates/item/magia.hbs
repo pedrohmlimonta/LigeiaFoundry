@@ -34,6 +34,10 @@
       <input type="text" name="system.casting" value="{{system.casting}}" placeholder="Ação, 1 min..."/>
     </label>
   </div>
+  {{#if wordSlots.second}}
+  <p class="lig-hint">A mesma palavra pode ser escolhida mais de uma vez: cada repetição
+    conta, então um bônus de conjuração para ela é somado uma vez por repetição.</p>
+  {{/if}}
 
   <div class="lig-slots">
     <label>Alvo<input type="text" name="system.target" value="{{system.target}}"/></label>
