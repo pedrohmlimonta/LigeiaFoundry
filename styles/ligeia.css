@@ -1754,3 +1754,14 @@ label.lig-bars-players {
   aspect-ratio: 3 / 4;
   max-height: 170px;
 }
+
+/* Trava "item não encantável": separada do resto dos efeitos, para não ser
+   confundida com a lista de efeitos acima dela. */
+.lig-no-enchant {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--lig-border);
+}

@@ -92,6 +92,10 @@ export function activatableFields() {
       }),
       { initial: [] },
     ),
+    // TRAVA DE ENCANTAMENTO: marcada, o item não aparece na lista de escolha
+    // de "encantar um item". Desmarcada por padrão — todo item encantável
+    // entra na lista até alguém decidir o contrário.
+    noEnchant: new fields.BooleanField({ initial: false }),
     // Efeito visual PERSISTENTE enquanto o item estiver ligado (Sequencer)
     fxFile: new fields.StringField({ blank: true, initial: "" }),
     fxScale: new fields.StringField({ blank: true, initial: "1" }),

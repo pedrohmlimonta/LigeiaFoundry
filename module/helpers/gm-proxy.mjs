@@ -25,21 +25,30 @@ const CAMINHOS_PERMITIDOS = [
   "system.conditions",
 ];
 
+/**
+ * Caminhos que o relé aceita alterar num ITEM de terceiro.
+ * Encantar o item de outro personagem é uma ação legítima de jogador, mas
+ * ninguém pode mexer no resto da ficha do item por essa via.
+ */
+const CAMINHOS_ITEM_PERMITIDOS = [
+  "system.enchantments",
+];
+
 /** Pedidos aguardando resposta: requestId → resolve. */
 const pendentes = new Map();
 
 /** Apenas UM Mestre processa os pedidos (evita aplicar em duplicidade). */
 function mestreResponsavel() {
-  const gms = game.users?.filter((u) => u.isGM && u.active) || [];
+  const gms = globalThis.game?.users?.filter((u) => u.isGM && u.active) || [];
   if (!gms.length) return null;
   return gms.sort((a, b) => a.id.localeCompare(b.id))[0];
 }
 
 /** A alteração mexe apenas no que o relé aceita? */
-function alteracaoPermitida(update) {
+function alteracaoPermitida(update, lista = CAMINHOS_PERMITIDOS) {
   const chaves = Object.keys(update || {});
   if (!chaves.length) return false;
-  return chaves.every((k) => CAMINHOS_PERMITIDOS.some((p) => k === p || k.startsWith(p)));
+  return chaves.every((k) => lista.some((p) => k === p || k.startsWith(p)));
 }
 
 /**
@@ -53,15 +62,35 @@ function alteracaoPermitida(update) {
  *          noGM?:boolean, timeout?:boolean, refused?:boolean}>}
  */
 export async function updateActorAsGM(actor, update, options = {}, timeoutMs = 15000) {
-  if (!actor) return { ok: false };
+  return updateDocAsGM(actor, "actor", update, options, CAMINHOS_PERMITIDOS, timeoutMs);
+}
 
-  // Dono da ficha (o próprio personagem, ou o Mestre): aplica direto.
-  if (actor.isOwner) {
-    await actor.update(update, options);
+/**
+ * Aplica uma alteração num ITEM, repassando ao Mestre quando o usuário não é
+ * dono dele. É o caminho de ENCANTAR o item de outro personagem: o jogador
+ * escolhe o item na hora, mas quem grava é o Mestre.
+ *
+ * @param {Item} item
+ * @param {object} update  alterações (só caminhos de CAMINHOS_ITEM_PERMITIDOS)
+ * @param {object} [options]
+ * @returns {Promise<{ok:boolean, direct?:boolean, relayed?:boolean,
+ *          noGM?:boolean, timeout?:boolean, refused?:boolean}>}
+ */
+export async function updateItemAsGM(item, update, options = {}, timeoutMs = 15000) {
+  return updateDocAsGM(item, "item", update, options, CAMINHOS_ITEM_PERMITIDOS, timeoutMs);
+}
+
+/** Miolo comum: aplica direto se for dono, senão pede ao Mestre. */
+async function updateDocAsGM(doc, kind, update, options, lista, timeoutMs) {
+  if (!doc) return { ok: false };
+
+  // Dono do documento (o próprio personagem, ou o Mestre): aplica direto.
+  if (doc.isOwner) {
+    await doc.update(update, options);
     return { ok: true, direct: true };
   }
 
-  if (!alteracaoPermitida(update)) {
+  if (!alteracaoPermitida(update, lista)) {
     console.warn("Ligeia | alteração fora da lista branca não foi repassada ao Mestre:", update);
     return { ok: false, refused: true };
   }
@@ -81,11 +110,14 @@ export async function updateActorAsGM(actor, update, options = {}, timeoutMs = 1
       resolve(res);
     });
     game.socket?.emit(SOCKET, {
+      // O nome do pedido não mudou: um cliente ainda na versão antiga do
+      // sistema continua entendendo (e atendendo) os pedidos de ficha.
       type: "actorUpdateRequest",
       requestId,
       userId: gm.id,
       fromUserId: game.user.id,
-      actorUuid: actor.uuid,
+      actorUuid: doc.uuid,
+      kind,
       update,
       options,
     });
@@ -107,13 +139,18 @@ export function registerGmProxySocket() {
       let ok = false;
       let error = null;
       try {
-        if (!alteracaoPermitida(payload.update)) {
+        // Cada tipo de documento tem a sua própria lista branca.
+        const ehItem = payload.kind === "item";
+        const lista = ehItem ? CAMINHOS_ITEM_PERMITIDOS : CAMINHOS_PERMITIDOS;
+        if (!alteracaoPermitida(payload.update, lista)) {
           error = "alteração fora da lista branca";
         } else {
-          const actor = await fromUuid(payload.actorUuid);
-          if (!actor) error = "ficha não encontrada";
+          const doc = await fromUuid(payload.actorUuid);
+          if (!doc) error = ehItem ? "item não encontrado" : "ficha não encontrada";
+          else if (ehItem && doc.documentName !== "Item") error = "o pedido não aponta para um item";
+          else if (!ehItem && doc.documentName !== "Actor") error = "o pedido não aponta para uma ficha";
           else {
-            await actor.update(payload.update, payload.options || {});
+            await doc.update(payload.update, payload.options || {});
             ok = true;
           }
         }

@@ -71,4 +71,10 @@
   {{#unless effects.length}}
   <div class="lig-empty">Sem efeitos.</div>
   {{/unless}}
+
+  {{!-- Trava: tira o item da lista de escolha de "encantar um item" --}}
+  <label class="lig-inline-check lig-no-enchant" title="Marcada, este item não aparece na lista quando alguém usa um efeito de encantar. Encantamentos já gravados continuam valendo.">
+    <input type="checkbox" name="system.noEnchant" {{checked system.noEnchant}}/>
+    Item não encantável
+  </label>
 </div>

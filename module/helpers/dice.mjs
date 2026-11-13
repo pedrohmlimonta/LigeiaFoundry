@@ -715,7 +715,7 @@ export async function applyConditionsToActor(actor, ids = []) {
  * personagem (self/area/aura com includeSelf). `acertou` indica se a defesa
  * falhou (ou se não houve defesa, em self/auto).
  */
-async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls = [], healRoll = null, atkTotal, defTotal, dcTotal = null, acertou, cfg, attackerMods, caster }) {
+async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls = [], healRoll = null, atkTotal, defTotal, dcTotal = null, acertou, cfg, attackerMods, caster, item = null }) {
   let dmgText = "";
 
   const hasExtra = Array.isArray(extraDamageRolls) && extraDamageRolls.length > 0;
@@ -902,8 +902,11 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
         // ENCANTAR: em vez de ir para a ficha do alvo, o efeito é gravado num
         // ITEM dele, escolhido agora, e passa a valer nas ações daquele item.
         if (ae.fxEnchant && effects.length) {
+          // A escolha é de QUEM ESTÁ CONJURANDO (este código roda no cliente
+          // dele), mas a lista é dos itens do ALVO.
+          const origem = item?.name || action?.name || "Encantamento";
           const alvoItem = await pedirItemParaEncantar(
-            tActor, `${item.name} — encantar um item de ${tActor.name}`,
+            tActor, `${origem} — encantar um item de ${tActor.name}`,
           );
           if (alvoItem) {
             const rodadasEnc = ae.durationMode === "rounds" ? resolveEffectValue(ae.durationRounds, caster) : 0;
@@ -1631,7 +1634,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
         defInfo = isSelf ? ' <span class="lig-outcome self">(em si)</span>' : ' <span class="lig-outcome ok">(automático)</span>';
       }
 
-      const detail = await resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls, healRoll, atkTotal, defTotal, dcTotal: effectiveDCFor(tActor), acertou, cfg, attackerMods: atkCond, caster: actor });
+      const detail = await resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls, healRoll, atkTotal, defTotal, dcTotal: effectiveDCFor(tActor), acertou, cfg, attackerMods: atkCond, caster: actor, item });
       hits.push({ actor: tActor, acertou, isSelf });
       lines.push(`<div class="lig-atk-target"><div class="lig-atk-line"><strong>${tActor.name}</strong>${defInfo}</div>${detail}</div>`);
     }
