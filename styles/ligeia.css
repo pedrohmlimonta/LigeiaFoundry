@@ -1766,8 +1766,9 @@ label.lig-bars-players {
   border-top: 1px solid var(--lig-border);
 }
 
-/* Grade de TIPAGENS da arma: muitas opções curtas, em colunas, para caber
-   sem transformar a ficha numa lista rolante. */
+/* ===========================================================================
+   CAMPO DE ETIQUETAS (tipagens de arma) — estilo Selectize
+   =========================================================================== */
 .lig-tags-block {
   background: var(--lig-bg-raised);
   border: 1px solid var(--lig-border);
@@ -1775,26 +1776,117 @@ label.lig-bars-players {
   padding: 0.5rem;
 }
 
-.lig-tag-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
-  gap: 0.15rem 0.5rem;
-  margin-bottom: 0.45rem;
+.lig-tagsel {
+  position: relative;
 }
 
-.lig-tag-check {
-  font-size: 0.75rem !important;
+/* A caixa: as etiquetas e o campo de digitar, lado a lado, quebrando linha */
+.lig-tagsel-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.25rem;
-  min-width: 0;
+  min-height: 2rem;
+  padding: 0.25rem 0.3rem;
+  background: var(--lig-bg-deep);
+  border: 1px solid var(--lig-border);
+  border-radius: 3px;
+  cursor: text;
 }
 
-.lig-tag-check input[type="checkbox"] {
-  flex: 0 0 auto;
+.lig-tagsel.aberto .lig-tagsel-box {
+  border-color: var(--lig-accent, #c8a24a);
 }
 
-.lig-tag-check.on {
-  color: var(--lig-accent, #c8a24a) !important;
-  font-weight: 600;
+.lig-tagsel.disabled .lig-tagsel-box {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Cada tipagem escolhida */
+.lig-tagsel-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.1rem 0.2rem 0.1rem 0.45rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  white-space: nowrap;
+  color: var(--lig-ink);
+  background: var(--lig-bg-raised);
+  border: 1px solid var(--lig-accent, #c8a24a);
+  border-radius: 10px;
+}
+
+.lig-tagsel-x {
+  all: unset;
+  cursor: pointer;
+  padding: 0 0.25rem;
+  font-size: 0.7rem;
+  line-height: 1;
+  opacity: 0.6;
+}
+
+.lig-tagsel-x:hover { opacity: 1; color: var(--lig-danger, #b4553f); }
+
+/* O campo de digitar cresce para ocupar o resto da linha */
+.lig-tagsel-input {
+  flex: 1 1 6rem;
+  min-width: 6rem;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  font-size: 0.78rem !important;
+  height: auto !important;
+  padding: 0.1rem 0.2rem !important;
+  color: var(--lig-ink);
+}
+
+/* A lista suspensa */
+.lig-tagsel-menu {
+  position: absolute;
+  z-index: 50;
+  left: 0;
+  right: 0;
+  max-height: 13rem;
+  overflow-y: auto;
+  margin-top: 2px;
+  background: var(--lig-bg-deep);
+  border: 1px solid var(--lig-accent, #c8a24a);
+  border-radius: 3px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.lig-tagsel-menu[hidden] { display: none; }
+
+.lig-tagsel-opt {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.lig-tagsel-opt.on,
+.lig-tagsel-opt:hover {
+  background: var(--lig-bg-raised);
+  color: var(--lig-accent, #c8a24a);
+}
+
+/* A linha de "Criar «termo»" */
+.lig-tagsel-opt.novo {
+  font-style: italic;
+}
+
+/* Quando ela vem DEPOIS de sugestões, um traço a separa delas */
+.lig-tagsel-opt.novo.separado {
+  border-top: 1px solid var(--lig-border);
+}
+
+.lig-tagsel-vazio {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--lig-ink-soft);
 }
 
 .lig-tag-count {

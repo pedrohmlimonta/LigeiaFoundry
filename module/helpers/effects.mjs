@@ -211,6 +211,9 @@ export function weaponTagId(nome) {
 export function weaponTagsOf(item) {
   const sys = item?.system || {};
   const marcadas = Array.isArray(sys.tags) ? sys.tags : [];
+  // tagsExtra é o campo ANTIGO (tipagens livres separadas por vírgula). A
+  // migração do item junta tudo em `tags`, mas ele continua sendo lido aqui
+  // para que um mundo ainda não migrado não perca as tipagens.
   const livres = String(sys.tagsExtra || "").split(",");
   const out = [];
   for (const t of [...marcadas, ...livres]) {
@@ -221,16 +224,56 @@ export function weaponTagsOf(item) {
 }
 
 /**
- * Rótulo de exibição de uma tipagem: o do livro quando existe, senão o
- * próprio id reconstruído em palavras.
- * @param {string} id
+ * Tipagens de um item para EXIBIR: o id usado na comparação e o rótulo tal
+ * como deve aparecer na tela.
+ *
+ * Uma tipagem inventada é guardada com o texto que a pessoa digitou
+ * ("Forja Anã"), e não com o id normalizado, para que a acentuação e as
+ * maiúsculas sobrevivam. O id continua sendo a forma normalizada, que é o
+ * que os efeitos comparam.
+ *
+ * @param {Item} item
+ * @returns {Array<{id:string, label:string}>}
+ */
+export function weaponTagEntriesOf(item) {
+  const sys = item?.system || {};
+  const guardadas = [
+    ...(Array.isArray(sys.tags) ? sys.tags : []),
+    ...String(sys.tagsExtra || "").split(","),
+  ];
+  const vistos = new Set();
+  const out = [];
+  for (const bruto of guardadas) {
+    const id = weaponTagId(bruto);
+    if (!id || vistos.has(id)) continue;
+    vistos.add(id);
+    out.push({ id, label: weaponTagLabel(bruto) });
+  }
+  return out;
+}
+
+/**
+ * Rótulo de exibição de uma tipagem.
+ *
+ * Recebe o que está guardado, que pode ser um id do livro ("duas_maos") ou
+ * o texto que a pessoa digitou ("Forja Anã"). No primeiro caso devolve o
+ * rótulo do livro; no segundo, o próprio texto, limpo.
+ *
+ * @param {string} guardado
  * @returns {string}
  */
-export function weaponTagLabel(id) {
-  const doLivro = CONFIG?.LIGEIA?.weaponTags?.[id];
+export function weaponTagLabel(guardado) {
+  const bruto = String(guardado || "").trim();
+  if (!bruto) return "";
+  const doLivro = CONFIG?.LIGEIA?.weaponTags?.[bruto]
+    || CONFIG?.LIGEIA?.weaponTags?.[weaponTagId(bruto)];
   if (doLivro) return doLivro;
-  return String(id || "").split("_")
-    .map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" ");
+  // Texto digitado: fica como está. Só um id cru (sem espaço, com
+  // underscore) é reconstruído em palavras.
+  if (/^[a-z0-9]+(_[a-z0-9]+)*$/.test(bruto) && bruto.includes("_")) {
+    return bruto.split("_").map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" ");
+  }
+  return bruto;
 }
 
 /**
@@ -248,12 +291,17 @@ export function weaponTagLabel(id) {
 export function tipagensComoAlvos() {
   const out = { [WEAPON_ANY_TARGET]: "Arma (qualquer tipagem)" };
   const ids = Object.keys(CONFIG?.LIGEIA?.weaponTags || {});
-  const extras = new Set();
+  // tipagem inventada → rótulo como foi digitado (a primeira grafia vista)
+  const extras = new Map();
   const varrer = (itens) => {
     for (const it of itens || []) {
-      for (const t of String(it?.system?.tagsExtra || "").split(",")) {
+      const guardadas = [
+        ...(Array.isArray(it?.system?.tags) ? it.system.tags : []),
+        ...String(it?.system?.tagsExtra || "").split(","),
+      ];
+      for (const t of guardadas) {
         const id = weaponTagId(t);
-        if (id && !ids.includes(id)) extras.add(id);
+        if (id && !ids.includes(id) && !extras.has(id)) extras.set(id, weaponTagLabel(t));
       }
     }
   };
@@ -261,8 +309,12 @@ export function tipagensComoAlvos() {
     varrer(globalThis.game?.items);
     for (const a of globalThis.game?.actors || []) varrer(a.items);
   } catch (e) { /* fora de um mundo carregado: só a lista do livro */ }
-  for (const id of [...ids, ...[...extras].sort()]) {
+  for (const id of ids) {
     out[`${WEAPON_TAG_PREFIX}${id}`] = `Arma — ${weaponTagLabel(id)}`;
+  }
+  // As inventadas vão depois, em ordem, com a grafia que foi digitada.
+  for (const [id, rotulo] of [...extras].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"))) {
+    out[`${WEAPON_TAG_PREFIX}${id}`] = `Arma — ${rotulo}`;
   }
   return out;
 }

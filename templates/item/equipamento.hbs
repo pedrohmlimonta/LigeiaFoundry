@@ -16,27 +16,31 @@
     </label>
   </div>
 
-  {{!-- TIPAGENS: grupos e propriedades do livro. Sem teto — uma arma pode
-        carregar quantas quiser. Efeitos podem mirar "Arma (qualquer
-        tipagem)" ou uma tipagem específica, e acumulam entre si. --}}
+  {{!-- TIPAGENS: campo de etiquetas. Escolhe-se da lista do livro ou
+        digita-se uma nova, que vira etiqueta na hora. Sem teto — uma arma
+        carrega quantas quiser. --}}
   <div class="lig-tags-block">
     <div class="lig-section-title">
       Tipagens da arma
-      {{#if tagsCount}}<span class="lig-tag-count">{{tagsCount}} marcada(s)</span>{{/if}}
+      {{#if tagsCount}}<span class="lig-tag-count">{{tagsCount}}</span>{{/if}}
     </div>
-    <div class="lig-tag-grid">
-      {{#each weaponTagRows as |tag|}}
-      <label class="lig-inline-check lig-tag-check {{#if tag.on}}on{{/if}}" title="{{tag.label}}">
-        <input type="checkbox" data-action="toggleWeaponTag" data-tag="{{tag.id}}" {{#if tag.on}}checked{{/if}}/>
-        {{tag.label}}
-      </label>
-      {{/each}}
+    <div class="lig-tagsel" data-allow-new="true">
+      <div class="lig-tagsel-box">
+        {{#each weaponTags as |tag|}}
+        <span class="lig-tagsel-chip" data-tag="{{tag.id}}">
+          {{tag.label}}
+          <button type="button" class="lig-tagsel-x" title="Tirar esta tipagem">✕</button>
+        </span>
+        {{/each}}
+        <input type="text" class="lig-tagsel-input" autocomplete="off"
+               placeholder="{{#if weaponTags.length}}mais uma…{{else}}escolha ou digite uma tipagem…{{/if}}"/>
+      </div>
+      <div class="lig-tagsel-menu" hidden></div>
+      <script type="application/json" class="lig-tagsel-data">{{{weaponTagOptionsJson}}}</script>
     </div>
-    <label class="lig-full">Outras tipagens
-      <input type="text" name="system.tagsExtra" value="{{system.tagsExtra}}" placeholder="separadas por vírgula — ex.: Ancestral, Élfica"/>
-    </label>
-    <p class="lig-hint">Um efeito pode mirar <strong>Arma (qualquer tipagem)</strong> ou
-      uma tipagem específica; tipagens diferentes somam seus bônus.</p>
+    <p class="lig-hint">Escolha da lista ou digite uma nova e tecle Enter. Um efeito pode mirar
+      <strong>Arma (qualquer tipagem)</strong> ou uma tipagem específica; tipagens
+      diferentes somam seus bônus.</p>
   </div>
 
   <label class="lig-full">Notas / propriedades

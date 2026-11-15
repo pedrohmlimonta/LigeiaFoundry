@@ -3,8 +3,10 @@
  *
  * Uma classe base genérica + uma PARTS/template por tipo de item.
  */
-import { WORDS_BY_TIER, WORD_TARGET_PREFIX, tipagensComoAlvos, weaponTagsOf, costsForLevel, LEVELED_TYPES,
+import { WORDS_BY_TIER, WORD_TARGET_PREFIX, tipagensComoAlvos, weaponTagsOf, weaponTagEntriesOf,
+         weaponTagId, WEAPON_TAG_PREFIX, costsForLevel, LEVELED_TYPES,
          buildPreActivationRef, parsePreActivation, resolvePreActivation } from "../helpers/effects.mjs";
+import { activateTagInputs } from "../apps/tag-input.mjs";
 import { removeEnchantment } from "../helpers/enchant.mjs";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -195,7 +197,6 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       pullFxAnim: LigeiaItemSheetBase._onPullFxAnim,
       clearAllAnims: LigeiaItemSheetBase._onClearAllAnims,
       removeEnchantment: LigeiaItemSheetBase._onRemoveEnchantment,
-      toggleWeaponTag: LigeiaItemSheetBase._onToggleWeaponTag,
       addPreActivation: LigeiaItemSheetBase._onAddPreActivation,
       removePreActivation: LigeiaItemSheetBase._onRemovePreActivation,
       clearFxAnim: LigeiaItemSheetBase._onClearFxAnim,
@@ -530,14 +531,24 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     // Botão "limpar todas as animações": só aparece quando há o que limpar.
     context.animInventory = contarAnimacoes(item);
     // Encantamentos recebidos, com um resumo legível do que cada um faz.
-    // TIPAGENS da arma: a grade de checkboxes da ficha do equipamento.
-    // Inclui as do livro e, no fim, as tipagens livres já digitadas, para
-    // que apareçam marcadas em vez de só existirem no campo de texto.
+    // TIPAGENS da arma: o campo de etiquetas da ficha do equipamento.
+    // As já escolhidas viram etiquetas; as sugestões são as do livro mais
+    // as que outras armas do mundo já inventaram.
     if (item.type === "equipamento") {
-      const marcadas = Array.isArray(item.system?.tags) ? item.system.tags : [];
-      context.weaponTagRows = Object.entries(CONFIG.LIGEIA?.weaponTags || {})
-        .map(([id, label]) => ({ id, label, on: marcadas.includes(id) }));
-      context.tagsCount = weaponTagsOf(item).length;
+      const escolhidas = weaponTagEntriesOf(item);
+      context.weaponTags = escolhidas;
+      context.tagsCount = escolhidas.length;
+      const jaTem = new Set(escolhidas.map((t) => t.id));
+      // tipagensComoAlvos já junta livro + inventadas pelo mundo; aqui só
+      // tiramos o prefixo de alvo e o "qualquer tipagem", que não é tipagem.
+      const sugestoes = [];
+      for (const [alvo, rotulo] of Object.entries(tipagensComoAlvos())) {
+        if (!alvo.startsWith(WEAPON_TAG_PREFIX)) continue;
+        const id = alvo.slice(WEAPON_TAG_PREFIX.length);
+        if (jaTem.has(id)) continue;
+        sugestoes.push({ id, label: rotulo.replace(/^Arma — /, "") });
+      }
+      context.weaponTagOptionsJson = JSON.stringify(sugestoes);
     }
 
     context.enchantments = (item.system?.enchantments || []).map((e) => ({
@@ -652,6 +663,13 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     // usamos mais delegação manual aqui — ela ficava órfã após um re-render
     // que troca o elemento raiz, fazendo os botões de Ação pararem de
     // funcionar até um F5.
+
+    // ----- Campo de etiquetas das TIPAGENS de arma -----
+    activateTagInputs(root, {
+      editable: () => this.isEditable,
+      onAdd: (texto) => this._addWeaponTag(texto),
+      onRemove: (id) => this._removeWeaponTag(id),
+    });
 
     // ----- Drag & drop de MACRO sobre as ações -----
     // Liga um DragDrop a cada render (o elemento muda no re-render do
@@ -1071,20 +1089,42 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
   }
 
   /**
-   * Liga/desliga uma TIPAGEM da arma.
+   * Acrescenta uma TIPAGEM à arma.
    *
-   * Grava direto em vez de deixar o formulário resolver: um grupo de
-   * checkboxes com o mesmo name chega ao Foundry ora como texto, ora como
-   * lista, e a diferença some o valor quando só uma está marcada.
+   * Recebe o que o campo de etiquetas entregou: um id do livro, quando foi
+   * escolhido da lista, ou o texto digitado, quando é uma tipagem nova. O
+   * texto é guardado como veio, para não perder acento nem maiúsculas; a
+   * comparação usa a forma normalizada, que é o que os efeitos olham.
+   *
+   * Grava direto no documento em vez de passar pelo formulário: uma lista
+   * de etiquetas não tem um input por valor para o Foundry remontar.
    */
-  static async _onToggleWeaponTag(event, target) {
-    const id = target.dataset.tag;
-    if (!id) return;
+  async _addWeaponTag(texto) {
+    const novo = String(texto || "").trim();
+    if (!novo) return;
     const atuais = Array.isArray(this.document.system?.tags) ? [...this.document.system.tags] : [];
-    const i = atuais.indexOf(id);
-    if (i >= 0) atuais.splice(i, 1);
-    else atuais.push(id);
+    const id = weaponTagId(novo);
+    if (!id) return;
+    if (atuais.some((t) => weaponTagId(t) === id)) return; // já tem
+    atuais.push(novo);
     await this.document.update({ "system.tags": atuais });
+  }
+
+  /** Tira uma TIPAGEM da arma (pelo id normalizado). */
+  async _removeWeaponTag(id) {
+    const alvo = weaponTagId(id);
+    if (!alvo) return;
+    const atuais = Array.isArray(this.document.system?.tags) ? this.document.system.tags : [];
+    const restantes = atuais.filter((t) => weaponTagId(t) !== alvo);
+    // O campo antigo pode ainda ter a tipagem (mundo não migrado): limpa lá
+    // também, senão ela voltaria no próximo render.
+    const update = { "system.tags": restantes };
+    const extra = String(this.document.system?.tagsExtra || "");
+    if (extra) {
+      update["system.tagsExtra"] = extra.split(",")
+        .filter((t) => weaponTagId(t) !== alvo).join(", ");
+    }
+    await this.document.update(update);
   }
 
   static async _onClearFxAnim(event, target) {

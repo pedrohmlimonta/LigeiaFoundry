@@ -141,12 +141,18 @@ export class EquipamentoData extends foundry.abstract.TypeDataModel {
   static defineSchema() {
     return {
       category: new fields.StringField({ blank: true, initial: "" }),
-      // TIPAGENS da arma (grupos e propriedades do livro). Diferente das
-      // palavras arcanas, que têm teto por círculo, uma arma carrega quantas
-      // tipagens quiser. Guardadas como ids de CONFIG.LIGEIA.weaponTags.
+      // TIPAGENS da arma (grupos e propriedades do livro, mais as que você
+      // inventar). Diferente das palavras arcanas, que têm teto por círculo,
+      // uma arma carrega quantas quiser.
+      //
+      // Guarda o id do livro ("duas_maos") para as de lá, e o texto digitado
+      // ("Forja Anã") para as inventadas — assim a grafia sobrevive. A
+      // comparação é sempre pela forma normalizada (ver weaponTagId).
       tags: new fields.ArrayField(new fields.StringField({ blank: true }), { initial: [] }),
-      // Tipagens fora da lista do livro, separadas por vírgula. Entram na
-      // conta junto das acima e aparecem no seletor de alvos dos efeitos.
+      // LEGADO: antes as tipagens inventadas moravam aqui, separadas por
+      // vírgula, num campo à parte. Hoje entram direto em `tags` pelo campo
+      // de etiquetas. O campo fica para migrar fichas antigas (migrateData
+      // abaixo o esvazia) e não aparece mais na ficha.
       tagsExtra: new fields.StringField({ blank: true, initial: "" }),
       qty: new fields.NumberField({ initial: 1, integer: true, min: 0 }),
       weight: new fields.NumberField({ initial: 0, min: 0 }),
@@ -158,8 +164,33 @@ export class EquipamentoData extends foundry.abstract.TypeDataModel {
     };
   }
   static migrateData(source) {
-    return migrateFlatActionToArray(migrateEffectTargets(super.migrateData(source)));
+    return migrateFlatActionToArray(migrateEffectTargets(migrateWeaponTags(super.migrateData(source))));
   }
+}
+
+/**
+ * MIGRAÇÃO das tipagens de arma: as que moravam no campo de texto separado
+ * por vírgula (`tagsExtra`) passam a ser etiquetas normais em `tags`.
+ * Preserva a grafia digitada e não duplica o que já está marcado.
+ */
+function migrateWeaponTags(source) {
+  if (!source || typeof source !== "object") return source;
+  const extra = String(source.tagsExtra || "").trim();
+  if (!extra) return source;
+  const tags = Array.isArray(source.tags) ? [...source.tags] : [];
+  const normal = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .trim().toLowerCase().replace(/\s+/g, "_");
+  const vistos = new Set(tags.map(normal));
+  for (const bruto of extra.split(",")) {
+    const texto = bruto.trim();
+    const id = normal(texto);
+    if (!id || vistos.has(id)) continue;
+    vistos.add(id);
+    tags.push(texto);
+  }
+  source.tags = tags;
+  source.tagsExtra = "";
+  return source;
 }
 
 /* ================================================================== */
