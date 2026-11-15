@@ -35,7 +35,7 @@ async function waitForDiceAnimation(fallbackMs = 1100) {
 import { conditionModifiers, attributeConditionDice, actorHasCondition, coverDefenseDice, hasFullCover } from "./conditions.mjs";
 import { playActionAnimation } from "./integrations.mjs";
 import { executeActionMovement } from "./movement.mjs";
-import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvailable, activeEffectsOf, arcaneWordsOf } from "./effects.mjs";
+import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvailable, activeEffectsOf, arcaneWordsOf, weaponTagsOf, WEAPON_ANY_TARGET, costsForLevel, resolvePreActivation, parsePreActivation } from "./effects.mjs";
 import { DEATH_HP, WOUND_LEVELS, woundLevelFor, setWoundLevel } from "./wounds.mjs";
 import { updateActorAsGM, canAffectActor } from "./gm-proxy.mjs";
 import { enchantmentMods, applyEnchantment, pedirItemParaEncantar } from "./enchant.mjs";
@@ -281,6 +281,54 @@ export function arcaneWordMods(actor, item, attrKey) {
     out.reroll1 = mergeReroll(out.reroll1, m.reroll1 || 0);
     out.reroll6 = mergeReroll(out.reroll6, m.reroll6 || 0);
     out.palavras.push(palavra);
+  }
+  if (out.reroll1 === Infinity) out.reroll1 = "all";
+  if (out.reroll6 === Infinity) out.reroll6 = "all";
+  return out;
+}
+
+/**
+ * Soma os bônus restritos às TIPAGENS de arma deste item.
+ *
+ * É a contraparte das palavras arcanas para as armas, com duas diferenças:
+ * não há teto de tipagens, e não há gatilho por atributo — se a rolagem sai
+ * daquela arma, as tipagens dela valem, seja com Força ou Agilidade.
+ *
+ * Entram na conta o alvo "arma" (qualquer arma tipada) e cada "arma:<tipagem>"
+ * que o item tenha. Duas tipagens diferentes com bônus acumulam; a mesma
+ * tipagem não se repete numa arma, então não há acúmulo por repetição.
+ *
+ * @param {Actor} actor
+ * @param {Item}  item
+ * @returns {{bonus:number, dice:number, rollDice:number, critBonus:number,
+ *            failBonus:number, reroll1:(number|string), reroll6:(number|string),
+ *            damage:number, tipagens:string[]}}
+ */
+export function weaponTagMods(actor, item) {
+  const vazio = {
+    bonus: 0, dice: 0, rollDice: 0, critBonus: 0, failBonus: 0,
+    reroll1: 0, reroll6: 0, damage: 0, tipagens: [],
+  };
+  const mapa = actor?.system?.weaponMods;
+  if (!mapa) return vazio;
+  const tipagens = weaponTagsOf(item);
+  if (!tipagens.length) return vazio;
+
+  const out = { ...vazio, tipagens: [] };
+  // "arma" puro primeiro: vale para qualquer arma que tenha ao menos uma
+  // tipagem, e soma junto das tipagens específicas.
+  for (const chave of [WEAPON_ANY_TARGET, ...tipagens]) {
+    const m = mapa[chave];
+    if (!m) continue;
+    out.bonus += m.bonus || 0;
+    out.dice += m.dice || 0;
+    out.rollDice += m.rollDice || 0;
+    out.critBonus += m.critBonus || 0;
+    out.failBonus += m.failBonus || 0;
+    out.damage += m.damage || 0;
+    out.reroll1 = mergeReroll(out.reroll1, m.reroll1 || 0);
+    out.reroll6 = mergeReroll(out.reroll6, m.reroll6 || 0);
+    if (chave !== WEAPON_ANY_TARGET) out.tipagens.push(chave);
   }
   if (out.reroll1 === Infinity) out.reroll1 = "all";
   if (out.reroll6 === Infinity) out.reroll6 = "all";
@@ -744,7 +792,10 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       // ENCANTAMENTO do item: soma de dano, só na parcela principal (as
       // parcelas extras têm fórmula própria).
       const enchDmg = (isMain && isHp) ? (enchantmentMods(item, caster).damage || 0) : 0;
-      let amount = (total + (scaling || 0) + sizeDmg + enchDmg) * dealtMult;
+      // TIPAGEM da arma: "+1 de dano com armas de Haste". Como o
+      // encantamento, só na parcela principal e só em dano de PV.
+      const tagDmg = (isMain && isHp) ? (weaponTagMods(caster, item).damage || 0) : 0;
+      let amount = (total + (scaling || 0) + sizeDmg + enchDmg + tagDmg) * dealtMult;
       amount = amount - rd;
       amount = (amount + vuln.flat) * vuln.mult;
       amount = amount * takenMult;
@@ -1028,7 +1079,9 @@ export async function spendActionCosts(actor, action) {
  * @returns {{text:string, insufficient:boolean, spent:boolean}}
  */
 export async function spendItemCosts(actor, item) {
-  const costs = (item.system?.costs || []).filter((c) => (Number(c.value) || 0) > 0);
+  // Só os custos do ESTADO atual da habilidade (e, com a trava de custo
+  // conjunto ligada, também os dos níveis anteriores).
+  const costs = costsForLevel(item).filter((c) => resolveEffectValue(c.value, actor) > 0);
   if (!costs.length) return { text: "", insufficient: false, spent: false };
   if (!actor?.isOwner) {
     return { text: costs.map((c) => `${resolveEffectValue(c.value, actor)} ${resLabel(c.resource)}`).join(", "), insufficient: false, spent: false };
@@ -1055,6 +1108,92 @@ export async function spendItemCosts(actor, item) {
   }
   if (Object.keys(update).length) await actor.update(update);
   return { text: parts.join(", "), insufficient, spent: true };
+}
+
+/* ======================================================================== */
+/*  Ativações prévias                                                       */
+/* ======================================================================== */
+
+/**
+ * Liga o que a ação pediu ANTES de rolar: itens, efeitos soltos de itens ou
+ * outras ações do mesmo personagem.
+ *
+ * O que cada tipo faz:
+ *  - item   : liga o item ativável (o que já dispara efeitos, animação e
+ *             encantamento dele). Item passivo ou já ligado é pulado.
+ *  - effect : liga aquele efeito do item e, se o item for ativável, liga o
+ *             item junto — um efeito de item desligado não vale nada.
+ *  - action : executa a outra ação inteira, com rolagem e tudo.
+ *
+ * Uma ação pode chamar outra que chame uma terceira; `preChain` guarda o que
+ * já rodou nesta cadeia, para que um par de ações que se chamam não entre em
+ * laço infinito.
+ *
+ * @returns {Promise<string>} HTML resumindo o que foi ligado (ou "")
+ */
+export async function runPreActivations({ actor, item, action, hidden, preChain }) {
+  const lista = (action?.preActivations || []).filter((p) => p && p.enabled !== false && p.ref);
+  if (!lista.length) return "";
+
+  // Marca esta ação como já visitada antes de chamar as outras.
+  const cadeia = preChain instanceof Set ? preChain : new Set();
+  cadeia.add(`${item?.id || ""}:${(item?.system?.actions || []).indexOf(action)}`);
+
+  const ligados = [];
+  const avisos = [];
+  for (const pre of lista) {
+    const alvo = resolvePreActivation(actor, pre.ref);
+    if (!alvo) {
+      const { itemName } = parsePreActivation(pre.ref);
+      avisos.push(`${itemName || "algo"} (não encontrado nesta ficha)`);
+      continue;
+    }
+
+    if (alvo.kind === "action") {
+      const chave = `${alvo.item.id}:${alvo.index}`;
+      if (cadeia.has(chave)) {
+        avisos.push(`${alvo.label} (já estava nesta cadeia)`);
+        continue;
+      }
+      cadeia.add(chave);
+      await rollItemAction({
+        actor, item: alvo.item, action: alvo.action, hidden, preChain: cadeia,
+      });
+      ligados.push(alvo.label);
+      continue;
+    }
+
+    // Item e efeito: os dois podem precisar ligar o item.
+    const update = {};
+    const precisaLigar = alvo.item.system?.mode === "active" && !alvo.item.system?.active;
+    if (precisaLigar) update["system.active"] = true;
+
+    if (alvo.kind === "effect") {
+      const efeitos = foundry.utils.deepClone(alvo.item.system?.effects || []);
+      if (efeitos[alvo.index] && efeitos[alvo.index].enabled === false) {
+        efeitos[alvo.index].enabled = true;
+        update["system.effects"] = efeitos;
+      }
+    }
+
+    if (!Object.keys(update).length) {
+      ligados.push(`${alvo.label} (já estava ligado)`);
+      continue;
+    }
+    try {
+      await alvo.item.update(update);
+      ligados.push(alvo.label);
+    } catch (e) {
+      console.warn("Ligeia | não foi possível ativar previamente:", alvo.label, e);
+      avisos.push(`${alvo.label} (sem permissão)`);
+    }
+  }
+
+  if (!ligados.length && !avisos.length) return "";
+  const partes = [];
+  if (ligados.length) partes.push(`<strong>Ativado antes:</strong> ${ligados.join(", ")}`);
+  if (avisos.length) partes.push(`<span class="muted">não ativado: ${avisos.join(", ")}</span>`);
+  return `<div class="lig-preact">${partes.join(" · ")}</div>`;
 }
 
 /** Rótulo curto de um recurso de custo. */
@@ -1179,7 +1318,7 @@ function surpriseDiceFor(actor, action, overrideTargets) {
   return preTargets.every((a) => actorHasCondition(a, "surpreso")) ? 1 : 0;
 }
 
-export async function rollItemAction({ actor, item, action, hidden = false, overrideTargets = null, frozenAttackTotal = null }) {
+export async function rollItemAction({ actor, item, action, hidden = false, overrideTargets = null, frozenAttackTotal = null, preChain = null }) {
   const cfg = CONFIG.LIGEIA || {};
   // Compatibilidade: se nenhuma ação for passada, usa a primeira do item.
   if (!action) action = (item.system.actions || [])[0];
@@ -1207,6 +1346,10 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
   // Modo "ataque congelado": disparos por turno de uma emanação NÃO re-rolam
   // o ataque; usam o total da rolagem feita na criação da área como CD.
   const isFrozen = frozenAttackTotal != null;
+
+  // ATIVAÇÕES PRÉVIAS: liga o que a ação depende antes de qualquer rolagem,
+  // para que os bônus dessas habilidades/itens já estejam valendo.
+  const preText = await runPreActivations({ actor, item, action, hidden, preChain });
 
   // Gasta os custos da ação (PM/PV/PH) do executor.
   const costText = await spendActionCosts(actor, action);
@@ -1236,9 +1379,11 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     // que ela mostra não bate com o da rolagem.
     const wordPre = arcaneWordMods(actor, item, atkKey);
     const enchPre = enchantmentMods(item, actor, atkKey);
+    const tagPre = weaponTagMods(actor, item);
     const impPre =
       atkPre.dice + resolveEffectValue(action.rollDice, actor) + atkCond.atkDice +
       rmPre.dice + wordPre.dice + wordPre.rollDice + enchPre.dice + enchPre.rollDice +
+      tagPre.dice + tagPre.rollDice +
       attributeConditionDice(actor, atkKey) +
       surpriseDiceFor(actor, action, overrideTargets);
     const cfg2 = await promptRollConfig({
@@ -1271,6 +1416,8 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     const wordM = arcaneWordMods(actor, item, atkKey);
     // O que os ENCANTAMENTOS gravados neste item somam às ações dele.
     const enchM = enchantmentMods(item, actor, atkKey);
+    // O que as TIPAGENS desta arma somam (Militar, Haste, Duas Mãos...).
+    const tagM = weaponTagMods(actor, item);
     // Surdo: -1D em rolagens de Conjuração.
     const attrCondDice = attributeConditionDice(actor, atkKey);
     // Surpreso: +1D para o atacante se o(s) alvo(s) diretos estão surpresos.
@@ -1279,18 +1426,19 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
       attribute: atk.value,
       improvement: dlgImprovement != null
         ? dlgImprovement
-        : atk.dice + (atk.rollDice || 0) + resolveEffectValue(action.rollDice, actor) + atkCond.atkDice + rmDice + attrCondDice + surpriseDice + wordM.dice + wordM.rollDice + enchM.dice + enchM.rollDice,
+        : atk.dice + (atk.rollDice || 0) + resolveEffectValue(action.rollDice, actor) + atkCond.atkDice + rmDice + attrCondDice + surpriseDice + wordM.dice + wordM.rollDice + enchM.dice + enchM.rollDice + tagM.dice + tagM.rollDice,
       // O bônus da ação aceita fórmula com @variáveis ("2+ceil(@nivel/2)"),
       // como os demais campos — Number() sozinho devolvia NaN → 0.
-      bonus: resolveEffectValue(action.rollBonus, actor) + rmBonus + dlgBonus + (atk.rollBonus || 0) + wordM.bonus + enchM.bonus,
+      bonus: resolveEffectValue(action.rollBonus, actor) + rmBonus + dlgBonus + (atk.rollBonus || 0) + wordM.bonus + enchM.bonus + tagM.bonus,
       baseDice: dlgBaseDice,
       // Passa a CD fixa (quando houver) para marcar sucesso/falha e crítico.
       difficulty: fixedDC,
-      // Rerrolagem: atributo/categorias + palavras arcanas + encantamentos.
-      reroll1: (() => { const v = mergeReroll(mergeReroll(atkRr.reroll1, wordM.reroll1), enchM.reroll1); return v === Infinity ? "all" : v; })(),
-      reroll6: (() => { const v = mergeReroll(mergeReroll(atkRr.reroll6, wordM.reroll6), enchM.reroll6); return v === Infinity ? "all" : v; })(),
-      critBonus: atkCrit.critBonus + wordM.critBonus + enchM.critBonus,
-      failBonus: atkCrit.failBonus + wordM.failBonus + enchM.failBonus,
+      // Rerrolagem: atributo/categorias + palavras arcanas + encantamentos
+      // + tipagens da arma.
+      reroll1: (() => { const v = mergeReroll(mergeReroll(mergeReroll(atkRr.reroll1, wordM.reroll1), enchM.reroll1), tagM.reroll1); return v === Infinity ? "all" : v; })(),
+      reroll6: (() => { const v = mergeReroll(mergeReroll(mergeReroll(atkRr.reroll6, wordM.reroll6), enchM.reroll6), tagM.reroll6); return v === Infinity ? "all" : v; })(),
+      critBonus: atkCrit.critBonus + wordM.critBonus + enchM.critBonus + tagM.critBonus,
+      failBonus: atkCrit.failBonus + wordM.failBonus + enchM.failBonus + tagM.failBonus,
     });
     atkRolls.push(atkRoll.roll);
   }
@@ -1490,6 +1638,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
       <div class="ligeia-roll-flavor lig-action">
         <strong>${item.name}</strong> <span class="lig-act-name">— ${action.label || "Ação"}</span>
         ${metaText}
+        ${preText}
         ${costText}
         ${atkHeader}
         <div class="lig-atk-hint">Resolvendo defesa…</div>
@@ -1710,6 +1859,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     <div class="ligeia-roll-flavor lig-action">
       <strong>${item.name}</strong> <span class="lig-act-name">— ${action.label || "Ação"}</span>
       ${metaText}
+      ${preText}
       ${costText}
       ${atkHeader}
       ${lines.join("")}

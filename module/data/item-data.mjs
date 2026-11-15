@@ -141,6 +141,13 @@ export class EquipamentoData extends foundry.abstract.TypeDataModel {
   static defineSchema() {
     return {
       category: new fields.StringField({ blank: true, initial: "" }),
+      // TIPAGENS da arma (grupos e propriedades do livro). Diferente das
+      // palavras arcanas, que têm teto por círculo, uma arma carrega quantas
+      // tipagens quiser. Guardadas como ids de CONFIG.LIGEIA.weaponTags.
+      tags: new fields.ArrayField(new fields.StringField({ blank: true }), { initial: [] }),
+      // Tipagens fora da lista do livro, separadas por vírgula. Entram na
+      // conta junto das acima e aparecem no seletor de alvos dos efeitos.
+      tagsExtra: new fields.StringField({ blank: true, initial: "" }),
       qty: new fields.NumberField({ initial: 1, integer: true, min: 0 }),
       weight: new fields.NumberField({ initial: 0, min: 0 }),
       price: new fields.StringField({ blank: true, initial: "" }),

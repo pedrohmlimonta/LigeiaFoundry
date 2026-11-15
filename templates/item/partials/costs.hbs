@@ -5,15 +5,33 @@
     <button type="button" class="lig-mini-btn" data-action="addCost">+ custo</button>
   </div>
   {{#each costs as |cost i|}}
-  <div class="lig-cost-row">
+  <div class="lig-cost-row {{#if ../hasLevels}}has-level{{/if}}">
     <select name="system.costs.{{i}}.resource">
       {{selectOptions ../costResources selected=cost.resource}}
     </select>
     <input type="text" name="system.costs.{{i}}.value" value="{{cost.value}}" class="lig-narrow"/>
+    {{!-- ESTADO em que este custo vale (só onde o item tem níveis) --}}
+    {{#if ../hasLevels}}
+    <select name="system.costs.{{i}}.level" class="lig-narrow" title="Em que estado da habilidade este custo é cobrado.">
+      {{selectOptions ../costLevels selected=cost.level}}
+    </select>
+    {{/if}}
     <input type="text" name="system.costs.{{i}}.label" value="{{cost.label}}" placeholder="nota"/>
     <button type="button" class="lig-mini-btn danger" data-action="removeCost" data-index="{{i}}">✕</button>
   </div>
   {{else}}
   <div class="lig-empty">Sem custos.</div>
   {{/each}}
+
+  {{#if hasLevels}}
+  <label class="lig-inline-check lig-cost-joint" title="Marcada, usar a habilidade num estado cobra também os custos dos estados anteriores: no Avançado paga-se o custo de Básico somado ao de Avançado. Desmarcada, cada estado cobra só o custo dele. Custos marcados como 'Sempre' valem nos dois modos.">
+    <input type="checkbox" name="system.costsCumulative" {{checked system.costsCumulative}}/>
+    Custo conjunto (soma os estados anteriores)
+  </label>
+  {{#if costsNow.length}}
+  <p class="lig-hint">No estado atual ({{levelLabel}}) esta {{itemWord}} cobra: <strong>{{costsNowText}}</strong>.</p>
+  {{else}}
+  <p class="lig-hint">No estado atual ({{levelLabel}}) esta {{itemWord}} não cobra nada.</p>
+  {{/if}}
+  {{/if}}
 </div>

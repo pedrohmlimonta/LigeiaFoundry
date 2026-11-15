@@ -3,7 +3,8 @@
  *
  * Uma classe base genérica + uma PARTS/template por tipo de item.
  */
-import { WORDS_BY_TIER, WORD_TARGET_PREFIX } from "../helpers/effects.mjs";
+import { WORDS_BY_TIER, WORD_TARGET_PREFIX, tipagensComoAlvos, weaponTagsOf, costsForLevel, LEVELED_TYPES,
+         buildPreActivationRef, parsePreActivation, resolvePreActivation } from "../helpers/effects.mjs";
 import { removeEnchantment } from "../helpers/enchant.mjs";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -31,6 +32,82 @@ export function palavrasComoAlvos() {
   const out = {};
   for (const w of CONFIG.LIGEIA?.arcaneWords || []) {
     out[`${WORD_TARGET_PREFIX}${w}`] = `Conjuração — ${w.charAt(0).toUpperCase() + w.slice(1)}`;
+  }
+  return out;
+}
+
+/**
+ * Árvore do que uma ação pode ativar antes de rolar: os OUTROS itens da
+ * mesma ficha, cada um com seus efeitos e suas ações.
+ *
+ * O próprio item fica de fora (uma ação que liga o item dela mesma não tem
+ * para onde ir), mas as OUTRAS ações do mesmo item entram — encadear duas
+ * ações do mesmo golpe é justamente um dos usos.
+ *
+ * @param {Actor} actor
+ * @param {Item}  itemAtual
+ * @returns {Array<{nome:string, entradas:Array<{ref:string, rotulo:string}>}>}
+ */
+export function opcoesDeAtivacaoPrevia(actor, itemAtual) {
+  const grupos = [];
+  for (const it of actor?.items || []) {
+    const entradas = [];
+    const ehOAtual = it.id === itemAtual?.id;
+
+    // O item inteiro (só faz sentido no que é ativável, e não nele mesmo).
+    if (!ehOAtual && it.system?.mode === "active") {
+      entradas.push({
+        ref: buildPreActivationRef("item", it.id, 0, it.name),
+        rotulo: `${it.name} — ligar o item`,
+      });
+    }
+    // Efeitos soltos do item.
+    if (!ehOAtual) {
+      (it.system?.effects || []).forEach((e, idx) => {
+        const nome = e?.label || `${e?.type || "efeito"} ${e?.target || ""}`.trim();
+        entradas.push({
+          ref: buildPreActivationRef("effect", it.id, idx, it.name),
+          rotulo: `${it.name} — efeito: ${nome}`,
+        });
+      });
+    }
+    // Ações — inclusive as do próprio item, menos nenhuma: a que está sendo
+    // editada é filtrada na hora de montar o select de cada linha.
+    (it.system?.actions || []).forEach((a, idx) => {
+      entradas.push({
+        ref: buildPreActivationRef("action", it.id, idx, it.name),
+        rotulo: `${it.name} — ação: ${a?.label || "Ação"}`,
+      });
+    });
+
+    if (entradas.length) grupos.push({ nome: it.name, entradas });
+  }
+  return grupos;
+}
+
+/**
+ * HTML do select de uma linha de ativação prévia, com a opção escolhida
+ * marcada. Quando a referência guardada não existe mais nesta ficha, ela
+ * entra como uma opção própria para não sumir calada da ficha.
+ *
+ * @param {Array} grupos  saída de opcoesDeAtivacaoPrevia
+ * @param {string} escolhido  ref guardada
+ * @param {boolean} perdido  a ref não resolve nesta ficha
+ * @returns {string}
+ */
+export function htmlDeOpcoesPre(grupos, escolhido, perdido) {
+  const esc = (s) => foundry.utils.escapeHTML?.(String(s ?? "")) ?? String(s ?? "");
+  const sel = (v) => (v === escolhido ? " selected" : "");
+  let out = `<option value=""${escolhido ? "" : " selected"}>— escolha o que ativar —</option>`;
+  if (perdido) {
+    const { itemName } = parsePreActivation(escolhido);
+    out += `<option value="${esc(escolhido)}" selected>⚠ ${esc(itemName || escolhido)} (fora desta ficha)</option>`;
+  }
+  for (const g of grupos) {
+    const linhas = g.entradas
+      .map((e) => `<option value="${esc(e.ref)}"${sel(e.ref)}>${esc(e.rotulo)}</option>`)
+      .join("");
+    out += `<optgroup label="${esc(g.nome)}">${linhas}</optgroup>`;
   }
   return out;
 }
@@ -118,6 +195,9 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       pullFxAnim: LigeiaItemSheetBase._onPullFxAnim,
       clearAllAnims: LigeiaItemSheetBase._onClearAllAnims,
       removeEnchantment: LigeiaItemSheetBase._onRemoveEnchantment,
+      toggleWeaponTag: LigeiaItemSheetBase._onToggleWeaponTag,
+      addPreActivation: LigeiaItemSheetBase._onAddPreActivation,
+      removePreActivation: LigeiaItemSheetBase._onRemovePreActivation,
       clearFxAnim: LigeiaItemSheetBase._onClearFxAnim,
       clearAnim: LigeiaItemSheetBase._onClearAnim,
       toggleAnim: LigeiaItemSheetBase._onToggleAnim,
@@ -216,6 +296,15 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
           if (xd && !Array.isArray(xd) && typeof xd === "object") {
             arr[i].extraDamage = indexedToArray(xd);
           }
+          // Ativações prévias: mesmo tratamento (objeto indexado → array).
+          // Sem isto, digitar em qualquer campo da ação apagaria a lista,
+          // como acontecia com o dano extra.
+          const pa = arr[i].preActivations;
+          if (pa && !Array.isArray(pa) && typeof pa === "object") {
+            arr[i].preActivations = indexedToArray(pa);
+          } else if (pa === undefined) {
+            arr[i].preActivations = foundry.utils.deepClone(cur.preActivations || []);
+          }
           // Movimento: os subcampos só aparecem no form quando visíveis, então
           // mesclamos com o que já está salvo para não perder configuração.
           if (arr[i].movement === undefined) {
@@ -311,6 +400,23 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       hpTemp: "Vida temporária",
       heroic: "Ponto Heroico",
     };
+    // CUSTO POR ESTADO: só habilidades e complicações têm níveis, então só
+    // nelas aparece o seletor de estado e a trava de custo conjunto.
+    const NIVEIS = { B: "Básico", A: "Avançado", E: "Épico/Especial" };
+    context.hasLevels = LEVELED_TYPES.includes(item.type);
+    if (context.hasLevels) {
+      context.costLevels = { all: "Sempre", B: "Básico", A: "Avançado", E: "Épico/Especial" };
+      context.levelLabel = NIVEIS[item.system?.level || "B"] || item.system?.level;
+      context.itemWord = item.type === "complicacao" ? "complicação" : "habilidade";
+      // Prévia do que o estado atual realmente cobra — com a trava de custo
+      // conjunto ligada, a conta deixa de ser óbvia só olhando as linhas.
+      const resLabels = { mp: "PM", hp: "PV", hpTemp: "PV temp.", heroic: "PH" };
+      const agora = costsForLevel(item).filter((c) => String(c.value ?? "").trim() && String(c.value) !== "0");
+      context.costsNow = agora;
+      context.costsNowText = agora
+        .map((c) => `${c.value} ${resLabels[c.resource] || c.resource}`)
+        .join(" + ");
+    }
     context.arcaneWords = (CONFIG.LIGEIA?.arcaneWords || []).reduce((acc, w) => {
       acc[w] = w.charAt(0).toUpperCase() + w.slice(1);
       return acc;
@@ -370,6 +476,8 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         // Conjuração restrita a uma palavra arcana: só as magias que tenham
         // aquela palavra recebem o bônus (e acumulam, se tiverem mais de uma).
         ...palavrasComoAlvos(),
+        // Tipagem de arma: só as armas que carregam a tipagem recebem.
+        ...tipagensComoAlvos(),
       },
       stat: {
         hp: "PV máximo", mp: "PM máximo", heroic: "Pontos Heroicos máx.", deslocamento: "Deslocamento",
@@ -401,12 +509,14 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         case "fumble": return TARGETS.roll;
         case "stat": return TARGETS.stat;
         case "set": return TARGETS.set;
-        case "damage":
+        // Dano: por TIPO de dano (fogo, corte...) ou por TIPAGEM de arma
+        // ("+1 de dano com armas de Haste"), que soma na parcela principal
+        // seja qual for o tipo de dano dela.
+        case "damage": return { ...dmgChoices, ...tipagensComoAlvos() };
         case "rd":
         case "vuln": return dmgChoices;
         case "condition": return condChoices;
         case "size": return sizeTargets;
-        case "restore": return { hp: "Vida (PV)", mp: "Mana (PM)", heroic: "Pontos Heroicos" };
         case "restore": return { hp: "Vida (PV)", mp: "Mana (PM)", heroic: "Pontos Heroicos" };
         default: return TARGETS.roll;
       }
@@ -420,6 +530,16 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     // Botão "limpar todas as animações": só aparece quando há o que limpar.
     context.animInventory = contarAnimacoes(item);
     // Encantamentos recebidos, com um resumo legível do que cada um faz.
+    // TIPAGENS da arma: a grade de checkboxes da ficha do equipamento.
+    // Inclui as do livro e, no fim, as tipagens livres já digitadas, para
+    // que apareçam marcadas em vez de só existirem no campo de texto.
+    if (item.type === "equipamento") {
+      const marcadas = Array.isArray(item.system?.tags) ? item.system.tags : [];
+      context.weaponTagRows = Object.entries(CONFIG.LIGEIA?.weaponTags || {})
+        .map(([id, label]) => ({ id, label, on: marcadas.includes(id) }));
+      context.tagsCount = weaponTagsOf(item).length;
+    }
+
     context.enchantments = (item.system?.enchantments || []).map((e) => ({
       ...e,
       duracaoTexto: (e.remaining > 0) ? `${e.remaining} rodada(s)` : "",
@@ -432,10 +552,30 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       target: "No alvo",
       ranged: "Projétil (origem → alvo)",
     };
+    // ATIVAÇÕES PRÉVIAS: a árvore do que dá para ligar antes da ação são os
+    // OUTROS itens da mesma ficha — com seus efeitos e ações. Sem ficha (item
+    // de mundo ou de compêndio) não há o que listar.
+    const ator = item.parent?.documentName === "Actor" ? item.parent : null;
+    context.hasParentActor = !!ator;
+    const arvorePre = ator ? opcoesDeAtivacaoPrevia(ator, item) : [];
+
     context.actions = (item.system?.actions || []).map((a) => ({
       ...a,
       // Tem animação PUXADA do item? (cópia não-vazia)
       hasAnim: !!(a.aaConfig && typeof a.aaConfig === "object" && Object.keys(a.aaConfig).length > 0),
+      // Cada linha carrega o próprio HTML de opções, com a dela marcada —
+      // um único texto compartilhado não saberia qual está selecionada.
+      preActivations: (a.preActivations || []).map((pre) => {
+        const escolhido = resolvePreActivation(ator, pre.ref);
+        const alvoPerdido = !!pre.ref && !escolhido;
+        return {
+          ...pre,
+          optionsHtml: htmlDeOpcoesPre(arvorePre, pre.ref, alvoPerdido),
+          aviso: alvoPerdido
+            ? `"${parsePreActivation(pre.ref).itemName || pre.ref}" não está nesta ficha.`
+            : "",
+        };
+      }),
       appliesEffects: (a.appliesEffects || []).map((fx) => ({
         ...fx,
         targetChoices: targetsForType(fx.fxType),
@@ -724,6 +864,27 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     await this._replaceActions(actions);
   }
 
+  /* ---- Ativações prévias da ação ---- */
+
+  static async _onAddPreActivation(event, target) {
+    const ai = Number(target.dataset.actionIndex);
+    const actions = foundry.utils.deepClone(this.document.system.actions || []);
+    if (!actions[ai]) return;
+    actions[ai].preActivations = actions[ai].preActivations || [];
+    // Entra vazia: a linha aparece com o seletor aberto para escolher.
+    actions[ai].preActivations.push({ ref: "", enabled: true });
+    await this._replaceActions(actions);
+  }
+
+  static async _onRemovePreActivation(event, target) {
+    const ai = Number(target.dataset.actionIndex);
+    const pi = Number(target.dataset.index);
+    const actions = foundry.utils.deepClone(this.document.system.actions || []);
+    if (!actions[ai]?.preActivations) return;
+    actions[ai].preActivations.splice(pi, 1);
+    await this._replaceActions(actions);
+  }
+
   /* ---- Dano extra da ação ---- */
   static async _onAddExtraDamage(event, target) {
     const ai = Number(target.dataset.actionIndex);
@@ -907,6 +1068,23 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
   /** Remove um encantamento gravado neste item. */
   static async _onRemoveEnchantment(event, target) {
     await removeEnchantment(this.document, target.dataset.id);
+  }
+
+  /**
+   * Liga/desliga uma TIPAGEM da arma.
+   *
+   * Grava direto em vez de deixar o formulário resolver: um grupo de
+   * checkboxes com o mesmo name chega ao Foundry ora como texto, ora como
+   * lista, e a diferença some o valor quando só uma está marcada.
+   */
+  static async _onToggleWeaponTag(event, target) {
+    const id = target.dataset.tag;
+    if (!id) return;
+    const atuais = Array.isArray(this.document.system?.tags) ? [...this.document.system.tags] : [];
+    const i = atuais.indexOf(id);
+    if (i >= 0) atuais.splice(i, 1);
+    else atuais.push(id);
+    await this.document.update({ "system.tags": atuais });
   }
 
   static async _onClearFxAnim(event, target) {

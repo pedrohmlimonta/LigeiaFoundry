@@ -338,6 +338,36 @@
       </label>
     </div>
 
+    {{!-- ATIVAÇÕES PRÉVIAS: o que entra em jogo antes desta ação rolar --}}
+    <div class="lig-preact-editor">
+      <div class="lig-subtitle">
+        Ativações prévias (antes da rolagem)
+        <button type="button" class="lig-mini-btn" data-action="addPreActivation" data-action-index="{{i}}">+ ativação</button>
+      </div>
+      {{#each act.preActivations as |pre pi|}}
+      <div class="lig-preact-row">
+        <select name="system.actions.{{i}}.preActivations.{{pi}}.ref" class="lig-preact-select">
+          {{{pre.optionsHtml}}}
+        </select>
+        <label class="lig-inline-check" title="Ativa">
+          <input type="checkbox" name="system.actions.{{i}}.preActivations.{{pi}}.enabled" {{checked pre.enabled}}/>
+        </label>
+        <button type="button" class="lig-mini-btn danger" data-action="removePreActivation" data-action-index="{{i}}" data-index="{{pi}}" title="Remover">✕</button>
+      </div>
+      {{#if pre.aviso}}<p class="lig-hint lig-preact-warn">⚠ {{pre.aviso}}</p>{{/if}}
+      {{/each}}
+      {{#if act.preActivations.length}}
+      <p class="lig-hint">Ligadas na ordem, antes de gastar custos e rolar. Item ou efeito
+        já ligado é pulado; uma ação encadeada roda por inteiro.</p>
+      {{else}}
+      <div class="lig-empty">Nada é ativado antes desta ação.</div>
+      {{/if}}
+      {{#unless ../hasParentActor}}
+      <p class="lig-hint">Este item não está numa ficha, então não há o que listar.
+        Abra-o pela ficha do personagem para escolher as ativações.</p>
+      {{/unless}}
+    </div>
+
     <div class="lig-applies-fx-editor">
       <div class="lig-subtitle">
         Efeitos aplicados ao alvo (buff / debuff / condição)

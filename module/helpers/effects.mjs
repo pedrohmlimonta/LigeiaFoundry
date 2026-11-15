@@ -174,6 +174,100 @@ export function arcaneWordsOf(item) {
 }
 
 /* ======================================================================== */
+/*  Tipagens de arma                                                        */
+/* ======================================================================== */
+
+/** Prefixo dos alvos de efeito que valem só para UMA tipagem de arma. */
+export const WEAPON_TAG_PREFIX = "arma:";
+
+/** Alvo que vale para QUALQUER arma tipada (a contraparte de "conjuracao"). */
+export const WEAPON_ANY_TARGET = "arma";
+
+/**
+ * Normaliza um nome de tipagem para virar id: minúsculas, sem acento, com
+ * underscore no lugar dos espaços. É o que permite ao campo livre
+ * ("outras tipagens") casar com um efeito mirado na mesma tipagem.
+ * @param {string} nome
+ * @returns {string}
+ */
+export function weaponTagId(nome) {
+  return String(nome || "")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .trim().toLowerCase().replace(/\s+/g, "_");
+}
+
+/**
+ * TIPAGENS de um item, como ids.
+ *
+ * Diferente das palavras arcanas, não há teto: uma arma pode ter quantas
+ * tipagens quiser. Junta as marcadas na lista do livro com as digitadas no
+ * campo livre, sem repetir — uma tipagem marcada duas vezes é a mesma
+ * tipagem, então não acumula (ao contrário das palavras arcanas, em que a
+ * repetição é deliberada e conta de novo).
+ *
+ * @param {Item} item
+ * @returns {string[]} ids únicos
+ */
+export function weaponTagsOf(item) {
+  const sys = item?.system || {};
+  const marcadas = Array.isArray(sys.tags) ? sys.tags : [];
+  const livres = String(sys.tagsExtra || "").split(",");
+  const out = [];
+  for (const t of [...marcadas, ...livres]) {
+    const id = weaponTagId(t);
+    if (id && !out.includes(id)) out.push(id);
+  }
+  return out;
+}
+
+/**
+ * Rótulo de exibição de uma tipagem: o do livro quando existe, senão o
+ * próprio id reconstruído em palavras.
+ * @param {string} id
+ * @returns {string}
+ */
+export function weaponTagLabel(id) {
+  const doLivro = CONFIG?.LIGEIA?.weaponTags?.[id];
+  if (doLivro) return doLivro;
+  return String(id || "").split("_")
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" ");
+}
+
+/**
+ * Tipagens de arma como ALVOS de efeito, para os seletores das fichas.
+ *
+ * Além das tipagens do livro, inclui as que o mundo já usa em alguma arma
+ * (campo "outras tipagens"), senão não haveria como mirar uma tipagem
+ * inventada. O alvo "arma" puro vale para qualquer arma tipada.
+ *
+ * Mora aqui, e não numa ficha, porque os três lugares de efeito do sistema
+ * (item, ação e efeito ativo) precisam da mesma lista.
+ *
+ * @returns {Record<string,string>} alvo → rótulo
+ */
+export function tipagensComoAlvos() {
+  const out = { [WEAPON_ANY_TARGET]: "Arma (qualquer tipagem)" };
+  const ids = Object.keys(CONFIG?.LIGEIA?.weaponTags || {});
+  const extras = new Set();
+  const varrer = (itens) => {
+    for (const it of itens || []) {
+      for (const t of String(it?.system?.tagsExtra || "").split(",")) {
+        const id = weaponTagId(t);
+        if (id && !ids.includes(id)) extras.add(id);
+      }
+    }
+  };
+  try {
+    varrer(globalThis.game?.items);
+    for (const a of globalThis.game?.actors || []) varrer(a.items);
+  } catch (e) { /* fora de um mundo carregado: só a lista do livro */ }
+  for (const id of [...ids, ...[...extras].sort()]) {
+    out[`${WEAPON_TAG_PREFIX}${id}`] = `Arma — ${weaponTagLabel(id)}`;
+  }
+  return out;
+}
+
+/* ======================================================================== */
 /*  Agregação e aplicação de modificadores                                  */
 /* ======================================================================== */
 
@@ -212,7 +306,10 @@ function emptyMods() {
   // Bônus de conjuração restritos a uma PALAVRA ARCANA. Preenchido sob
   // demanda: palavra → mesmos campos de uma categoria de rolagem.
   const word = {};
-  return { attr, roll, stat, size, word };
+  // Bônus restritos a uma TIPAGEM de arma, no mesmo molde. A chave
+  // WEAPON_ANY_TARGET ("arma") guarda o que vale para qualquer arma tipada.
+  const weapon = {};
+  return { attr, roll, stat, size, word, weapon };
 }
 
 /**
@@ -264,6 +361,29 @@ function applyEffectToMods(mods, effect, actor) {
       case "crit": alvo.critBonus += v; break;
       case "fumble": alvo.failBonus += v; break;
       default: break; // os demais tipos não fazem sentido por palavra
+    }
+    return;
+  }
+
+  // Alvo "arma" (qualquer tipagem) ou "arma:<tipagem>": vale só para ações
+  // de itens que carregam a tipagem. Mesmo balde separado das palavras.
+  if (t === WEAPON_ANY_TARGET || t.startsWith(WEAPON_TAG_PREFIX)) {
+    const tipagem = t === WEAPON_ANY_TARGET ? WEAPON_ANY_TARGET : t.slice(WEAPON_TAG_PREFIX.length);
+    if (!tipagem) return;
+    const alvo = (mods.weapon[tipagem] ||= {
+      bonus: 0, dice: 0, rollDice: 0, reroll1: 0, reroll6: 0, critBonus: 0, failBonus: 0, damage: 0,
+    });
+    switch (effect.type) {
+      case "bonus": case "attr": alvo.bonus += v; break;
+      case "dice": alvo.dice += v; break;
+      case "rollDice": alvo.rollDice += v; break;
+      case "reroll1": alvo.reroll1 = combineReroll(alvo.reroll1, effect.rerollAll ? "all" : v); break;
+      case "reroll6": alvo.reroll6 = combineReroll(alvo.reroll6, effect.rerollAll ? "all" : v); break;
+      case "crit": alvo.critBonus += v; break;
+      case "fumble": alvo.failBonus += v; break;
+      // Dano por tipagem: "+1 de dano com armas de Haste".
+      case "damage": alvo.damage += v; break;
+      default: break;
     }
     return;
   }
@@ -386,6 +506,119 @@ export function actionIsAvailable(item, action) {
     return levelMeets(item.system?.level || "B", action.level || "all");
   }
   return true;
+}
+
+/* ======================================================================== */
+/*  Ativações prévias                                                       */
+/* ======================================================================== */
+
+/**
+ * Referência de uma ativação prévia, como texto: "tipo|idDoItem|índice|nome".
+ *
+ * O nome vai junto do id de propósito: ids de item são por ficha, então uma
+ * habilidade copiada para outro personagem perderia a referência. Com o
+ * nome, ela se reencontra na ficha nova.
+ *
+ * @param {"item"|"effect"|"action"} kind
+ * @param {string} itemId
+ * @param {number} index  índice do efeito/ação (ignorado em "item")
+ * @param {string} nome
+ * @returns {string}
+ */
+export function buildPreActivationRef(kind, itemId, index, nome) {
+  const limpo = String(nome || "").replace(/\|/g, "/");
+  return [kind, itemId, Number(index) || 0, limpo].join("|");
+}
+
+/**
+ * Lê uma referência de ativação prévia.
+ * @param {string} ref
+ * @returns {{kind:string, itemId:string, index:number, itemName:string}}
+ */
+export function parsePreActivation(ref) {
+  const partes = String(ref || "").split("|");
+  const [kind = "", itemId = "", idx = "", ...resto] = partes;
+  return {
+    kind: kind || "",
+    itemId: itemId || "",
+    index: Number(idx) || 0,
+    itemName: resto.join("|"),
+  };
+}
+
+/**
+ * Encontra o que uma referência de ativação prévia aponta, na ficha dada.
+ *
+ * Procura pelo id; não achando (item copiado para outra ficha, id trocado),
+ * cai para o NOME. Devolve null quando nada corresponde — a ação segue sem
+ * a ativação, em vez de travar.
+ *
+ * @param {Actor} actor
+ * @param {string} ref
+ * @returns {{kind:string, item:Item, index:number, effect?:object,
+ *            action?:object, label:string}|null}
+ */
+export function resolvePreActivation(actor, ref) {
+  const { kind, itemId, index, itemName } = parsePreActivation(ref);
+  if (!kind) return null;
+  const itens = actor?.items;
+  if (!itens) return null;
+  let item = itens.get?.(itemId) || null;
+  if (!item && itemName) {
+    item = [...itens].find((i) => i.name === itemName) || null;
+  }
+  if (!item) return null;
+
+  if (kind === "item") {
+    return { kind, item, index: 0, label: item.name };
+  }
+  if (kind === "effect") {
+    const effect = (item.system?.effects || [])[index];
+    if (!effect) return null;
+    const nome = effect.label || `${effect.type || "efeito"} ${effect.target || ""}`.trim();
+    return { kind, item, index, effect, label: `${item.name} — ${nome}` };
+  }
+  if (kind === "action") {
+    const action = (item.system?.actions || [])[index];
+    if (!action) return null;
+    return { kind, item, index, action, label: `${item.name} — ${action.label || "Ação"}` };
+  }
+  return null;
+}
+
+/** Tipos de item cujo custo varia com o ESTADO (nível B/A/E). */
+export const LEVELED_TYPES = ["habilidade", "complicacao"];
+
+/**
+ * CUSTOS que valem no estado atual do item.
+ *
+ * Uma habilidade pode cobrar uma coisa no Básico e outra no Avançado. Há dois
+ * modos, escolhidos pela trava `costsCumulative` do item:
+ *
+ *  - ISOLADO (padrão): cada nível cobra só o custo marcado para ele. Uma
+ *    habilidade Avançada paga o custo de Avançado, e não o de Básico.
+ *  - CONJUNTO: o nível cobra o dele MAIS os dos níveis anteriores. A mesma
+ *    habilidade Avançada paga Básico + Avançado.
+ *
+ * Custos marcados como "Sempre" entram nos dois modos. Em itens sem estado
+ * (equipamento, magia, traço) só os "Sempre" valem — não há nível para
+ * comparar, e cobrar um custo de "Avançado" ali seria invisível na ficha.
+ *
+ * @param {Item} item
+ * @returns {Array<object>} entradas de system.costs que devem ser pagas
+ */
+export function costsForLevel(item) {
+  const todos = item?.system?.costs || [];
+  if (!LEVELED_TYPES.includes(item?.type)) {
+    return todos.filter((c) => !c?.level || c.level === "all");
+  }
+  const atual = item.system?.level || "B";
+  const conjunto = !!item.system?.costsCumulative;
+  return todos.filter((c) => {
+    const nivel = c?.level || "all";
+    if (nivel === "all") return true;
+    return conjunto ? levelMeets(atual, nivel) : nivel === atual;
+  });
 }
 
 /**

@@ -68,6 +68,15 @@ export function costField() {
       // custos do sistema.
       value: new fields.StringField({ required: true, blank: true, initial: "0" }),
       label: new fields.StringField({ required: false, blank: true, initial: "" }),
+      // ESTADO (nível) em que este custo vale, para habilidades e
+      // complicações: "all" = sempre; "B"/"A"/"E" = só naquele nível.
+      // Com a trava de custo conjunto ligada no item, os níveis anteriores
+      // também entram na conta (ver custosDoNivel em dice.mjs).
+      level: new fields.StringField({
+        required: false,
+        initial: "all",
+        choices: ["all", "B", "A", "E"],
+      }),
     }),
   );
 }
@@ -92,6 +101,10 @@ export function activatableFields() {
       }),
       { initial: [] },
     ),
+    // CUSTO CONJUNTO: marcada, usar a habilidade num nível cobra também os
+    // custos dos níveis ANTERIORES (Avançado = custo de Básico + o de
+    // Avançado). Desmarcada — o padrão — cada nível cobra só o custo dele.
+    costsCumulative: new fields.BooleanField({ initial: false }),
     // TRAVA DE ENCANTAMENTO: marcada, o item não aparece na lista de escolha
     // de "encantar um item". Desmarcada por padrão — todo item encantável
     // entra na lista até alguém decidir o contrário.
@@ -277,6 +290,21 @@ export function actionEntryField() {
       // Encaixa o destino no centro da casa do grid.
       snap: new fields.BooleanField({ initial: true }),
     }),
+    // ATIVAÇÕES PRÉVIAS: itens, efeitos ou ações do próprio personagem que
+    // entram em jogo ANTES da rolagem desta ação. Serve para a ação que só
+    // faz sentido com uma postura ligada, ou que encadeia outra ação.
+    //
+    // Cada entrada guarda uma referência codificada (ver parsePreActivation
+    // em helpers/effects.mjs): "tipo|idDoItem|índice|nome". O nome entra na
+    // referência para que ela continue valendo se o item for copiado para
+    // outra ficha, onde os ids são outros.
+    preActivations: new fields.ArrayField(
+      new fields.SchemaField({
+        ref: new fields.StringField({ blank: true, initial: "" }),
+        enabled: new fields.BooleanField({ initial: true }),
+      }),
+      { initial: [] },
+    ),
     // Efeitos aplicados ao ALVO quando a ação acerta. Cada um é como um
     // efeito de habilidade (qualquer tipo, incluindo "condition") e vira um
     // "efeito ativo" na ficha do alvo, com duração e resistência por rodada.

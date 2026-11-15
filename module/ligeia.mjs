@@ -154,6 +154,46 @@ Hooks.once("init", function () {
       "noxia", "pluribus", "saeculorum", "sangon", "sankta", "sonigu",
       "sorcdiron", "tenebrae", "traumato", "vitae",
     ],
+    // TIPAGENS DE ARMA (pág. 98-99 do livro): os GRUPOS de arma e as
+    // PROPRIEDADES que elas carregam. Uma arma pode ter quantas quiser, e um
+    // efeito pode mirar uma tipagem específica ("Arma — Militar") ou todas
+    // as armas tipadas ("Arma (qualquer tipagem)").
+    // A lista é aberta: o campo "outras tipagens" da arma aceita nomes que
+    // não estejam aqui, e eles aparecem no seletor de alvos do mesmo jeito.
+    weaponTags: {
+      // Grupos
+      arcos: "Arcos",
+      bastoes: "Bastões",
+      bestas: "Bestas",
+      cajados: "Cajados",
+      chicotes: "Chicotes",
+      dardos: "Dardos",
+      desarmado: "Desarmado",
+      fundas: "Fundas",
+      laminas_grandes: "Lâminas Grandes",
+      laminas_pequenas: "Lâminas Pequenas",
+      lancas: "Lanças",
+      macas: "Maças",
+      machados: "Machados",
+      manguais: "Manguais",
+      martelos: "Martelos",
+      picaretas: "Picaretas",
+      // Propriedades
+      alcance: "Alcance",
+      arremesso: "Arremesso",
+      artilharia: "Artilharia",
+      corpo_a_corpo: "Corpo a Corpo",
+      duas_maos: "Duas Mãos",
+      haste: "Haste",
+      leve: "Leve",
+      militar: "Militar",
+      pesada: "Pesada",
+      recarga: "Recarga",
+      simples: "Simples",
+      uma_mao: "Uma Mão",
+      versatil: "Versátil",
+    },
+
     // Tabela de progressão (XP acumulado necessário por nível) — pág. 249
     xpTable: { 1: 0, 2: 100, 3: 210, 4: 330, 5: 460, 6: 600 },
 

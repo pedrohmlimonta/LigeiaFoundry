@@ -16,6 +16,29 @@
     </label>
   </div>
 
+  {{!-- TIPAGENS: grupos e propriedades do livro. Sem teto — uma arma pode
+        carregar quantas quiser. Efeitos podem mirar "Arma (qualquer
+        tipagem)" ou uma tipagem específica, e acumulam entre si. --}}
+  <div class="lig-tags-block">
+    <div class="lig-section-title">
+      Tipagens da arma
+      {{#if tagsCount}}<span class="lig-tag-count">{{tagsCount}} marcada(s)</span>{{/if}}
+    </div>
+    <div class="lig-tag-grid">
+      {{#each weaponTagRows as |tag|}}
+      <label class="lig-inline-check lig-tag-check {{#if tag.on}}on{{/if}}" title="{{tag.label}}">
+        <input type="checkbox" data-action="toggleWeaponTag" data-tag="{{tag.id}}" {{#if tag.on}}checked{{/if}}/>
+        {{tag.label}}
+      </label>
+      {{/each}}
+    </div>
+    <label class="lig-full">Outras tipagens
+      <input type="text" name="system.tagsExtra" value="{{system.tagsExtra}}" placeholder="separadas por vírgula — ex.: Ancestral, Élfica"/>
+    </label>
+    <p class="lig-hint">Um efeito pode mirar <strong>Arma (qualquer tipagem)</strong> ou
+      uma tipagem específica; tipagens diferentes somam seus bônus.</p>
+  </div>
+
   <label class="lig-full">Notas / propriedades
     <input type="text" name="system.notes" value="{{system.notes}}" placeholder="Versátil, alcance, penalidade..."/>
   </label>

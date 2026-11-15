@@ -254,6 +254,8 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
     this.rollMods = mods.roll;
     // Bônus de conjuração restritos a palavras arcanas (palavra → modificadores).
     this.wordMods = mods.word;
+    // Bônus restritos a tipagens de arma (tipagem → modificadores).
+    this.weaponMods = mods.weapon;
     // Reroll por atributo (primários + secundários) para as rolagens.
     this.attrReroll = {};
     this.attrCrit = {};

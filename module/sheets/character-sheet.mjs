@@ -8,7 +8,7 @@ import { requestRollConfig } from "../helpers/roll-request.mjs";
 import { placeTemplateForAction, scheduleTransientCleanup } from "../helpers/template.mjs";
 import { computeXpSpent, computeXpGained } from "../helpers/xp.mjs";
 import { performRest, performMedicalCare, DEATH_HP } from "../helpers/wounds.mjs";
-import { effectIsActive, availableActionsOf, resolveEffectValue, WORD_TARGET_PREFIX } from "../helpers/effects.mjs";
+import { effectIsActive, availableActionsOf, resolveEffectValue, WORD_TARGET_PREFIX, tipagensComoAlvos } from "../helpers/effects.mjs";
 import { artRowsFor, tokenArtFor, healthPercent } from "../helpers/token-art.mjs";
 import { pedirItemParaEncantar, applyEnchantment, removeEnchantment } from "../helpers/enchant.mjs";
 import { theatreRowsFor, theatreActive } from "../helpers/theatre-art.mjs";
@@ -241,6 +241,8 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
         acc[`${WORD_TARGET_PREFIX}${w}`] = `Conjuração — ${w.charAt(0).toUpperCase() + w.slice(1)}`;
         return acc;
       }, {}),
+      // Tipagem de arma: vale só para as armas que carregam a tipagem.
+      ...tipagensComoAlvos(),
     };
     const statTargets = { hp: "PV máximo", mp: "PM máximo", heroic: "Pontos Heroicos máx.", deslocamento: "Deslocamento" };
     const setTargets = {
@@ -265,7 +267,9 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
         case "bonus": case "attr": case "dice": case "rollDice": case "reroll1": case "reroll6": case "crit": case "fumble": return rollTargets;
         case "stat": return statTargets;
         case "set": return setTargets;
-        case "damage": case "rd": case "vuln": return dmgTargets;
+        // Dano por tipo OU por tipagem de arma (ver item-sheets.mjs).
+        case "damage": return { ...dmgTargets, ...tipagensComoAlvos() };
+        case "rd": case "vuln": return dmgTargets;
         case "condition": return condTargets;
         case "size": return sizeTargets;
         case "restore": return { hp: "Vida (PV)", mp: "Mana (PM)", heroic: "Pontos Heroicos" };
