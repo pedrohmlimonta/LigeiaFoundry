@@ -32,6 +32,26 @@
   </div>
   {{/if}}
 
+  {{!-- Habilidades-chave: só a vocação tem --}}
+  {{#if (eq itemType "vocacao")}}
+  <div class="lig-keyskills-block">
+    <div class="lig-section-title">Habilidades-chave</div>
+    <p class="lig-hint">Vêm com o personagem assim que esta vocação entra na ficha, sem precisar
+      adicioná-las, e <strong>não custam XP</strong>.</p>
+    {{#if editable}}<div class="lig-def-drop" data-drop="keySkills">⇩ Arraste uma <strong>Habilidade</strong> para cá</div>{{/if}}
+    {{#each system.keySkills as |skill i|}}
+    <div class="lig-granttrait-row">
+      <img class="lig-item-icon" src="{{skill.img}}" alt=""/>
+      <span class="lig-item-title">{{skill.name}}</span>
+      <span class="lig-item-tag lig-key-tag">chave</span>
+      {{#if ../editable}}<button type="button" class="lig-mini-btn danger" data-action="removeKeySkill" data-index="{{i}}" title="Tirar das habilidades-chave">✕</button>{{/if}}
+    </div>
+    {{else}}
+    <div class="lig-empty">Nenhuma habilidade-chave. Arraste uma habilidade para cá.</div>
+    {{/each}}
+  </div>
+  {{/if}}
+
   {{!-- Lista de habilidades concedidas --}}
   <div class="lig-skilllist-block">
     <div class="lig-section-title">
@@ -39,7 +59,7 @@
       {{#if editable}}<button type="button" class="lig-mini-btn" data-action="addListItem">+ habilidade</button>{{/if}}
     </div>
     <p class="lig-hint">Habilidades nesta lista têm custo de XP normal; fora da lista, o custo dobra.</p>
-    {{#if editable}}<div class="lig-def-drop">⇩ Arraste uma <strong>Habilidade</strong> para cá (ou digite o nome abaixo)</div>{{/if}}
+    {{#if editable}}<div class="lig-def-drop" data-drop="skillList">⇩ Arraste uma <strong>Habilidade</strong> para cá (ou digite o nome abaixo)</div>{{/if}}
     {{#each system.skillList as |skill i|}}
     <div class="lig-skilllist-row">
       <input type="text" name="system.skillList.{{i}}" value="{{skill}}" placeholder="Nome da habilidade"/>

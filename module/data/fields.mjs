@@ -68,14 +68,17 @@ export function costField() {
       // custos do sistema.
       value: new fields.StringField({ required: true, blank: true, initial: "0" }),
       label: new fields.StringField({ required: false, blank: true, initial: "" }),
-      // ESTADO (nível) em que este custo vale, para habilidades e
-      // complicações: "all" = sempre; "B"/"A"/"E" = só naquele nível.
-      // Com a trava de custo conjunto ligada no item, os níveis anteriores
-      // também entram na conta (ver custosDoNivel em dice.mjs).
+      // QUANDO este custo é cobrado, conforme o nível que está sendo
+      // ATIVADO (não o adquirido). Para habilidades e complicações:
+      //   all  — sempre, em qualquer ativação (a habilidade como um todo)
+      //   B/A/E — só quando ativada naquele nível
+      //   A+   — ativada no Avançado, somando os custos do Básico
+      //   E+   — ativada no Épico, somando os do Avançado e do Básico
+      // Ver costsForLevel em helpers/effects.mjs.
       level: new fields.StringField({
         required: false,
         initial: "all",
-        choices: ["all", "B", "A", "E"],
+        choices: ["all", "B", "A", "E", "A+", "E+"],
       }),
     }),
   );
@@ -101,10 +104,14 @@ export function activatableFields() {
       }),
       { initial: [] },
     ),
-    // CUSTO CONJUNTO: marcada, usar a habilidade num nível cobra também os
-    // custos dos níveis ANTERIORES (Avançado = custo de Básico + o de
-    // Avançado). Desmarcada — o padrão — cada nível cobra só o custo dele.
+    // LEGADO: antes a soma dos níveis anteriores era uma trava do item
+    // inteiro. Hoje cada custo diz por si se soma os inferiores ("A+"/"E+"),
+    // o que permite misturar os dois modos na mesma habilidade. O campo fica
+    // para a migração (ver migrateCostLevels em item-data.mjs).
     costsCumulative: new fields.BooleanField({ initial: false }),
+    // NÍVEL ESCOLHIDO PARA ESTA ATIVAÇÃO (B/A/E). Vazio = usa o adquirido.
+    // Nunca passa do adquirido; ver activationLevelOf em helpers/effects.mjs.
+    activeLevel: new fields.StringField({ blank: true, initial: "" }),
     // TRAVA DE ENCANTAMENTO: marcada, o item não aparece na lista de escolha
     // de "encantar um item". Desmarcada por padrão — todo item encantável
     // entra na lista até alguém decidir o contrário.

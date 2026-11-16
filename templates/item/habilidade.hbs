@@ -19,16 +19,16 @@
 
   <div class="lig-item-row lig-xp-costs">
     <label>Custo XP — Básico
-      <input type="number" name="system.costBasic" value="{{system.costBasic}}" min="0" placeholder="padrão"/>
+      <input type="text" name="system.costBasic" value="{{system.costBasic}}" placeholder="padrão" title="Vazio usa o custo padrão do sistema. Escreva 0 para a habilidade ser gratuita. Aceita fórmula com @variáveis."/>
     </label>
     <label>Custo XP — Avançado
-      <input type="number" name="system.costAdvanced" value="{{system.costAdvanced}}" min="0" placeholder="padrão"/>
+      <input type="text" name="system.costAdvanced" value="{{system.costAdvanced}}" placeholder="padrão" title="Vazio usa o custo padrão do sistema. Escreva 0 para a habilidade ser gratuita. Aceita fórmula com @variáveis."/>
     </label>
     <label>Custo XP — Épico
-      <input type="number" name="system.costSpecial" value="{{system.costSpecial}}" min="0" placeholder="padrão"/>
+      <input type="text" name="system.costSpecial" value="{{system.costSpecial}}" placeholder="padrão" title="Vazio usa o custo padrão do sistema. Escreva 0 para a habilidade ser gratuita. Aceita fórmula com @variáveis."/>
     </label>
   </div>
-  <p class="lig-hint">Deixe 0 para usar o custo padrão do sistema. O custo dobra se a habilidade não estiver nas listas de acesso do personagem.</p>
+  <p class="lig-hint">Deixe <strong>vazio</strong> para usar o custo padrão do sistema; escreva <strong>0</strong> para a habilidade ser gratuita. O custo dobra se a habilidade não estiver nas listas de acesso do personagem, e é zerado se ela for habilidade-chave de uma vocação dele.</p>
 
   <label class="lig-full">Listas (separadas por vírgula)
     <input type="text" name="system.lists" value="{{system.lists}}" placeholder="guerreiro, ladino, monge..."/>

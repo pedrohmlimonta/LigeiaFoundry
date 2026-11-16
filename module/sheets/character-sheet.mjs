@@ -8,7 +8,8 @@ import { requestRollConfig } from "../helpers/roll-request.mjs";
 import { placeTemplateForAction, scheduleTransientCleanup } from "../helpers/template.mjs";
 import { computeXpSpent, computeXpGained } from "../helpers/xp.mjs";
 import { performRest, performMedicalCare, DEATH_HP } from "../helpers/wounds.mjs";
-import { effectIsActive, availableActionsOf, resolveEffectValue, WORD_TARGET_PREFIX, tipagensComoAlvos } from "../helpers/effects.mjs";
+import { effectIsActive, availableActionsOf, resolveEffectValue, WORD_TARGET_PREFIX, tipagensComoAlvos,
+         activationLevelChoices, activationLevelOf, LEVELED_TYPES } from "../helpers/effects.mjs";
 import { artRowsFor, tokenArtFor, healthPercent } from "../helpers/token-art.mjs";
 import { pedirItemParaEncantar, applyEnchantment, removeEnchantment } from "../helpers/enchant.mjs";
 import { theatreRowsFor, theatreActive } from "../helpers/theatre-art.mjs";
@@ -205,6 +206,15 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       if (groups[item.type]) groups[item.type].push(item);
     }
     context.itemGroups = groups;
+
+    // NÍVEL DE ATIVAÇÃO: para habilidades e complicações com mais de um
+    // nível disponível, a ficha mostra um seletor. Quem tem a habilidade só
+    // no Básico não tem o que escolher, então o seletor nem aparece.
+    context.activationLevels = {};
+    for (const item of actor.items) {
+      const opcoes = activationLevelChoices(item);
+      if (opcoes.length > 1) context.activationLevels[item.id] = opcoes;
+    }
 
     // Condições: monta a lista completa (do CONFIG) marcando as ativas no ator.
     const activeConds = sys.conditions || [];
@@ -404,6 +414,24 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
         });
       }
     }
+    // ----- Seletor de NÍVEL DE ATIVAÇÃO das habilidades -----
+    // O despachante de `actions` do ApplicationV2 responde a clique, não a
+    // mudança de select — e estes selects pertencem a outro documento (o
+    // item), então também não entram no formulário da ficha.
+    if (root) {
+      for (const sel of root.querySelectorAll("select.lig-actlevel")) {
+        sel.addEventListener("change", async (ev) => {
+          const id = ev.currentTarget.closest("[data-item-id]")?.dataset.itemId;
+          const item = this.document.items.get(id);
+          if (!item) return;
+          await item.update({ "system.activeLevel": ev.currentTarget.value });
+        });
+        // Abrir o select não deve iniciar o arraste do item.
+        sel.addEventListener("mousedown", (ev) => ev.stopPropagation());
+        sel.addEventListener("dragstart", (ev) => { ev.preventDefault(); ev.stopPropagation(); });
+      }
+    }
+
     // Cria o manipulador de DragDrop (V13 não faz isso automaticamente)
     const DragDropCls =
       foundry.applications.ux?.DragDrop?.implementation ||
@@ -473,6 +501,23 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
           type: "traco",
           img: t.img || "icons/svg/aura.svg",
           system: foundry.utils.deepClone(t.system || {}),
+        });
+      }
+
+      // HABILIDADES-CHAVE da vocação: vêm junto, sem precisar adicioná-las.
+      // Não custam XP (quem zera o custo é collectKeySkills, comparando o
+      // nome com as chaves das vocações que o personagem tem).
+      for (const k of item.system?.keySkills || []) {
+        if (!k?.name) continue;
+        const exists = this.document.items.some(
+          (i) => i.type === "habilidade" && i.name.trim().toLowerCase() === k.name.trim().toLowerCase(),
+        );
+        if (exists) continue;
+        toCreate.push({
+          name: k.name,
+          type: "habilidade",
+          img: k.img || "icons/svg/book.svg",
+          system: foundry.utils.deepClone(k.system || {}),
         });
       }
     }
@@ -729,9 +774,14 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     if (turningOn && item.system.mode === "active") {
       const { text, insufficient, spent } = await spendItemCosts(this.document, item);
       if (spent && text) {
+        // Com o nível de ativação escolhível, dizer QUAL nível foi usado
+        // deixa de ser detalhe: é o que explica o custo cobrado.
+        const niveis = { B: "Básico", A: "Avançado", E: "Épico" };
+        const nivel = LEVELED_TYPES.includes(item.type)
+          ? ` <span class="lig-act-level">(${niveis[activationLevelOf(item)] || ""})</span>` : "";
         await ChatMessage.create({
           speaker: ChatMessage.getSpeaker({ actor: this.document }),
-          flavor: `<div class="ligeia-roll-flavor"><strong>${item.name}</strong> ativada — custo: ${text}${insufficient ? ' <span class="lig-insufficient">(recurso insuficiente!)</span>' : ""}</div>`,
+          flavor: `<div class="ligeia-roll-flavor"><strong>${item.name}</strong>${nivel} ativada — custo: ${text}${insufficient ? ' <span class="lig-insufficient">(recurso insuficiente!)</span>' : ""}</div>`,
         });
       }
     }

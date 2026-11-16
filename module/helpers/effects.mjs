@@ -40,9 +40,11 @@ export function itemIsOn(item) {
 export function effectIsActive(item, effect) {
   if (!effect || effect.enabled === false) return false;
   if (!itemIsOn(item)) return false;
-  // Nível só se aplica a habilidades e complicações
+  // Nível só se aplica a habilidades e complicações. Vale o nível que está
+  // sendo ATIVADO, não o adquirido: ativar no Básico uma habilidade que se
+  // tem no Épico usa só os efeitos do Básico.
   if (item.type === "habilidade" || item.type === "complicacao") {
-    return levelMeets(item.system?.level || "B", effect.level || "all");
+    return levelMeets(activationLevelOf(item), effect.level || "all");
   }
   return true;
 }
@@ -555,7 +557,8 @@ export function areaFilterOverrideFor(actor) {
 export function actionIsAvailable(item, action) {
   if (!action) return false;
   if (item?.type === "habilidade" || item?.type === "complicacao") {
-    return levelMeets(item.system?.level || "B", action.level || "all");
+    // Idem: o que vale é o nível ativado.
+    return levelMeets(activationLevelOf(item), action.level || "all");
   }
   return true;
 }
@@ -641,6 +644,49 @@ export function resolvePreActivation(actor, ref) {
 /** Tipos de item cujo custo varia com o ESTADO (nível B/A/E). */
 export const LEVELED_TYPES = ["habilidade", "complicacao"];
 
+/** Ordem dos níveis, do menor para o maior. */
+export const LEVEL_SEQUENCE = ["B", "A", "E"];
+
+/**
+ * NÍVEL DE ATIVAÇÃO de um item: em qual nível ele está sendo usado agora.
+ *
+ * Uma coisa é o nível que o personagem ADQUIRIU (system.level, que é o que
+ * ele pagou em XP); outra é o nível que ele escolhe USAR nesta ativação
+ * (system.activeLevel). Quem tem a habilidade no Épico pode querer ativá-la
+ * no Básico — pagando o custo do Básico e usando só os efeitos e ações do
+ * Básico.
+ *
+ * Nunca passa do nível adquirido: escolher acima do que se tem não vale, e
+ * um valor antigo acima do adquirido é rebaixado em vez de dar erro.
+ *
+ * @param {Item} item
+ * @returns {string} "B" | "A" | "E"
+ */
+export function activationLevelOf(item) {
+  const adquirido = item?.system?.level || "B";
+  if (!LEVELED_TYPES.includes(item?.type)) return adquirido;
+  const escolhido = item?.system?.activeLevel || "";
+  if (!escolhido || !LEVEL_SEQUENCE.includes(escolhido)) return adquirido;
+  return levelMeets(adquirido, escolhido) ? escolhido : adquirido;
+}
+
+/**
+ * Níveis que o personagem pode escolher ao ativar: do Básico até o que ele
+ * adquiriu. Para o seletor da ficha.
+ *
+ * @param {Item} item
+ * @returns {Array<{id:string, label:string, on:boolean}>}
+ */
+export function activationLevelChoices(item) {
+  if (!LEVELED_TYPES.includes(item?.type)) return [];
+  const adquirido = item.system?.level || "B";
+  const atual = activationLevelOf(item);
+  const rotulos = { B: "Básico", A: "Avançado", E: "Épico" };
+  return LEVEL_SEQUENCE
+    .filter((n) => levelMeets(adquirido, n))
+    .map((n) => ({ id: n, label: rotulos[n], on: n === atual }));
+}
+
 /**
  * CUSTOS que valem no estado atual do item.
  *
@@ -659,18 +705,52 @@ export const LEVELED_TYPES = ["habilidade", "complicacao"];
  * @param {Item} item
  * @returns {Array<object>} entradas de system.costs que devem ser pagas
  */
-export function costsForLevel(item) {
+export const COST_LEVEL_MODES = {
+  all: "Sempre",
+  B: "Só Básico",
+  A: "Só Avançado",
+  E: "Só Épico",
+  "A+": "Avançado + Básico",
+  "E+": "Épico + Av. + Básico",
+};
+
+/** Separa "A+" em { nivel: "A", soma: true }. */
+export function parseCostLevel(bruto) {
+  const texto = String(bruto || "all");
+  if (texto === "all") return { nivel: "all", soma: false };
+  const soma = texto.endsWith("+");
+  const nivel = soma ? texto.slice(0, -1) : texto;
+  if (!LEVEL_SEQUENCE.includes(nivel)) return { nivel: "all", soma: false };
+  return { nivel, soma };
+}
+
+export function costsForLevel(item, nivelAtivacao = null) {
   const todos = item?.system?.costs || [];
   if (!LEVELED_TYPES.includes(item?.type)) {
-    return todos.filter((c) => !c?.level || c.level === "all");
+    return todos.filter((c) => parseCostLevel(c?.level).nivel === "all");
   }
-  const atual = item.system?.level || "B";
-  const conjunto = !!item.system?.costsCumulative;
-  return todos.filter((c) => {
-    const nivel = c?.level || "all";
-    if (nivel === "all") return true;
-    return conjunto ? levelMeets(atual, nivel) : nivel === atual;
-  });
+  const ativacao = nivelAtivacao || activationLevelOf(item);
+
+  // Os "Sempre" entram em qualquer ativação.
+  const sempre = todos.filter((c) => parseCostLevel(c?.level).nivel === "all");
+  const doNivel = (n) => todos.filter((c) => parseCostLevel(c?.level).nivel === n);
+
+  // Desce a escada a partir do nível ativado: cobra o que está nele e, se
+  // algum desses custos for do tipo "soma os inferiores", desce mais um
+  // degrau e repete. Um custo marcado "Só no Avançado" para a descida ali;
+  // um marcado "Avançado + Básico" puxa o Básico junto.
+  const pagar = [];
+  let i = LEVEL_SEQUENCE.indexOf(ativacao);
+  while (i >= 0) {
+    const nesteNivel = doNivel(LEVEL_SEQUENCE[i]);
+    pagar.push(...nesteNivel);
+    if (!nesteNivel.some((c) => parseCostLevel(c.level).soma)) break;
+    i -= 1;
+  }
+
+  // Devolve na ordem original da lista, para a ficha não embaralhar.
+  const escolhidos = new Set([...sempre, ...pagar]);
+  return todos.filter((c) => escolhidos.has(c));
 }
 
 /**

@@ -4,7 +4,8 @@
  * Uma classe base genérica + uma PARTS/template por tipo de item.
  */
 import { WORDS_BY_TIER, WORD_TARGET_PREFIX, tipagensComoAlvos, weaponTagsOf, weaponTagEntriesOf,
-         weaponTagId, WEAPON_TAG_PREFIX, costsForLevel, LEVELED_TYPES,
+         weaponTagId, WEAPON_TAG_PREFIX, costsForLevel, LEVELED_TYPES, COST_LEVEL_MODES,
+         LEVEL_SEQUENCE, levelMeets, activationLevelOf,
          buildPreActivationRef, parsePreActivation, resolvePreActivation } from "../helpers/effects.mjs";
 import { activateTagInputs } from "../apps/tag-input.mjs";
 import { removeEnchantment } from "../helpers/enchant.mjs";
@@ -181,6 +182,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       addListItem: LigeiaItemSheetBase._onAddListItem,
       removeListItem: LigeiaItemSheetBase._onRemoveListItem,
       removeTrait: LigeiaItemSheetBase._onRemoveTrait,
+      removeKeySkill: LigeiaItemSheetBase._onRemoveKeySkill,
       addAction: LigeiaItemSheetBase._onAddAction,
       duplicateAction: LigeiaItemSheetBase._onDuplicateAction,
       removeAction: LigeiaItemSheetBase._onRemoveAction,
@@ -231,7 +233,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       // correto e o form ainda reflete o estado antigo. Reconstruir aqui
       // sobrescreveria a operação (causava o bug de "não cria ação ao reabrir").
       if (this.#arrayOpInProgress) {
-        for (const key of ["actions", "effects", "costs", "metamagics", "skillList", "grantedTraits"]) {
+        for (const key of ["actions", "effects", "costs", "metamagics", "skillList", "grantedTraits", "keySkills"]) {
           delete sys[key];
         }
         return submitData;
@@ -406,17 +408,23 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     const NIVEIS = { B: "Básico", A: "Avançado", E: "Épico/Especial" };
     context.hasLevels = LEVELED_TYPES.includes(item.type);
     if (context.hasLevels) {
-      context.costLevels = { all: "Sempre", B: "Básico", A: "Avançado", E: "Épico/Especial" };
+      context.costLevels = COST_LEVEL_MODES;
       context.levelLabel = NIVEIS[item.system?.level || "B"] || item.system?.level;
       context.itemWord = item.type === "complicacao" ? "complicação" : "habilidade";
-      // Prévia do que o estado atual realmente cobra — com a trava de custo
-      // conjunto ligada, a conta deixa de ser óbvia só olhando as linhas.
+      // Prévia do que CADA nível de ativação cobra. Com os modos "+" na
+      // mistura, a conta deixa de ser óbvia só olhando as linhas soltas.
       const resLabels = { mp: "PM", hp: "PV", hpTemp: "PV temp.", heroic: "PH" };
-      const agora = costsForLevel(item).filter((c) => String(c.value ?? "").trim() && String(c.value) !== "0");
-      context.costsNow = agora;
-      context.costsNowText = agora
-        .map((c) => `${c.value} ${resLabels[c.resource] || c.resource}`)
-        .join(" + ");
+      const temValor = (c) => String(c.value ?? "").trim() && String(c.value) !== "0";
+      const textoDe = (lista) => lista.filter(temValor)
+        .map((c) => `${c.value} ${resLabels[c.resource] || c.resource}`).join(" + ");
+      context.costPreview = LEVEL_SEQUENCE
+        .filter((n) => levelMeets(item.system?.level || "B", n))
+        .map((n) => ({
+          nivel: n,
+          label: NIVEIS[n],
+          texto: textoDe(costsForLevel(item, n)) || "nada",
+          atual: n === activationLevelOf(item),
+        }));
     }
     context.arcaneWords = (CONFIG.LIGEIA?.arcaneWords || []).reduce((acc, w) => {
       acc[w] = w.charAt(0).toUpperCase() + w.slice(1);
@@ -816,6 +824,10 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
   /* ---- Traços concedidos (definições) ---- */
   static async _onRemoveTrait(event, target) {
     await this._removeFromArray("system.grantedTraits", Number(target.dataset.index));
+  }
+
+  static async _onRemoveKeySkill(event, target) {
+    await this._removeFromArray("system.keySkills", Number(target.dataset.index));
   }
 
   /* ---- Ações (habilidade/magia/equipamento/traço) ---- */
@@ -1324,7 +1336,11 @@ export class DefinicaoSheet extends LigeiaItemSheetBase {
       if (!this.isEditable) return;
       event.preventDefault();
       event.stopPropagation();
-      await this._onDropSkill(event);
+      // A ficha inteira aceita o arraste, mas cada área tem um destino
+      // próprio: soltar sobre "Habilidades-chave" não é o mesmo que soltar
+      // sobre a lista de acesso. Fora de uma área marcada, vale o padrão.
+      const zona = event.target?.closest?.("[data-drop]")?.dataset.drop || "";
+      await this._onDropSkill(event, zona);
     });
   }
 
@@ -1335,7 +1351,7 @@ export class DefinicaoSheet extends LigeiaItemSheetBase {
    *  - TRAÇO → adiciona um snapshot a grantedTraits (traços concedidos que
    *    serão criados na ficha do personagem ao inserir esta definição).
    */
-  async _onDropSkill(event) {
+  async _onDropSkill(event, zona = "") {
     // Extrai os dados do arraste pela API do Foundry (com fallback manual).
     let data = null;
     try {
@@ -1362,6 +1378,9 @@ export class DefinicaoSheet extends LigeiaItemSheetBase {
     if (!dropped) return;
 
     if (dropped.type === "habilidade") {
+      // Habilidade-chave: a vocação a concede pronta e de graça.
+      if (zona === "keySkills") return this._addKeySkill(dropped);
+
       const name = dropped.name;
       const list = foundry.utils.deepClone(this.document.system.skillList || []);
       if (list.some((n) => String(n).trim().toLowerCase() === name.trim().toLowerCase())) {
@@ -1392,5 +1411,33 @@ export class DefinicaoSheet extends LigeiaItemSheetBase {
     }
 
     ui.notifications?.warn(`"${dropped.name}" é do tipo "${dropped.type}". Arraste uma Habilidade ou um Traço.`);
+  }
+
+  /**
+   * Grava uma habilidade como HABILIDADE-CHAVE desta vocação.
+   *
+   * Guarda um instantâneo (nome, ícone e system), como os traços
+   * concedidos, para que a habilidade possa ser recriada na ficha de quem
+   * receber a vocação mesmo que o item original saia do mundo.
+   */
+  async _addKeySkill(dropped) {
+    if (this.document.type !== "vocacao") {
+      ui.notifications?.warn("Só vocações têm habilidades-chave.");
+      return;
+    }
+    const lista = foundry.utils.deepClone(this.document.system.keySkills || []);
+    const mesmoNome = (a, b) => String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+    if (lista.some((k) => mesmoNome(k.name, dropped.name))) {
+      ui.notifications?.info(`"${dropped.name}" já é habilidade-chave desta vocação.`);
+      return;
+    }
+    lista.push({
+      name: dropped.name,
+      img: dropped.img || "icons/svg/book.svg",
+      system: foundry.utils.deepClone(dropped.system?.toObject?.() ?? dropped.system ?? {}),
+      sourceUuid: dropped.uuid || "",
+    });
+    await this.document.update({ "system.keySkills": lista });
+    ui.notifications?.info(`"${dropped.name}" é agora habilidade-chave desta vocação.`);
   }
 }

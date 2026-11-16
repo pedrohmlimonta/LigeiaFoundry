@@ -1943,9 +1943,74 @@ label.lig-bars-players {
 /* Linha de custo com o seletor de ESTADO: uma coluna a mais, e o estado
    ocupa só o necessário para o rótulo mais longo ("Épico/Especial"). */
 .lig-cost-row.has-level {
-  grid-template-columns: 1.3fr 0.6fr 1fr 1.1fr auto;
+  grid-template-columns: 1.1fr 0.5fr 1.5fr 0.9fr auto;
 }
+
+/* O seletor de modo tem os rótulos mais longos da linha */
+.lig-costlevel { text-align: left; }
 
 /* Em grid, um input tem largura mínima própria e estoura a linha mesmo com
    colunas em fr. min-width:0 deixa as colunas encolherem de verdade. */
 .lig-cost-row > * { min-width: 0; }
+
+/* Habilidade-chave da vocação: vem junto e não custa XP */
+.lig-cost-tag.is-key {
+  color: var(--lig-accent, #c8a24a);
+  border-color: var(--lig-accent, #c8a24a);
+}
+
+.lig-key-tag {
+  color: var(--lig-accent, #c8a24a);
+  border-color: var(--lig-accent, #c8a24a);
+}
+
+/* Bloco de habilidades-chave na ficha da vocação */
+.lig-keyskills-block {
+  background: var(--lig-bg-raised);
+  border: 1px solid var(--lig-border);
+  border-radius: 4px;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Seletor de NÍVEL DE ATIVAÇÃO na linha da habilidade */
+select.lig-actlevel {
+  flex: 0 0 auto;
+  width: auto !important;
+  height: auto !important;
+  padding: 0 0.2rem !important;
+  font-size: 0.7rem !important;
+  line-height: 1.6;
+  color: var(--lig-ink-soft);
+  background: var(--lig-bg-deep);
+  border: 1px solid var(--lig-border);
+  border-radius: 3px;
+}
+
+select.lig-actlevel:hover {
+  color: var(--lig-accent, #c8a24a);
+  border-color: var(--lig-accent, #c8a24a);
+}
+
+/* Prévia de cobrança por nível, na ficha da habilidade */
+.lig-cost-preview {
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--lig-border);
+}
+
+.lig-cost-preview-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  padding: 0.1rem 0.2rem;
+}
+
+.lig-cost-preview-row.atual {
+  color: var(--lig-accent, #c8a24a);
+  font-weight: 600;
+}
+
+.lig-cost-preview-level { opacity: 0.85; }
+.lig-cost-preview-val { text-align: right; }

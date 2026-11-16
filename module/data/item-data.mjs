@@ -30,12 +30,15 @@ export class HabilidadeData extends foundry.abstract.TypeDataModel {
         initial: "B",
         choices: ["B", "A", "E"],
       }),
-      // Custo de XP por nível (0 = usa a tabela padrão do sistema).
+      // Custo de XP por nível. VAZIO = usa a tabela padrão do sistema
+      // (20/40/80); qualquer valor escrito vale como está — inclusive "0",
+      // que torna a habilidade gratuita. Aceita fórmula com @variáveis.
       // O custo efetivo dobra se a habilidade não estiver nas listas de
-      // acesso do personagem.
-      costBasic: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
-      costAdvanced: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
-      costSpecial: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+      // acesso do personagem, e é zerado se ela for habilidade-chave de uma
+      // vocação do personagem.
+      costBasic: new fields.StringField({ blank: true, initial: "" }),
+      costAdvanced: new fields.StringField({ blank: true, initial: "" }),
+      costSpecial: new fields.StringField({ blank: true, initial: "" }),
       // Pré-requisito textual (ex: "Mente 4+")
       prereq: new fields.StringField({ blank: true, initial: "" }),
       // Listas a que pertence (texto livre separado por vírgula)
@@ -52,8 +55,45 @@ export class HabilidadeData extends foundry.abstract.TypeDataModel {
     };
   }
   static migrateData(source) {
-    return migrateFlatActionToArray(migrateEffectTargets(super.migrateData(source)));
+    return migrateFlatActionToArray(migrateEffectTargets(migrateCostLevels(
+      migrateCostFields(super.migrateData(source), ["costBasic", "costAdvanced", "costSpecial"]))));
   }
+}
+
+/**
+ * MIGRAÇÃO dos campos de custo/XP que eram numéricos.
+ *
+ * Na regra antiga o 0 queria dizer "usa a tabela padrão"; na nova, vazio
+ * quer dizer isso e 0 quer dizer zero. Converter os zeros guardados em
+ * vazio mantém as fichas existentes exatamente como estavam — quem quiser
+ * uma habilidade gratuita agora escreve 0 de propósito.
+ */
+/**
+ * MIGRAÇÃO do modo de custo: a trava de "custo conjunto" do item inteiro
+ * vira o modo "+" de cada custo.
+ *
+ * Com a trava ligada, cada custo de nível passava a somar os inferiores —
+ * então ele vira "A+"/"E+". O Básico não tem nível abaixo, então continua
+ * "B". Sem a trava, nada muda.
+ */
+function migrateCostLevels(source) {
+  if (!source || typeof source !== "object") return source;
+  if (!source.costsCumulative || !Array.isArray(source.costs)) return source;
+  for (const c of source.costs) {
+    if (!c || typeof c !== "object") continue;
+    if (c.level === "A" || c.level === "E") c.level = `${c.level}+`;
+  }
+  source.costsCumulative = false;
+  return source;
+}
+
+function migrateCostFields(source, campos) {
+  if (!source || typeof source !== "object") return source;
+  for (const campo of campos) {
+    const v = source[campo];
+    if (typeof v === "number") source[campo] = v > 0 ? String(v) : "";
+  }
+  return source;
 }
 
 /* ================================================================== */
@@ -70,11 +110,12 @@ export class ComplicacaoData extends foundry.abstract.TypeDataModel {
         initial: "B",
         choices: ["B", "A", "E"],
       }),
-      // XP CONCEDIDO por nível (0 = usa a tabela padrão do sistema,
-      // CONFIG.LIGEIA.complicationXp).
-      xpBasic: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
-      xpAdvanced: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
-      xpSpecial: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+      // XP CONCEDIDO por nível. VAZIO = usa a tabela padrão do sistema
+      // (CONFIG.LIGEIA.complicationXp); valor escrito vale como está,
+      // inclusive "0". Aceita fórmula com @variáveis.
+      xpBasic: new fields.StringField({ blank: true, initial: "" }),
+      xpAdvanced: new fields.StringField({ blank: true, initial: "" }),
+      xpSpecial: new fields.StringField({ blank: true, initial: "" }),
       // Pré-requisito textual (ex: "Mente 4+")
       prereq: new fields.StringField({ blank: true, initial: "" }),
       // Listas a que pertence (texto livre separado por vírgula)
@@ -91,7 +132,8 @@ export class ComplicacaoData extends foundry.abstract.TypeDataModel {
     };
   }
   static migrateData(source) {
-    return migrateFlatActionToArray(migrateEffectTargets(super.migrateData(source)));
+    return migrateFlatActionToArray(migrateEffectTargets(migrateCostLevels(
+      migrateCostFields(super.migrateData(source), ["xpBasic", "xpAdvanced", "xpSpecial"]))));
   }
 }
 
@@ -266,6 +308,21 @@ export class VocacaoData extends foundry.abstract.TypeDataModel {
       // Aceitam fórmula com @variáveis, como os demais campos numéricos.
       hpBonus: new fields.StringField({ blank: true, initial: "0" }),
       mpBonus: new fields.StringField({ blank: true, initial: "0" }),
+      // HABILIDADES-CHAVE: toda vocação tem uma ou mais. Elas vêm com o
+      // personagem assim que a vocação entra na ficha, sem precisar
+      // adicioná-las, e não custam XP (ver collectKeySkills em xp.mjs).
+      //
+      // Guarda um instantâneo da habilidade, como grantedTraits faz com os
+      // traços, para recriá-la na ficha do personagem.
+      keySkills: new fields.ArrayField(
+        new fields.SchemaField({
+          name: new fields.StringField({ required: true, blank: false }),
+          img: new fields.StringField({ blank: true, initial: "icons/svg/book.svg" }),
+          system: new fields.ObjectField({}),
+          sourceUuid: new fields.StringField({ blank: true, initial: "" }),
+        }),
+        { initial: [] },
+      ),
     };
   }
 }

@@ -361,11 +361,24 @@
         <img class="lig-item-icon" src="{{item.img}}" alt=""/>
         <span class="lig-item-title">{{item.name}}</span>
         <span class="lig-item-tag">{{item.system.level}}</span>
+        {{#with (lookup @root.activationLevels item.id) as |niveis|}}
+        <select class="lig-actlevel" title="Nível em que esta habilidade está sendo usada. Muda os efeitos, as ações e os custos que valem.">
+          {{#each niveis as |n|}}
+          <option value="{{n.id}}" {{#if n.on}}selected{{/if}}>{{n.label}}</option>
+          {{/each}}
+        </select>
+        {{/with}}
         {{#if cost}}{{#unless @root.isNpc}}
+        {{#if cost.isKey}}
+        <span class="lig-cost-tag is-key" title="Habilidade-chave de uma vocação do personagem: vem junto com ela e não custa XP.">
+          chave · 0 XP
+        </span>
+        {{else}}
         <span class="lig-cost-tag {{#if cost.onList}}on-list{{else}}off-list{{/if}}"
               title="{{#if cost.onList}}Na sua lista de acesso (custo normal){{else}}Fora das suas listas — custo dobrado{{/if}}">
           {{cost.total}} XP{{#unless cost.onList}} ×2{{/unless}}
         </span>
+        {{/if}}
         {{/unless}}{{/if}}
         {{> systems/ligeia-rpg/templates/actor/partials/item-actions.hbs item=item}}
         {{#if (eq item.system.mode "active")}}
@@ -391,6 +404,13 @@
         <img class="lig-item-icon" src="{{item.img}}" alt=""/>
         <span class="lig-item-title">{{item.name}}</span>
         <span class="lig-item-tag">{{item.system.level}}</span>
+        {{#with (lookup @root.activationLevels item.id) as |niveis|}}
+        <select class="lig-actlevel" title="Nível em que esta habilidade está sendo usada. Muda os efeitos, as ações e os custos que valem.">
+          {{#each niveis as |n|}}
+          <option value="{{n.id}}" {{#if n.on}}selected{{/if}}>{{n.label}}</option>
+          {{/each}}
+        </select>
+        {{/with}}
         {{#if gain}}{{#unless @root.isNpc}}
         <span class="lig-gain-tag" title="Complicação — concede XP para gastar">+{{gain.xp}} XP</span>
         {{/unless}}{{/if}}

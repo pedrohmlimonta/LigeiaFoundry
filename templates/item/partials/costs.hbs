@@ -12,7 +12,7 @@
     <input type="text" name="system.costs.{{i}}.value" value="{{cost.value}}" class="lig-narrow"/>
     {{!-- ESTADO em que este custo vale (só onde o item tem níveis) --}}
     {{#if ../hasLevels}}
-    <select name="system.costs.{{i}}.level" class="lig-narrow" title="Em que estado da habilidade este custo é cobrado.">
+    <select name="system.costs.{{i}}.level" class="lig-costlevel" title="Quando este custo é cobrado, conforme o nível ATIVADO. &quot;Sempre&quot; vale em qualquer ativação; &quot;Só X&quot; vale apenas ativando em X; &quot;X + …&quot; cobra também os custos dos níveis abaixo.">
       {{selectOptions ../costLevels selected=cost.level}}
     </select>
     {{/if}}
@@ -24,14 +24,17 @@
   {{/each}}
 
   {{#if hasLevels}}
-  <label class="lig-inline-check lig-cost-joint" title="Marcada, usar a habilidade num estado cobra também os custos dos estados anteriores: no Avançado paga-se o custo de Básico somado ao de Avançado. Desmarcada, cada estado cobra só o custo dele. Custos marcados como 'Sempre' valem nos dois modos.">
-    <input type="checkbox" name="system.costsCumulative" {{checked system.costsCumulative}}/>
-    Custo conjunto (soma os estados anteriores)
-  </label>
-  {{#if costsNow.length}}
-  <p class="lig-hint">No estado atual ({{levelLabel}}) esta {{itemWord}} cobra: <strong>{{costsNowText}}</strong>.</p>
-  {{else}}
-  <p class="lig-hint">No estado atual ({{levelLabel}}) esta {{itemWord}} não cobra nada.</p>
-  {{/if}}
+  <p class="lig-hint">Cada custo diz quando é cobrado, conforme o nível que for
+    <strong>ativado</strong>. Os modos “+” somam os níveis abaixo: um custo em
+    <em>Avançado + Básico</em> faz a ativação no Avançado cobrar os dois.</p>
+  <div class="lig-cost-preview">
+    <div class="lig-subtitle">Cobrança por nível de ativação</div>
+    {{#each costPreview as |p|}}
+    <div class="lig-cost-preview-row {{#if p.atual}}atual{{/if}}">
+      <span class="lig-cost-preview-level">{{p.label}}</span>
+      <span class="lig-cost-preview-val">{{p.texto}}</span>
+    </div>
+    {{/each}}
+  </div>
   {{/if}}
 </div>

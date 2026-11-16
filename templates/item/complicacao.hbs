@@ -19,16 +19,16 @@
 
   <div class="lig-item-row lig-xp-costs">
     <label>XP concedido — Básico
-      <input type="number" name="system.xpBasic" value="{{system.xpBasic}}" min="0" placeholder="padrão"/>
+      <input type="text" name="system.xpBasic" value="{{system.xpBasic}}" placeholder="padrão" title="Vazio usa o valor padrão do sistema. Escreva 0 para não conceder XP. Aceita fórmula com @variáveis."/>
     </label>
     <label>XP concedido — Avançado
-      <input type="number" name="system.xpAdvanced" value="{{system.xpAdvanced}}" min="0" placeholder="padrão"/>
+      <input type="text" name="system.xpAdvanced" value="{{system.xpAdvanced}}" placeholder="padrão" title="Vazio usa o valor padrão do sistema. Escreva 0 para não conceder XP. Aceita fórmula com @variáveis."/>
     </label>
     <label>XP concedido — Épico
-      <input type="number" name="system.xpSpecial" value="{{system.xpSpecial}}" min="0" placeholder="padrão"/>
+      <input type="text" name="system.xpSpecial" value="{{system.xpSpecial}}" placeholder="padrão" title="Vazio usa o valor padrão do sistema. Escreva 0 para não conceder XP. Aceita fórmula com @variáveis."/>
     </label>
   </div>
-  <p class="lig-hint">Deixe 0 para usar o valor padrão do sistema. Complicações CONCEDEM XP em vez de custar: o valor é somado ao XP disponível do personagem para gastar em habilidades.</p>
+  <p class="lig-hint">Deixe <strong>vazio</strong> para usar o valor padrão do sistema; escreva <strong>0</strong> para não conceder nada. Complicações CONCEDEM XP em vez de custar: o valor é somado ao XP disponível do personagem para gastar em habilidades.</p>
 
   <label class="lig-full">Listas (separadas por vírgula)
     <input type="text" name="system.lists" value="{{system.lists}}" placeholder="maldições, dívidas, fraquezas..."/>
