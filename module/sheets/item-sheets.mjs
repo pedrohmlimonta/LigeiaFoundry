@@ -6,7 +6,8 @@
 import { WORDS_BY_TIER, WORD_TARGET_PREFIX, tipagensComoAlvos, weaponTagsOf, weaponTagEntriesOf,
          weaponTagId, WEAPON_TAG_PREFIX, costsForLevel, LEVELED_TYPES, COST_LEVEL_MODES,
          LEVEL_SEQUENCE, levelMeets, activationLevelOf,
-         buildPreActivationRef, parsePreActivation, resolvePreActivation } from "../helpers/effects.mjs";
+         buildPreActivationRef, parsePreActivation, resolvePreActivation,
+         REMOVE_FX_MODES } from "../helpers/effects.mjs";
 import { activateTagInputs } from "../apps/tag-input.mjs";
 import { CHAIN_WHEN_LABELS } from "../helpers/dice.mjs";
 import { removeEnchantment } from "../helpers/enchant.mjs";
@@ -204,6 +205,8 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       removePreActivation: LigeiaItemSheetBase._onRemovePreActivation,
       addChainAction: LigeiaItemSheetBase._onAddChainAction,
       removeChainAction: LigeiaItemSheetBase._onRemoveChainAction,
+      addRemoveEffect: LigeiaItemSheetBase._onAddRemoveEffect,
+      removeRemoveEffect: LigeiaItemSheetBase._onRemoveRemoveEffect,
       clearFxAnim: LigeiaItemSheetBase._onClearFxAnim,
       clearAnim: LigeiaItemSheetBase._onClearAnim,
       toggleAnim: LigeiaItemSheetBase._onToggleAnim,
@@ -317,6 +320,24 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
             arr[i].chainActions = indexedToArray(ca);
           } else if (ca === undefined) {
             arr[i].chainActions = foundry.utils.deepClone(cur.chainActions || []);
+          }
+          // Efeitos removidos: idem.
+          const re = arr[i].removesEffects;
+          if (re && !Array.isArray(re) && typeof re === "object") {
+            arr[i].removesEffects = indexedToArray(re);
+          } else if (re === undefined) {
+            arr[i].removesEffects = foundry.utils.deepClone(cur.removesEffects || []);
+          }
+          // DRENO: como o movimento, os subcampos só aparecem no form com a
+          // caixa marcada — sem mesclar, desmarcar apagaria a configuração.
+          if (arr[i].drain === undefined) {
+            if (cur.drain) arr[i].drain = foundry.utils.deepClone(cur.drain);
+          } else if (typeof arr[i].drain === "object") {
+            arr[i].drain = foundry.utils.mergeObject(
+              foundry.utils.deepClone(cur.drain || {}),
+              arr[i].drain,
+              { inplace: false },
+            );
           }
           // Movimento: os subcampos só aparecem no form quando visíveis, então
           // mesclamos com o que já está salvo para não perder configuração.
@@ -593,6 +614,14 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       .map((g) => ({ ...g, entradas: g.entradas.filter((e) => e.ref.startsWith("action|")) }))
       .filter((g) => g.entradas.length);
     context.chainWhenChoices = CHAIN_WHEN_LABELS;
+    context.removeFxModes = REMOVE_FX_MODES;
+    context.drainResources = { hp: "Vida (PV)", mp: "Mana (PM)", heroic: "Pontos Heroicos", hpTemp: "Sobrevida" };
+    context.drainFromChoices = {
+      both: "Todo o dano",
+      base: "Só o dano base",
+      scaling: "Só o escalonado",
+    };
+    context.conditionChoices = condChoices;
     context.chainTargetChoices = {
       own: "Alvos dela mesma",
       same: "Os mesmos desta",
@@ -965,6 +994,26 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     const actions = foundry.utils.deepClone(this.document.system.actions || []);
     if (!actions[ai]?.chainActions) return;
     actions[ai].chainActions.splice(ci, 1);
+    await this._replaceActions(actions);
+  }
+
+  /* ---- Efeitos removidos do alvo (dissipar) ---- */
+
+  static async _onAddRemoveEffect(event, target) {
+    const ai = Number(target.dataset.actionIndex);
+    const actions = foundry.utils.deepClone(this.document.system.actions || []);
+    if (!actions[ai]) return;
+    actions[ai].removesEffects = actions[ai].removesEffects || [];
+    actions[ai].removesEffects.push({ mode: "label", value: "", count: "", enabled: true });
+    await this._replaceActions(actions);
+  }
+
+  static async _onRemoveRemoveEffect(event, target) {
+    const ai = Number(target.dataset.actionIndex);
+    const ri = Number(target.dataset.index);
+    const actions = foundry.utils.deepClone(this.document.system.actions || []);
+    if (!actions[ai]?.removesEffects) return;
+    actions[ai].removesEffects.splice(ri, 1);
     await this._replaceActions(actions);
   }
 

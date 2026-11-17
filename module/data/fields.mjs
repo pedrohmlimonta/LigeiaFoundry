@@ -312,6 +312,56 @@ export function actionEntryField() {
       }),
       { initial: [] },
     ),
+    // DRENO: parte do dano causado volta como recurso para quem conjurou.
+    // Serve para "causar dano e recuperar mana", "drenar mana e recuperar
+    // vida", "causar dano em vida e recuperar vida" — qualquer combinação,
+    // já que o recurso ferido é o da ação (damageResource) e o recuperado é
+    // escolhido aqui.
+    drain: new fields.SchemaField({
+      enabled: new fields.BooleanField({ initial: false }),
+      // O que o CONJURADOR recupera (pode ser o mesmo que a ação feriu).
+      resource: new fields.StringField({
+        initial: "mp",
+        choices: ["hp", "mp", "heroic", "hpTemp"],
+      }),
+      // Qual parte do dano vira recurso:
+      //   base     — só o dano base (a rolagem e os bônus fixos)
+      //   scaling  — só o dano escalonado (o bônus por superar a defesa)
+      //   both     — os dois
+      from: new fields.StringField({
+        initial: "both",
+        choices: ["base", "scaling", "both"],
+      }),
+      // Quanto se recupera por ponto drenado. 1 = tudo; 0.5 = metade.
+      // Aceita fórmula com @variáveis de quem conjura.
+      ratio: new fields.StringField({ blank: true, initial: "1" }),
+    }),
+    // EFEITOS REMOVIDOS do alvo quando a ação acerta — a contraparte de
+    // appliesEffects. É o que faz uma ação dissipar, purificar ou curar uma
+    // condição, em vez de aplicar algo novo.
+    removesEffects: new fields.ArrayField(
+      new fields.SchemaField({
+        // O QUE procurar na aba de efeitos do alvo:
+        //   label     — pelo nome do efeito (texto digitado abaixo)
+        //   condition — os que marcam a condição escolhida
+        //   mine      — os que ESTE personagem aplicou
+        //   all       — todos
+        mode: new fields.StringField({
+          required: false,
+          initial: "label",
+          choices: ["label", "condition", "mine", "all"],
+        }),
+        // Nome a procurar (modo "label") ou id da condição (modo "condition").
+        // No nome, a comparação ignora acentos e maiúsculas, e casa por
+        // trecho: "veneno" alcança "Veneno da Aranha".
+        value: new fields.StringField({ blank: true, initial: "" }),
+        // Quantos remover entre os que casarem (vazio/0 = todos).
+        // Aceita fórmula com @variáveis de quem conjura.
+        count: new fields.StringField({ blank: true, initial: "" }),
+        enabled: new fields.BooleanField({ initial: true }),
+      }),
+      { initial: [] },
+    ),
     // AÇÕES EM CADEIA: outras ações do personagem que disparam DEPOIS desta
     // se resolver, conforme o desfecho dela. É a contraparte das ativações
     // prévias acima — aquelas ligam o que a ação precisa antes de rolar;

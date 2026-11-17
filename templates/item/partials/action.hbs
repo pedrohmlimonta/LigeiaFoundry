@@ -208,6 +208,31 @@
       Dano escalonado (+1 por 2 pontos acima da defesa)
     </label>
 
+    {{!-- DRENO: o dano causado volta como recurso para quem conjura --}}
+    <label class="lig-inline-check" title="Parte do dano causado volta como recurso para quem conjurou. O recurso ferido é o da ação acima; o recuperado é escolhido abaixo — podem ser diferentes ou o mesmo.">
+      <input type="checkbox" name="system.actions.{{i}}.drain.enabled" {{checked act.drain.enabled}}/>
+      Drenar: converter o dano em recurso para mim
+    </label>
+    {{#if act.drain.enabled}}
+    <div class="lig-item-row lig-drain-row">
+      <label>Recupero
+        <select name="system.actions.{{i}}.drain.resource" title="O que o conjurador recupera.">
+          {{selectOptions ../drainResources selected=act.drain.resource}}
+        </select>
+      </label>
+      <label>A partir de
+        <select name="system.actions.{{i}}.drain.from" title="Qual parte do dano vira recurso.">
+          {{selectOptions ../drainFromChoices selected=act.drain.from}}
+        </select>
+      </label>
+      <label>Proporção
+        <input type="text" name="system.actions.{{i}}.drain.ratio" value="{{act.drain.ratio}}" class="lig-narrow" placeholder="1" title="Quanto se recupera por ponto drenado: 1 = tudo, 0.5 = metade. Aceita fórmula com @variáveis."/>
+      </label>
+    </div>
+    <p class="lig-hint">Conta o que de fato passou: se a Redução de Dano aparou metade, drena metade.
+      Numa área, soma o drenado de cada alvo atingido.</p>
+    {{/if}}
+
     {{!-- CURA: recuperação de vida/recurso aplicada a quem a ação alcançar --}}
     <div class="lig-item-row">
       <label>Cura (ex: 1d6+2)
@@ -366,6 +391,41 @@
       <p class="lig-hint">Este item não está numa ficha, então não há o que listar.
         Abra-o pela ficha do personagem para escolher as ativações.</p>
       {{/unless}}
+    </div>
+
+    {{!-- EFEITOS REMOVIDOS do alvo: dissipar, purificar, curar condição --}}
+    <div class="lig-removefx-editor">
+      <div class="lig-subtitle">
+        Efeitos removidos do alvo
+        <button type="button" class="lig-mini-btn" data-action="addRemoveEffect" data-action-index="{{i}}">+ remoção</button>
+      </div>
+      {{#each act.removesEffects as |rm ri|}}
+      <div class="lig-removefx-row">
+        <select name="system.actions.{{i}}.removesEffects.{{ri}}.mode" title="O que procurar na aba de efeitos do alvo.">
+          {{selectOptions ../../removeFxModes selected=rm.mode}}
+        </select>
+        {{#if (eq rm.mode "condition")}}
+        <select name="system.actions.{{i}}.removesEffects.{{ri}}.value" title="Efeitos que marcam esta condição.">
+          {{selectOptions ../../conditionChoices selected=rm.value}}
+        </select>
+        {{else if (eq rm.mode "label")}}
+        <input type="text" name="system.actions.{{i}}.removesEffects.{{ri}}.value" value="{{rm.value}}" placeholder="nome do efeito" title="Casa por trecho, sem diferenciar acento nem maiúscula: 'veneno' alcança 'Veneno da Aranha'."/>
+        {{else}}
+        <span class="lig-hint lig-removefx-na">—</span>
+        {{/if}}
+        <input type="text" name="system.actions.{{i}}.removesEffects.{{ri}}.count" value="{{rm.count}}" class="lig-narrow" placeholder="todos" title="Quantos remover entre os que casarem. Vazio ou 0 = todos. Aceita fórmula com @variáveis."/>
+        <label class="lig-inline-check" title="Ativa">
+          <input type="checkbox" name="system.actions.{{i}}.removesEffects.{{ri}}.enabled" {{checked rm.enabled}}/>
+        </label>
+        <button type="button" class="lig-mini-btn danger" data-action="removeRemoveEffect" data-action-index="{{i}}" data-index="{{ri}}" title="Remover esta regra">✕</button>
+      </div>
+      {{/each}}
+      {{#if act.removesEffects.length}}
+      <p class="lig-hint">Aplicado a cada alvo atingido, antes dos efeitos que esta ação concede.
+        A condição marcada pelo efeito sai junto, a menos que outro efeito ativo ainda a sustente.</p>
+      {{else}}
+      <div class="lig-empty">Esta ação não remove efeitos.</div>
+      {{/if}}
     </div>
 
     {{!-- AÇÕES EM CADEIA: o que dispara DEPOIS, conforme o desfecho --}}

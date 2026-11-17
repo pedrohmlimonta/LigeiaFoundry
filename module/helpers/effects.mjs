@@ -564,6 +564,95 @@ export function actionIsAvailable(item, action) {
 }
 
 /* ======================================================================== */
+/*  Remoção de efeitos ativos (dissipar / purificar)                        */
+/* ======================================================================== */
+
+/** Rótulos dos modos de busca, para a ficha e para o chat. */
+export const REMOVE_FX_MODES = {
+  label: "Pelo nome",
+  condition: "Que marcam a condição",
+  mine: "Os que eu apliquei",
+  all: "Todos",
+};
+
+/** Normaliza para comparar nome de efeito: sem acento, minúsculo. */
+function dobrarNome(s) {
+  return String(s || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .trim().toLowerCase();
+}
+
+/**
+ * Quais efeitos ativos de um alvo uma regra de remoção alcança.
+ *
+ * Devolve os ÍNDICES na lista do alvo, para que quem chama possa remover
+ * sem depender da identidade dos objetos.
+ *
+ * @param {Array<object>} lista   system.appliedEffects do alvo
+ * @param {object} regra          { mode, value, count }
+ * @param {object} [ctx]          { casterName, limite }
+ * @returns {number[]} índices a remover, na ordem da lista
+ */
+export function matchEffectsToRemove(lista, regra, { casterName = "", limite = 0 } = {}) {
+  const todos = Array.isArray(lista) ? lista : [];
+  const modo = regra?.mode || "label";
+  const alvoTexto = dobrarNome(regra?.value);
+
+  const casa = (ae) => {
+    if (!ae) return false;
+    switch (modo) {
+      case "all": return true;
+      // Casa por TRECHO: "veneno" alcança "Veneno da Aranha".
+      case "label": return !!alvoTexto && dobrarNome(ae.label).includes(alvoTexto);
+      case "condition": return !!regra?.value && ae.conditionId === regra.value;
+      case "mine": return !!casterName && dobrarNome(ae.source) === dobrarNome(casterName);
+      default: return false;
+    }
+  };
+
+  const achados = [];
+  for (let i = 0; i < todos.length; i++) if (casa(todos[i])) achados.push(i);
+  // Sem limite, tira todos os que casaram; com limite, os primeiros.
+  return limite > 0 ? achados.slice(0, limite) : achados;
+}
+
+/**
+ * Tira da lista os efeitos nos índices dados e devolve o que precisa ser
+ * gravado: a lista nova, as condições que ficam órfãs e os itens que
+ * precisam ser desencantados.
+ *
+ * As condições só saem se nenhum efeito ATIVO que fica ainda as sustente —
+ * a mesma regra do botão de remover da ficha.
+ *
+ * @param {Array<object>} lista
+ * @param {number[]} indices
+ * @param {string[]} condicoesAtuais
+ * @returns {{restantes:Array, condicoes:string[], removidos:Array, mudouCondicoes:boolean}}
+ */
+export function removeEffectsAt(lista, indices, condicoesAtuais = []) {
+  const fora = new Set(indices);
+  const restantes = [];
+  const removidos = [];
+  (Array.isArray(lista) ? lista : []).forEach((ae, i) => {
+    (fora.has(i) ? removidos : restantes).push(ae);
+  });
+
+  const aindaAtivas = new Set(
+    restantes.filter((ae) => ae && !ae.disabled && ae.conditionId).map((ae) => ae.conditionId),
+  );
+  const sair = new Set(
+    removidos.map((ae) => ae?.conditionId).filter((c) => c && !aindaAtivas.has(c)),
+  );
+  const condicoes = (condicoesAtuais || []).filter((c) => !sair.has(c));
+  return {
+    restantes,
+    condicoes,
+    removidos,
+    mudouCondicoes: sair.size > 0,
+  };
+}
+
+/* ======================================================================== */
 /*  Ativações prévias                                                       */
 /* ======================================================================== */
 

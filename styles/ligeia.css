@@ -2051,3 +2051,35 @@ select.lig-actlevel:hover {
   opacity: 0.75;
   font-style: italic;
 }
+
+/* Efeitos removidos do alvo (dissipar / purificar) */
+.lig-removefx-editor {
+  background: var(--lig-bg-raised);
+  border: 1px solid var(--lig-border);
+  border-radius: 4px;
+  padding: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.lig-removefx-row {
+  display: grid;
+  grid-template-columns: 1.3fr 1.6fr 0.6fr auto auto;
+  gap: 0.35rem;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.lig-removefx-row > * { min-width: 0; }
+
+.lig-removefx-na {
+  text-align: center;
+  opacity: 0.5;
+  margin: 0;
+}
+
+/* No chat: a linha dos efeitos dissipados */
+.lig-atk-dispel { color: #a9c6e8; }
+
+/* Dreno: o dano convertido em recurso para quem conjura */
+.lig-drain-row { margin-top: 0.2rem; }
+.lig-atk-drain { font-size: 0.85rem; color: #b9a0d8; margin-top: 0.1rem; }

@@ -35,10 +35,10 @@ async function waitForDiceAnimation(fallbackMs = 1100) {
 import { conditionModifiers, attributeConditionDice, actorHasCondition, coverDefenseDice, hasFullCover } from "./conditions.mjs";
 import { playActionAnimation } from "./integrations.mjs";
 import { executeActionMovement } from "./movement.mjs";
-import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvailable, activeEffectsOf, arcaneWordsOf, weaponTagsOf, WEAPON_ANY_TARGET, costsForLevel, resolvePreActivation, parsePreActivation } from "./effects.mjs";
+import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvailable, activeEffectsOf, arcaneWordsOf, weaponTagsOf, WEAPON_ANY_TARGET, costsForLevel, resolvePreActivation, parsePreActivation, matchEffectsToRemove, removeEffectsAt } from "./effects.mjs";
 import { DEATH_HP, WOUND_LEVELS, woundLevelFor, setWoundLevel } from "./wounds.mjs";
 import { updateActorAsGM, canAffectActor } from "./gm-proxy.mjs";
-import { enchantmentMods, applyEnchantment, pedirItemParaEncantar } from "./enchant.mjs";
+import { enchantmentMods, applyEnchantment, pedirItemParaEncantar, removeEnchantment } from "./enchant.mjs";
 import { privateResource } from "./chat-privacy.mjs";
 // Re-export: outros módulos importam estas funções daqui.
 export { actorRollData, resolveEffectValue };
@@ -803,6 +803,18 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       // Relata para quem chamou: as ações em cadeia com condição "causou
       // dano" precisam saber se algo passou da RD, não só se acertou.
       if (outcome && dealt > 0) outcome.dealtDamage = true;
+      // DRENO: separa o que passou entre a parte BASE e a ESCALONADA.
+      // A RD e os multiplicadores reduzem o conjunto, então cada parte
+      // entra na conta pela fatia que lhe cabe do que realmente passou —
+      // se metade do dano foi aparada, metade de cada parte drena.
+      if (outcome && dealt > 0) {
+        const parteBase = total + sizeDmg + enchDmg + tagDmg;
+        const parteEscalada = scaling || 0;
+        const antes = parteBase + parteEscalada;
+        const fatia = antes > 0 ? dealt / antes : 0;
+        outcome.drainBase += parteBase * fatia;
+        outcome.drainScaling += parteEscalada * fatia;
+      }
       const typeLabel = dmgTypeLabel(type);
       const scaleNote = scaling ? ` <span class="lig-scale">(+${scaling} escalonado)</span>` : "";
       const typeNote = isHp && typeLabel ? " " + typeLabel : "";
@@ -909,6 +921,49 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
         applyNote = `<div class="lig-dmg-applied muted">${relayFailNote(applied)}</div>`;
       }
       healText = `<div class="lig-atk-heal">${resWord}: <strong>${amount}</strong>${scaleNote}</div>${applyNote}`;
+    }
+  }
+
+  // REMOVE efeitos ativos do alvo (dissipar / purificar), quando acerta.
+  // Roda ANTES de aplicar os novos: uma ação que tira o veneno e põe uma
+  // bênção no lugar faz as duas coisas na ordem esperada.
+  let remText = "";
+  const remList = (action.removesEffects || []).filter((r) => r && r.enabled !== false);
+  if (acertou && remList.length) {
+    if (canAffectActor(tActor)) {
+      let lista = foundry.utils.deepClone(tActor.system?.appliedEffects || []);
+      let condicoes = foundry.utils.deepClone(tActor.system?.conditions || []);
+      const tirados = [];
+      let mexeuCondicoes = false;
+      for (const regra of remList) {
+        const limite = resolveEffectValue(regra.count, caster);
+        const indices = matchEffectsToRemove(lista, regra, {
+          casterName: caster?.name || "", limite,
+        });
+        if (!indices.length) continue;
+        const r = removeEffectsAt(lista, indices, condicoes);
+        lista = r.restantes;
+        condicoes = r.condicoes;
+        if (r.mudouCondicoes) mexeuCondicoes = true;
+        for (const ae of r.removidos) {
+          tirados.push(ae?.label || "Efeito");
+          // Um efeito que encantava um item leva o encantamento junto.
+          if (ae?.enchantItemId && ae?.fxId) {
+            const encantado = tActor.items?.get?.(ae.enchantItemId);
+            if (encantado) { try { await removeEnchantment(encantado, ae.fxId); } catch (e) { /* segue */ } }
+          }
+        }
+      }
+      if (tirados.length) {
+        const upd = { "system.appliedEffects": lista };
+        if (mexeuCondicoes) upd["system.conditions"] = condicoes;
+        await updateActorAsGM(tActor, upd);
+        remText = `<div class="lig-atk-fx lig-atk-dispel">Efeitos removidos: <strong>${tirados.join(", ")}</strong></div>`;
+      } else {
+        remText = `<div class="lig-atk-fx muted">Nada a remover.</div>`;
+      }
+    } else {
+      remText = `<div class="lig-atk-fx muted">Efeitos a remover — nenhum Mestre conectado para alterar o alvo.</div>`;
     }
   }
 
@@ -1040,7 +1095,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
     }
   }
 
-  return dmgText + healText + fxText;
+  return dmgText + healText + remText + fxText;
 }
 
 /**
@@ -1893,7 +1948,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
       }
 
       // O desfecho por alvo alimenta as condições das ações em cadeia.
-      const outcome = { dealtDamage: false, healed: false };
+      const outcome = { dealtDamage: false, healed: false, drainBase: 0, drainScaling: 0 };
       const detail = await resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls, healRoll, atkTotal, defTotal, dcTotal: effectiveDCFor(tActor), acertou, cfg, attackerMods: atkCond, caster: actor, item, outcome });
       hits.push({ actor: tActor, acertou, isSelf, ...outcome });
       lines.push(`<div class="lig-atk-target"><div class="lig-atk-line"><strong>${tActor.name}</strong>${defInfo}</div>${detail}</div>`);
@@ -1915,6 +1970,40 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
       const hRes = action.healResource || "hp";
       const hWord = { hp: "Cura", mp: "Mana recuperada", heroic: "Heroico recuperado", hpTemp: "Sobrevida" }[hRes];
       lines.push(`<div class="lig-atk-heal">${hWord}: <strong>${healRoll.total}</strong></div>`);
+    }
+  }
+
+  // ---- DRENO: o dano causado volta como recurso para quem conjurou ----
+  // Soma o que passou em TODOS os alvos atingidos, então uma área drena de
+  // cada um. Roda depois dos alvos e antes do movimento, para que a linha
+  // apareça junto do dano que a originou.
+  if (action.drain?.enabled) {
+    const somaBase = hits.reduce((s, h) => s + (h.drainBase || 0), 0);
+    const somaEscala = hits.reduce((s, h) => s + (h.drainScaling || 0), 0);
+    const modo = action.drain.from || "both";
+    const bruto = modo === "base" ? somaBase
+      : modo === "scaling" ? somaEscala
+        : somaBase + somaEscala;
+    // Campo vazio vale 1 (converte tudo). Sem isso, limpar o campo zeraria
+    // o dreno em silêncio, que não é o que se espera ao apagar uma
+    // proporção — quem quiser desligar desmarca a caixa.
+    const taxaBruta = String(action.drain.ratio ?? "").trim();
+    const taxa = taxaBruta === "" ? 1 : resolveEffectValue(taxaBruta, actor);
+    const recuperar = Math.max(0, Math.floor(bruto * (Number.isFinite(taxa) ? taxa : 1)));
+    if (recuperar > 0) {
+      const recurso = action.drain.resource || "mp";
+      const curto = { hp: "PV", mp: "PM", heroic: "PH", hpTemp: "Sobrevida" }[recurso] || recurso;
+      let nota = "";
+      if (recurso === "hpTemp") {
+        const r = await applyTempHpToActor(actor, recuperar, { stack: false });
+        nota = r.applied ? ` <span class="lig-cond-note">(${curto}: ${r.newTemp})</span>` : "";
+      } else {
+        const r = await applyHealingToActor(actor, recuperar, recurso);
+        nota = r.applied ? ` ${privateResource(actor, `(${curto}: ${r.newValue}/${r.newMax})`, recurso)}` : "";
+      }
+      const comoLabel = { base: "dano base", scaling: "dano escalonado", both: "dano causado" }[modo];
+      const taxaNota = taxa !== 1 ? ` <span class="lig-scale">(×${taxa})</span>` : "";
+      lines.push(`<div class="lig-atk-drain">Drenou do ${comoLabel}${taxaNota}: <strong>+${recuperar}</strong> ${curto}${nota}</div>`);
     }
   }
 
