@@ -110,7 +110,8 @@ export async function processRegenAtTurnStart(actor) {
   for (const ae of actor.system?.appliedEffects || []) {
     if (ae?.disabled) continue;
     const th = ae?.tickHeal || {};
-    const amount = Number(th.amount) || 0;
+    // Como o dano contínuo: número ou fórmula do portador.
+    const amount = resolveEffectValue(th.amount, actor);
     if (amount <= 0) continue;
     const resource = th.resource || "hp";
     const applied = await applyHealingToActor(actor, amount, resource);
@@ -131,7 +132,8 @@ export async function processTickDamageAtTurnStart(actor) {
   for (const ae of actor.system?.appliedEffects || []) {
     if (ae?.disabled) continue;
     const tick = ae?.tickDamage || {};
-    const amount = Number(tick.amount) || 0;
+    // Aceita número ou fórmula com as @variáveis de quem carrega o efeito.
+    const amount = resolveEffectValue(tick.amount, actor);
     if (amount <= 0) continue;
     const resource = tick.resource || "hp";
     const applied = await applyDamageToActor(actor, amount, resource);

@@ -72,15 +72,18 @@ function appliedEffectsField() {
         // categorias de ataque (attackMelee/attackRanged) entram na CD refeita.
         attackerMelee: new fields.BooleanField({ initial: false }),
       }),
-      // Dano contínuo por rodada aplicado ao portador (0 = nenhum).
+      // Dano contínuo por rodada aplicado ao portador (vazio/0 = nenhum).
+      // Texto para aceitar fórmula com @variáveis do PORTADOR, como os demais
+      // campos de valor do sistema. Um efeito vindo de uma ação grava aqui um
+      // número já resolvido com os dados de quem conjurou.
       tickDamage: new fields.SchemaField({
-        amount: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+        amount: new fields.StringField({ blank: true, initial: "" }),
         type: new fields.StringField({ blank: true, initial: "" }),
         resource: new fields.StringField({ initial: "hp", choices: ["hp", "mp", "heroic"] }),
       }),
       // Regeneração contínua por rodada (contraparte do dano contínuo).
       tickHeal: new fields.SchemaField({
-        amount: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+        amount: new fields.StringField({ blank: true, initial: "" }),
         resource: new fields.StringField({ initial: "hp", choices: ["hp", "mp", "heroic"] }),
       }),
       // Sobrevida VINCULADA concedida por este efeito (0 = nenhuma).
@@ -127,13 +130,34 @@ function resourceField() {
   });
 }
 
+/**
+ * MIGRAÇÃO dos valores de dano contínuo e regeneração.
+ *
+ * Os campos eram numéricos e passaram a ser texto, para aceitar fórmula com
+ * @variáveis. Um número guardado vira o texto equivalente, e o zero — que
+ * antes queria dizer "nenhum" — vira vazio, que é como o nada se escreve
+ * agora. Nada muda de comportamento: zero e vazio não causam dano.
+ */
+function migrateTickAmounts(source) {
+  if (!source || !Array.isArray(source.appliedEffects)) return source;
+  for (const ae of source.appliedEffects) {
+    for (const campo of ["tickDamage", "tickHeal"]) {
+      const bloco = ae?.[campo];
+      if (!bloco || typeof bloco !== "object") continue;
+      if (typeof bloco.amount === "number") bloco.amount = bloco.amount > 0 ? String(bloco.amount) : "";
+    }
+  }
+  return source;
+}
+
 /* ================================================================== */
 /*  PERSONAGEM                                                         */
 /* ================================================================== */
 export class PersonagemData extends foundry.abstract.TypeDataModel {
   static migrateData(source) {
-    return migrateEffectTargets(super.migrateData(source));
+    return migrateTickAmounts(migrateEffectTargets(super.migrateData(source)));
   }
+
   static defineSchema() {
     return {
       // Identidade

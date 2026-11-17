@@ -95,6 +95,11 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
   // reconstrói o array a partir do form.
   #fxOpInProgress = false;
 
+  // Ids dos efeitos aplicados NA ORDEM EM QUE A FICHA FOI DESENHADA. O
+  // formulário identifica cada efeito pela posição; se a lista mudar antes
+  // da gravação, é por estes ids que a mesclagem reencontra o efeito certo.
+  #renderedFxIds = [];
+
   /**
    * Reconstrói system.appliedEffects (array) a partir do form e protege-o
    * contra ser apagado quando uma operação programática está em curso.
@@ -129,12 +134,66 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
               ae.effects = Object.keys(ae.effects).sort((a, b) => Number(a) - Number(b)).map((k) => ae.effects[k]);
             }
           }
+          sys.appliedEffects = this.#mergeAppliedEffects(sys.appliedEffects);
         }
       } else {
         delete sys.appliedEffects;
       }
     }
     return submitData;
+  }
+
+  /**
+   * Mescla os efeitos aplicados vindos do FORMULÁRIO sobre os que já estão
+   * gravados, preservando o que o formulário não tem como enviar.
+   *
+   * A aba Efeitos & Condições mostra só parte de cada efeito: rótulo,
+   * duração, o primeiro modificador, o visual e a rolagem de encerramento.
+   * Tudo o mais — dano contínuo, regeneração, sobrevida vinculada, o id da
+   * barreira, a animação puxada, a condição marcada, o item encantado — não
+   * tem input nenhum. Sem esta mesclagem o DataModel repõe esses campos pelos
+   * valores iniciais a cada gravação, e qualquer digitada na ficha (mudar os
+   * PV à mão, por exemplo) zerava o dano contínuo, estourava as barreiras e
+   * apagava as animações.
+   *
+   * Também preserva os modificadores além do primeiro: a ficha edita apenas
+   * `effects.0`, mas um efeito vindo de uma ação pode trazer vários.
+   *
+   * @param {Array<object>} doForm
+   * @returns {Array<object>}
+   */
+  #mergeAppliedEffects(doForm) {
+    const guardados = this.document.system?.appliedEffects || [];
+    // O formulário identifica cada efeito pela POSIÇÃO. Se a lista tiver
+    // mudado entre o desenho da ficha e a gravação (o Mestre aplicou um
+    // efeito no meio, por exemplo), a posição aponta para outro efeito e a
+    // mesclagem misturaria campos de dois. O id guardado resolve: quando a
+    // ficha desenhada trazia um, a mesclagem procura por ele primeiro.
+    const porId = new Map(guardados.filter((ae) => ae?.fxId).map((ae) => [ae.fxId, ae]));
+    const idsNoForm = this.#renderedFxIds || [];
+    return doForm.map((novo, i) => {
+      const idEsperado = idsNoForm[i];
+      const velho = (idEsperado && porId.get(idEsperado)) || guardados[i];
+      if (!velho) return novo;                    // efeito novo: nada a preservar
+      // A posição aponta para OUTRO efeito e não há id para reencontrar o
+      // certo: é mais seguro não mesclar do que misturar dois efeitos.
+      if (idEsperado && velho.fxId && velho.fxId !== idEsperado) return novo;
+      const base = foundry.utils.deepClone(velho.toObject?.() ?? velho);
+
+      // Os modificadores: o form traz só o primeiro; os demais ficam.
+      const efeitosVelhos = Array.isArray(base.effects) ? base.effects : [];
+      const efeitosNovos = Array.isArray(novo.effects) ? novo.effects : [];
+      const efeitos = efeitosVelhos.map((e, j) =>
+        (efeitosNovos[j] ? foundry.utils.mergeObject(e, efeitosNovos[j], { inplace: false }) : e),
+      );
+      for (let j = efeitosVelhos.length; j < efeitosNovos.length; j++) efeitos.push(efeitosNovos[j]);
+
+      const semEfeitos = { ...novo };
+      delete semEfeitos.effects;
+      const juntado = foundry.utils.mergeObject(base, semEfeitos, { inplace: false });
+      juntado.effects = efeitos;
+      return juntado;
+    });
   }
 
   /** @override */
@@ -260,6 +319,9 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       bloqueio: "Bloqueio", esquiva: "Esquiva", conjuracao: "Conjuração", iniciativa: "Iniciativa", deslocamento: "Deslocamento",
     };
     const dmgTargets = { all: "Qualquer", ...(CONFIG.LIGEIA?.damageTypes || {}) };
+    // Listas dos campos de dano contínuo / regeneração por rodada.
+    context.damageTypeChoices = { ...(CONFIG.LIGEIA?.damageTypes || {}) };
+    context.tickResourceChoices = { hp: "PV", mp: "PM", heroic: "PH" };
     // Condições disponíveis como alvo do efeito do tipo "Condição".
     const condTargets = Object.fromEntries(
       Object.entries(CONFIG.LIGEIA?.conditions || {}).map(([id, d]) => [id, d.label || id]),
@@ -286,6 +348,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
         default: return rollTargets;
       }
     };
+    this.#renderedFxIds = (sys.appliedEffects || []).map((ae) => ae?.fxId || "");
     context.appliedEffects = (sys.appliedEffects || []).map((ae, idx) => {
       const e0 = (ae.effects && ae.effects[0]) || {};
       const type0 = e0.type || "bonus";
@@ -315,7 +378,10 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
             .join(", "),
           // Etiquetas extras: barreira (sobrevida vinculada) e regeneração
           (Number(ae.tempHp) || 0) > 0 ? `Barreira ${ae.tempHp}` : "",
-          (ae.tickHeal?.amount || 0) > 0
+          resolveEffectValue(ae.tickDamage?.amount, actor) > 0
+            ? `Dano ${ae.tickDamage.amount} ${({ hp: "PV", mp: "PM", heroic: "PH" })[ae.tickDamage.resource || "hp"]}/rodada`
+            : "",
+          resolveEffectValue(ae.tickHeal?.amount, actor) > 0
             ? `Regen +${ae.tickHeal.amount} ${({ hp: "PV", mp: "PM", heroic: "PH" })[ae.tickHeal.resource || "hp"]}/rodada`
             : "",
         ].filter(Boolean).join(" · "),
@@ -635,6 +701,9 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       disabled: false,
       duration: { rounds: 0, remaining: 0 },
       endRoll: { enabled: false, attr: "mente", dc: 0 },
+      // Identidade própria desde o começo: é por ela que a mesclagem do
+      // formulário reencontra o efeito se a lista mudar de ordem.
+      fxId: foundry.utils.randomID(),
       source: "",
     });
     this.#fxOpInProgress = true;
@@ -703,24 +772,26 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
 
     // Dano contínuo por rodada (ex.: Corrosão)
     const tick = ae.tickDamage || {};
-    if ((tick.amount || 0) > 0) {
-      const applied = await applyDamageToActor(this.document, tick.amount, tick.resource || "hp");
+    const tickVal = resolveEffectValue(tick.amount, this.document);
+    if (tickVal > 0) {
+      const applied = await applyDamageToActor(this.document, tickVal, tick.resource || "hp");
       const resLabel = { hp: "PV", mp: "PM", heroic: "PH" }[tick.resource || "hp"];
       const typeLabel = tick.type ? (CONFIG.LIGEIA?.damageTypes?.[tick.type] || tick.type) : "";
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor: this.document }),
-        content: `<div class="ligeia-roll-flavor"><strong>${this.document.name}</strong> — <em>${ae.label}</em>: ${tick.amount} de dano${typeLabel ? " " + typeLabel : ""}${applied.applied ? ` (${resLabel}: ${applied.newValue}/${applied.newMax})` : ""}</div>`,
+        content: `<div class="ligeia-roll-flavor"><strong>${this.document.name}</strong> — <em>${ae.label}</em>: ${tickVal} de dano${typeLabel ? " " + typeLabel : ""}${applied.applied ? ` (${resLabel}: ${applied.newValue}/${applied.newMax})` : ""}</div>`,
       });
     }
 
     // Regeneração por rodada (contraparte do dano contínuo)
     const th = ae.tickHeal || {};
-    if ((th.amount || 0) > 0) {
-      const healed = await applyHealingToActor(this.document, th.amount, th.resource || "hp");
+    const healVal = resolveEffectValue(th.amount, this.document);
+    if (healVal > 0) {
+      const healed = await applyHealingToActor(this.document, healVal, th.resource || "hp");
       const hLabel = { hp: "PV", mp: "PM", heroic: "PH" }[th.resource || "hp"];
       await ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor: this.document }),
-        content: `<div class="ligeia-roll-flavor"><strong>${this.document.name}</strong> — <em>${ae.label}</em>: <span class="lig-atk-heal">regenera <strong>${th.amount}</strong> ${hLabel}</span>${healed.applied ? ` (${hLabel}: ${healed.newValue}/${healed.newMax})` : ""}</div>`,
+        content: `<div class="ligeia-roll-flavor"><strong>${this.document.name}</strong> — <em>${ae.label}</em>: <span class="lig-atk-heal">regenera <strong>${healVal}</strong> ${hLabel}</span>${healed.applied ? ` (${hLabel}: ${healed.newValue}/${healed.newMax})` : ""}</div>`,
       });
     }
 

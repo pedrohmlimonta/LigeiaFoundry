@@ -603,6 +603,37 @@
               <input type="text" value="{{#if ae.duration.rounds}}{{ae.duration.rounds}}{{/if}}" placeholder="permanente" title="Vazio ou 0 = permanente (dura até ser removido). Um número = quantas rodadas o efeito dura, descontando 1 no início de cada turno do personagem." name="system.appliedEffects.{{ae.index}}.duration.rounds"/>
             </label>
           </div>
+
+          {{!-- DANO CONTÍNUO e REGENERAÇÃO por rodada: aplicados no início do
+                turno de quem carrega o efeito. --}}
+          <div class="lig-applied-config lig-tick-config">
+            <label>Dano por rodada
+              <input type="text" name="system.appliedEffects.{{ae.index}}.tickDamage.amount" value="{{#if ae.tickDamage.amount}}{{ae.tickDamage.amount}}{{/if}}" placeholder="0" title="Dano aplicado ao portador no início de cada turno dele. Aceita fórmula com @variáveis do portador."/>
+            </label>
+            {{#if ae.tickDamage.amount}}
+            <label>Tipo
+              <select name="system.appliedEffects.{{ae.index}}.tickDamage.type">
+                <option value="">—</option>
+                {{selectOptions ../damageTypeChoices selected=ae.tickDamage.type}}
+              </select>
+            </label>
+            <label>Recurso
+              <select name="system.appliedEffects.{{ae.index}}.tickDamage.resource">
+                {{selectOptions ../tickResourceChoices selected=ae.tickDamage.resource}}
+              </select>
+            </label>
+            {{/if}}
+            <label>Regenera por rodada
+              <input type="text" name="system.appliedEffects.{{ae.index}}.tickHeal.amount" value="{{#if ae.tickHeal.amount}}{{ae.tickHeal.amount}}{{/if}}" placeholder="0" title="Recurso recuperado pelo portador no início de cada turno dele. Aceita fórmula com @variáveis do portador."/>
+            </label>
+            {{#if ae.tickHeal.amount}}
+            <label>Recurso
+              <select name="system.appliedEffects.{{ae.index}}.tickHeal.resource">
+                {{selectOptions ../tickResourceChoices selected=ae.tickHeal.resource}}
+              </select>
+            </label>
+            {{/if}}
+          </div>
           {{#if ae.fxAaName}}
           <div class="lig-macro-bound">
             <span class="lig-macro-name">🎞️ {{ae.fxAaName}}</span>

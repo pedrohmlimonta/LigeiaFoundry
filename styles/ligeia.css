@@ -2014,3 +2014,10 @@ select.lig-actlevel:hover {
 
 .lig-cost-preview-level { opacity: 0.85; }
 .lig-cost-preview-val { text-align: right; }
+
+/* Dano contínuo e regeneração, na aba Efeitos & Condições */
+.lig-tick-config {
+  border-top: 1px dashed var(--lig-border);
+  margin-top: 0.3rem;
+  padding-top: 0.4rem;
+}
