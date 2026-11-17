@@ -368,6 +368,38 @@
       {{/unless}}
     </div>
 
+    {{!-- AÇÕES EM CADEIA: o que dispara DEPOIS, conforme o desfecho --}}
+    <div class="lig-chain-editor">
+      <div class="lig-subtitle">
+        Ações em cadeia (depois desta se resolver)
+        <button type="button" class="lig-mini-btn" data-action="addChainAction" data-action-index="{{i}}">+ cadeia</button>
+      </div>
+      {{#each act.chainActions as |elo ci|}}
+      <div class="lig-chain-row">
+        <select name="system.actions.{{i}}.chainActions.{{ci}}.ref" class="lig-chain-select">
+          {{{elo.optionsHtml}}}
+        </select>
+        <select name="system.actions.{{i}}.chainActions.{{ci}}.when" class="lig-chain-when-sel" title="Quando esta ação encadeada dispara, conforme o desfecho da ação acima.">
+          {{selectOptions ../../chainWhenChoices selected=elo.when}}
+        </select>
+        <select name="system.actions.{{i}}.chainActions.{{ci}}.targets" class="lig-chain-tgt" title="Em quem a ação encadeada age.">
+          {{selectOptions ../../chainTargetChoices selected=elo.targets}}
+        </select>
+        <label class="lig-inline-check" title="Ativa">
+          <input type="checkbox" name="system.actions.{{i}}.chainActions.{{ci}}.enabled" {{checked elo.enabled}}/>
+        </label>
+        <button type="button" class="lig-mini-btn danger" data-action="removeChainAction" data-action-index="{{i}}" data-index="{{ci}}" title="Remover">✕</button>
+      </div>
+      {{#if elo.aviso}}<p class="lig-hint lig-preact-warn">⚠ {{elo.aviso}}</p>{{/if}}
+      {{/each}}
+      {{#if act.chainActions.length}}
+      <p class="lig-hint">Disparam depois desta ação resolver, na ordem. Cada uma roda por
+        inteiro — com os próprios custos, rolagem e efeitos.</p>
+      {{else}}
+      <div class="lig-empty">Nenhuma ação dispara depois desta.</div>
+      {{/if}}
+    </div>
+
     <div class="lig-applies-fx-editor">
       <div class="lig-subtitle">
         Efeitos aplicados ao alvo (buff / debuff / condição)

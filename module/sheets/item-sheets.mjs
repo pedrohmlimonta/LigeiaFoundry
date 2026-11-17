@@ -8,6 +8,7 @@ import { WORDS_BY_TIER, WORD_TARGET_PREFIX, tipagensComoAlvos, weaponTagsOf, wea
          LEVEL_SEQUENCE, levelMeets, activationLevelOf,
          buildPreActivationRef, parsePreActivation, resolvePreActivation } from "../helpers/effects.mjs";
 import { activateTagInputs } from "../apps/tag-input.mjs";
+import { CHAIN_WHEN_LABELS } from "../helpers/dice.mjs";
 import { removeEnchantment } from "../helpers/enchant.mjs";
 
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -201,6 +202,8 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       removeEnchantment: LigeiaItemSheetBase._onRemoveEnchantment,
       addPreActivation: LigeiaItemSheetBase._onAddPreActivation,
       removePreActivation: LigeiaItemSheetBase._onRemovePreActivation,
+      addChainAction: LigeiaItemSheetBase._onAddChainAction,
+      removeChainAction: LigeiaItemSheetBase._onRemoveChainAction,
       clearFxAnim: LigeiaItemSheetBase._onClearFxAnim,
       clearAnim: LigeiaItemSheetBase._onClearAnim,
       toggleAnim: LigeiaItemSheetBase._onToggleAnim,
@@ -307,6 +310,13 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
             arr[i].preActivations = indexedToArray(pa);
           } else if (pa === undefined) {
             arr[i].preActivations = foundry.utils.deepClone(cur.preActivations || []);
+          }
+          // Ações em cadeia: mesmo tratamento.
+          const ca = arr[i].chainActions;
+          if (ca && !Array.isArray(ca) && typeof ca === "object") {
+            arr[i].chainActions = indexedToArray(ca);
+          } else if (ca === undefined) {
+            arr[i].chainActions = foundry.utils.deepClone(cur.chainActions || []);
           }
           // Movimento: os subcampos só aparecem no form quando visíveis, então
           // mesclamos com o que já está salvo para não perder configuração.
@@ -577,6 +587,17 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     const ator = item.parent?.documentName === "Actor" ? item.parent : null;
     context.hasParentActor = !!ator;
     const arvorePre = ator ? opcoesDeAtivacaoPrevia(ator, item) : [];
+    // A cadeia só encadeia AÇÕES — ligar um item ou um efeito solto é o que
+    // as ativações prévias fazem, antes da rolagem.
+    const arvoreAcoes = arvorePre
+      .map((g) => ({ ...g, entradas: g.entradas.filter((e) => e.ref.startsWith("action|")) }))
+      .filter((g) => g.entradas.length);
+    context.chainWhenChoices = CHAIN_WHEN_LABELS;
+    context.chainTargetChoices = {
+      own: "Alvos dela mesma",
+      same: "Os mesmos desta",
+      hitOnly: "Só os acertados",
+    };
 
     context.actions = (item.system?.actions || []).map((a) => ({
       ...a,
@@ -584,6 +605,17 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       hasAnim: !!(a.aaConfig && typeof a.aaConfig === "object" && Object.keys(a.aaConfig).length > 0),
       // Cada linha carrega o próprio HTML de opções, com a dela marcada —
       // um único texto compartilhado não saberia qual está selecionada.
+      chainActions: (a.chainActions || []).map((elo) => {
+        const escolhido = resolvePreActivation(ator, elo.ref);
+        const alvoPerdido = !!elo.ref && !escolhido;
+        return {
+          ...elo,
+          optionsHtml: htmlDeOpcoesPre(arvoreAcoes, elo.ref, alvoPerdido),
+          aviso: alvoPerdido
+            ? `"${parsePreActivation(elo.ref).itemName || elo.ref}" não está nesta ficha.`
+            : "",
+        };
+      }),
       preActivations: (a.preActivations || []).map((pre) => {
         const escolhido = resolvePreActivation(ator, pre.ref);
         const alvoPerdido = !!pre.ref && !escolhido;
@@ -912,6 +944,27 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     const actions = foundry.utils.deepClone(this.document.system.actions || []);
     if (!actions[ai]?.preActivations) return;
     actions[ai].preActivations.splice(pi, 1);
+    await this._replaceActions(actions);
+  }
+
+  /* ---- Ações em cadeia (disparam depois) ---- */
+
+  static async _onAddChainAction(event, target) {
+    const ai = Number(target.dataset.actionIndex);
+    const actions = foundry.utils.deepClone(this.document.system.actions || []);
+    if (!actions[ai]) return;
+    actions[ai].chainActions = actions[ai].chainActions || [];
+    // "Se acertar" é o encadeamento mais comum (o golpe que puxa a cura).
+    actions[ai].chainActions.push({ ref: "", when: "hit", targets: "own", enabled: true });
+    await this._replaceActions(actions);
+  }
+
+  static async _onRemoveChainAction(event, target) {
+    const ai = Number(target.dataset.actionIndex);
+    const ci = Number(target.dataset.index);
+    const actions = foundry.utils.deepClone(this.document.system.actions || []);
+    if (!actions[ai]?.chainActions) return;
+    actions[ai].chainActions.splice(ci, 1);
     await this._replaceActions(actions);
   }
 

@@ -763,7 +763,7 @@ export async function applyConditionsToActor(actor, ids = []) {
  * personagem (self/area/aura com includeSelf). `acertou` indica se a defesa
  * falhou (ou se não houve defesa, em self/auto).
  */
-async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls = [], healRoll = null, atkTotal, defTotal, dcTotal = null, acertou, cfg, attackerMods, caster, item = null }) {
+async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls = [], healRoll = null, atkTotal, defTotal, dcTotal = null, acertou, cfg, attackerMods, caster, item = null, outcome = null }) {
   let dmgText = "";
 
   const hasExtra = Array.isArray(extraDamageRolls) && extraDamageRolls.length > 0;
@@ -800,6 +800,9 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       amount = (amount + vuln.flat) * vuln.mult;
       amount = amount * takenMult;
       const dealt = Math.max(0, Math.floor(amount));
+      // Relata para quem chamou: as ações em cadeia com condição "causou
+      // dano" precisam saber se algo passou da RD, não só se acertou.
+      if (outcome && dealt > 0) outcome.dealtDamage = true;
       const typeLabel = dmgTypeLabel(type);
       const scaleNote = scaling ? ` <span class="lig-scale">(+${scaling} escalonado)</span>` : "";
       const typeNote = isHp && typeLabel ? " " + typeLabel : "";
@@ -892,6 +895,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       const resWord = { hp: "Cura", mp: "Mana recuperada", heroic: "Heroico recuperado" }[hResource];
       const resShort = { hp: "PV", mp: "PM", heroic: "PH" }[hResource];
       const applied = await applyHealingToActor(tActor, amount, hResource);
+      if (outcome && (applied.gained ?? 0) > 0) outcome.healed = true;
       if (applied.applied) {
         const overNote = applied.gained < applied.heal ? ` <span class="lig-cond-note">(+${applied.heal - applied.gained} acima do máximo)</span>` : "";
         const woundNote = applied.woundTo
@@ -1194,6 +1198,111 @@ export async function runPreActivations({ actor, item, action, hidden, preChain 
   if (ligados.length) partes.push(`<strong>Ativado antes:</strong> ${ligados.join(", ")}`);
   if (avisos.length) partes.push(`<span class="muted">não ativado: ${avisos.join(", ")}</span>`);
   return `<div class="lig-preact">${partes.join(" · ")}</div>`;
+}
+
+/* ======================================================================== */
+/*  Ações em cadeia                                                         */
+/* ======================================================================== */
+
+/** Rótulos das condições de disparo, para o chat e para a ficha. */
+export const CHAIN_WHEN_LABELS = {
+  always: "Sempre",
+  hit: "Se acertar",
+  miss: "Se errar",
+  crit: "Se for crítico",
+  damage: "Se causar dano",
+  heal: "Se curar",
+};
+
+/**
+ * A condição de disparo de uma ação encadeada foi satisfeita?
+ *
+ * @param {string} when   always | hit | miss | crit | damage | heal
+ * @param {object} desfecho  { hits, isCrit }
+ * @returns {boolean}
+ */
+export function chainConditionMet(when, { hits = [], isCrit = false } = {}) {
+  // Para "acertou"/"errou", o que conta são os ALVOS — atingir a si mesmo
+  // numa área não torna o golpe um acerto nem um erro.
+  const alvos = hits.filter((h) => !h.isSelf);
+  const base = alvos.length ? alvos : hits;
+  switch (when) {
+    case "always": return true;
+    case "hit": return base.some((h) => h.acertou);
+    case "miss": return base.length > 0 && !base.some((h) => h.acertou);
+    case "crit": return !!isCrit;
+    case "damage": return hits.some((h) => h.dealtDamage);
+    case "heal": return hits.some((h) => h.healed);
+    default: return false;
+  }
+}
+
+/**
+ * Dispara as AÇÕES EM CADEIA depois que esta ação se resolveu.
+ *
+ * Cada entrada aponta para outra ação do personagem e só roda se a condição
+ * dela bater com o desfecho: "se causar dano", "se errar", "se for crítico"...
+ * É o que liga um golpe à cura que vem depois dele.
+ *
+ * A cadeia é a mesma das ativações prévias (`preChain`), então uma ação que
+ * encadeia outra que volta para a primeira roda cada uma só uma vez.
+ *
+ * @returns {Promise<string>} HTML resumindo o que disparou (ou "")
+ */
+export async function runChainActions({ actor, item, action, hidden, preChain, hits, isCrit }) {
+  const lista = (action?.chainActions || []).filter((c) => c && c.enabled !== false && c.ref);
+  if (!lista.length) return "";
+
+  const cadeia = preChain instanceof Set ? preChain : new Set();
+  cadeia.add(`${item?.id || ""}:${(item?.system?.actions || []).indexOf(action)}`);
+
+  const disparadas = [];
+  const avisos = [];
+  for (const elo of lista) {
+    if (!chainConditionMet(elo.when || "hit", { hits, isCrit })) continue;
+
+    const alvo = resolvePreActivation(actor, elo.ref);
+    if (!alvo || alvo.kind !== "action") {
+      const { itemName } = parsePreActivation(elo.ref);
+      avisos.push(`${itemName || "algo"} (não encontrado nesta ficha)`);
+      continue;
+    }
+    const chave = `${alvo.item.id}:${alvo.index}`;
+    if (cadeia.has(chave)) {
+      avisos.push(`${alvo.label} (já estava nesta cadeia)`);
+      continue;
+    }
+    cadeia.add(chave);
+
+    // Em quem a ação encadeada age:
+    //   same    — os mesmos alvos desta ação
+    //   hitOnly — só os que esta acertou
+    //   own     — o que a própria ação definir (alvos atuais, "em si"...)
+    let override = null;
+    if (elo.targets === "same") override = hits.map((h) => h.actor);
+    else if (elo.targets === "hitOnly") override = hits.filter((h) => h.acertou).map((h) => h.actor);
+    if (override && !override.length) {
+      avisos.push(`${alvo.label} (sem alvos para encadear)`);
+      continue;
+    }
+
+    try {
+      await rollItemAction({
+        actor, item: alvo.item, action: alvo.action, hidden,
+        overrideTargets: override, preChain: cadeia,
+      });
+      disparadas.push(`${alvo.label} <span class="lig-chain-when">(${CHAIN_WHEN_LABELS[elo.when] || elo.when})</span>`);
+    } catch (e) {
+      console.warn("Ligeia | falha ao encadear a ação:", alvo.label, e);
+      avisos.push(`${alvo.label} (falhou)`);
+    }
+  }
+
+  if (!disparadas.length && !avisos.length) return "";
+  const partes = [];
+  if (disparadas.length) partes.push(`<strong>Encadeou:</strong> ${disparadas.join(", ")}`);
+  if (avisos.length) partes.push(`<span class="muted">não encadeado: ${avisos.join(", ")}</span>`);
+  return `<div class="lig-chain">${partes.join(" · ")}</div>`;
 }
 
 /** Rótulo curto de um recurso de custo. */
@@ -1783,8 +1892,10 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
         defInfo = isSelf ? ' <span class="lig-outcome self">(em si)</span>' : ' <span class="lig-outcome ok">(automático)</span>';
       }
 
-      const detail = await resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls, healRoll, atkTotal, defTotal, dcTotal: effectiveDCFor(tActor), acertou, cfg, attackerMods: atkCond, caster: actor, item });
-      hits.push({ actor: tActor, acertou, isSelf });
+      // O desfecho por alvo alimenta as condições das ações em cadeia.
+      const outcome = { dealtDamage: false, healed: false };
+      const detail = await resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls, healRoll, atkTotal, defTotal, dcTotal: effectiveDCFor(tActor), acertou, cfg, attackerMods: atkCond, caster: actor, item, outcome });
+      hits.push({ actor: tActor, acertou, isSelf, ...outcome });
       lines.push(`<div class="lig-atk-target"><div class="lig-atk-line"><strong>${tActor.name}</strong>${defInfo}</div>${detail}</div>`);
     }
   } else if (mode === "target") {
@@ -1851,6 +1962,11 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
         ${lines.join("")}
       </div>`;
     const msg = await ChatMessage.create({ speaker, flavor: defFlavor, rolls: defRolls, sound: CONFIG.sounds.dice, ...whisperData });
+    // A cadeia roda DEPOIS da mensagem: a ação encadeada posta a dela em
+    // seguida, na ordem em que as coisas aconteceram.
+    await postarCadeia(await runChainActions({
+      actor, item, action, hidden, preChain, hits, isCrit: !!atkRoll?.isCritSuccess,
+    }));
     return { message: msg, atkTotal, atkRolled: !!atkRoll };
   }
 
@@ -1865,5 +1981,14 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
       ${lines.join("")}
     </div>`;
   const msg = await ChatMessage.create({ speaker, flavor, rolls: [...atkRolls, ...defRolls], sound: CONFIG.sounds.dice, ...whisperData });
+  await postarCadeia(await runChainActions({
+    actor, item, action, hidden, preChain, hits, isCrit: !!atkRoll?.isCritSuccess,
+  }));
   return { message: msg, atkTotal, atkRolled: !!atkRoll };
+
+  /** Anuncia no chat o que a cadeia disparou, se disparou algo. */
+  async function postarCadeia(texto) {
+    if (!texto) return;
+    await ChatMessage.create({ speaker, content: `<div class="ligeia-roll-flavor">${texto}</div>`, ...whisperData });
+  }
 }

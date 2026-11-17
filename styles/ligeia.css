@@ -2021,3 +2021,33 @@ select.lig-actlevel:hover {
   margin-top: 0.3rem;
   padding-top: 0.4rem;
 }
+
+/* Ações em cadeia: o bloco da ação que dispara outras depois */
+.lig-chain-editor {
+  background: var(--lig-bg-raised);
+  border: 1px solid var(--lig-border);
+  border-radius: 4px;
+  padding: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.lig-chain-row {
+  display: grid;
+  grid-template-columns: 2fr 1.1fr 1.2fr auto auto;
+  gap: 0.35rem;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.lig-chain-row > * { min-width: 0; }
+
+/* No chat: a linha que conta o que a cadeia disparou */
+.lig-chain {
+  font-size: 0.8rem;
+  margin: 0.15rem 0;
+}
+
+.lig-chain-when {
+  opacity: 0.75;
+  font-style: italic;
+}

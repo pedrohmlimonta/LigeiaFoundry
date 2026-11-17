@@ -312,6 +312,41 @@ export function actionEntryField() {
       }),
       { initial: [] },
     ),
+    // AÇÕES EM CADEIA: outras ações do personagem que disparam DEPOIS desta
+    // se resolver, conforme o desfecho dela. É a contraparte das ativações
+    // prévias acima — aquelas ligam o que a ação precisa antes de rolar;
+    // estas reagem ao que a ação conseguiu.
+    //
+    // Exemplo: um golpe que, ao causar dano, dispara a ação de se curar.
+    chainActions: new fields.ArrayField(
+      new fields.SchemaField({
+        // Mesma referência codificada das ativações prévias, sempre do tipo
+        // "action" (ver parsePreActivation em helpers/effects.mjs).
+        ref: new fields.StringField({ blank: true, initial: "" }),
+        // QUANDO dispara:
+        //   always — sempre que a ação é usada
+        //   hit    — acertou pelo menos um alvo
+        //   miss   — não acertou nenhum
+        //   crit   — a rolagem foi crítica
+        //   damage — causou dano de fato (passou da RD)
+        //   heal   — curou alguém de fato
+        when: new fields.StringField({
+          required: false,
+          initial: "hit",
+          choices: ["always", "hit", "miss", "crit", "damage", "heal"],
+        }),
+        // Em quem a ação encadeada age: nos mesmos alvos que esta atingiu,
+        // ou nos que ela mesma escolher (alvos atuais / modo próprio dela,
+        // como "em si").
+        targets: new fields.StringField({
+          required: false,
+          initial: "own",
+          choices: ["same", "hitOnly", "own"],
+        }),
+        enabled: new fields.BooleanField({ initial: true }),
+      }),
+      { initial: [] },
+    ),
     // Efeitos aplicados ao ALVO quando a ação acerta. Cada um é como um
     // efeito de habilidade (qualquer tipo, incluindo "condition") e vira um
     // "efeito ativo" na ficha do alvo, com duração e resistência por rodada.
