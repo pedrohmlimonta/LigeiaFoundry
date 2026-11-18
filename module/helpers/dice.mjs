@@ -42,7 +42,7 @@ import { enchantmentMods, applyEnchantment, pedirItemParaEncantar, removeEnchant
 import { privateResource } from "./chat-privacy.mjs";
 // Re-export: outros módulos importam estas funções daqui.
 export { actorRollData, resolveEffectValue };
-import { promptRollConfig, shouldPromptRoll, pedirNovosAlvos } from "../apps/roll-dialog.mjs";
+import { promptRollConfig, shouldPromptRoll, pedirAlvoPorClique } from "../apps/roll-dialog.mjs";
 // template.mjs importa daqui (passesAreaFilter), então trazê-lo no topo
 // fecharia um ciclo de módulos. Ele é carregado sob demanda, só quando uma
 // ação em cadeia precisa reposicionar uma área — ver pedirAlvoDaCadeia.
@@ -1318,7 +1318,9 @@ async function pedirAlvoDaCadeia(actor, item, action) {
   }
 
   if (modo === "target") {
-    const escolhidos = await pedirNovosAlvos(`${item.name} — ${action.label || "Ação"}`);
+    // Um clique = um alvo = a ação sai. Para atingir mais de um, encadeia-se
+    // mais de uma ação — que é justamente o que a cascata faz.
+    const escolhidos = await pedirAlvoPorClique(`${item.name} — ${action.label || "Ação"}`);
     if (escolhidos === null) return { proceed: false, actors: null, templateId: null };
     return { proceed: true, actors: escolhidos, templateId: null };
   }

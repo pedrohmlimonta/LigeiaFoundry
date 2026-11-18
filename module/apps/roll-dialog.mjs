@@ -54,44 +54,89 @@ export function currentTargetActors() {
 }
 
 /**
- * Pede ao jogador que escolha alvos NOVOS no mapa, e espera a confirmação.
+ * Arma a mira: o PRÓXIMO CLIQUE num token escolhe o alvo e já dispara.
  *
- * Usado pelas ações em cadeia marcadas como "escolher na hora": a segunda
- * magia pode ir para outro inimigo que não o da primeira. A janela não
- * bloqueia o mapa — o jogador mira os tokens normalmente e então confirma.
+ * Usado pelas ações em cadeia marcadas como "Variável". Não há janela nem
+ * botão de confirmar — clicar no inimigo É a confirmação, e a ação sai na
+ * hora. Assim, uma cadeia de três ataques vira três cliques seguidos, cada
+ * um num alvo diferente.
  *
- * A mira anterior é LIMPA ao abrir, para que esquecer de mirar não repita
- * o alvo passado sem querer; cancelar devolve a mira como estava.
+ * Botão direito ou Esc pulam a ação. O token clicado também fica marcado
+ * como alvo, para que a animação e o resto do sistema vejam o mesmo que o
+ * jogador acabou de escolher.
  *
- * @param {string} titulo  nome da ação que vai ser executada
- * @param {string} [dica]
- * @returns {Promise<Actor[]|null>} atores escolhidos, ou null se cancelou
+ * @param {string} titulo  nome da ação que vai sair no clique
+ * @returns {Promise<Actor[]|null>} o ator clicado, ou null se desistiu
  */
-export async function pedirNovosAlvos(titulo, dica = "") {
-  const user = game.user;
-  if (!user) return null;
-  const anteriores = Array.from(user.targets ?? []);
-  // Limpa a mira atual (sem avisar os outros clientes de cada passo).
-  for (const t of anteriores) t.setTarget(false, { releaseOthers: false, groupSelection: true });
-  user.broadcastActivity({ targets: [] });
+export async function pedirAlvoPorClique(titulo) {
+  const canvas = globalThis.canvas;
+  if (!canvas?.ready || !canvas.stage || !canvas.tokens) return null;
 
-  const ok = await foundry.applications.api.DialogV2.wait({
-    window: { title: `${titulo} — escolher alvo` },
-    content: `<p class="lig-hint">Mire o(s) alvo(s) no mapa e confirme.${dica ? ` ${dica}` : ""}</p>`,
-    buttons: [
-      { action: "ok", label: "Confirmar alvos", default: true, callback: () => true },
-      { action: "cancel", label: "Pular esta ação", callback: () => false },
-    ],
-    rejectClose: false,
+  return new Promise((resolve) => {
+    let encerrado = false;
+
+    /** Ponto da cena sob o cursor, nas várias versões de PIXI/Foundry. */
+    const ponto = (event) => {
+      try {
+        if (typeof event?.getLocalPosition === "function") return event.getLocalPosition(canvas.tokens);
+        if (event?.data?.getLocalPosition) return event.data.getLocalPosition(canvas.tokens);
+      } catch (e) { /* cai no cursor global */ }
+      return canvas.mousePosition || null;
+    };
+
+    /** O token visível sob aquele ponto (o de cima, se houver pilha). */
+    const tokenEm = (p) => {
+      if (!p) return null;
+      const candidatos = canvas.tokens.placeables.filter(
+        (tk) => tk.visible && tk.actor && tk.bounds?.contains?.(p.x, p.y),
+      );
+      if (!candidatos.length) return null;
+      return candidatos.sort((a, b) => (b.document?.sort ?? 0) - (a.document?.sort ?? 0))[0];
+    };
+
+    const limpar = () => {
+      encerrado = true;
+      canvas.stage.off("mousedown", aoClicar);
+      if (canvas.app?.view) canvas.app.view.oncontextmenu = null;
+      document.removeEventListener("keydown", aoTeclar, true);
+    };
+
+    const desistir = (event) => {
+      event?.preventDefault?.();
+      if (encerrado) return;
+      limpar();
+      resolve(null);
+    };
+
+    const aoTeclar = (event) => {
+      if (event.key !== "Escape") return;
+      // Esc aqui não pode fechar a ficha nem a janela de trás.
+      event.preventDefault();
+      event.stopPropagation();
+      desistir();
+    };
+
+    const aoClicar = (event) => {
+      if (encerrado) return;
+      const tk = tokenEm(ponto(event));
+      if (!tk) {
+        // Clique fora de qualquer token: não é desistência, é mira errada.
+        ui.notifications?.warn("Clique sobre um token. Botão direito ou Esc para pular.");
+        return;
+      }
+      limpar();
+      // Marca o alvo para o resto do sistema ver o mesmo que o jogador.
+      try {
+        tk.setTarget(true, { releaseOthers: true, groupSelection: false });
+      } catch (e) { /* a mira é cosmética aqui; os alvos vão por parâmetro */ }
+      resolve([tk.actor]);
+    };
+
+    canvas.stage.on("mousedown", aoClicar);
+    if (canvas.app?.view) canvas.app.view.oncontextmenu = desistir;
+    document.addEventListener("keydown", aoTeclar, true);
+    ui.notifications?.info(`${titulo}: clique no alvo (botão direito ou Esc para pular).`);
   });
-
-  if (ok !== true) {
-    // Devolve a mira anterior: cancelar não deve deixar o jogador sem alvo.
-    for (const t of anteriores) t.setTarget(true, { releaseOthers: false, groupSelection: true });
-    user.broadcastActivity({ targets: anteriores.map((t) => t.id) });
-    return null;
-  }
-  return currentTargetActors();
 }
 
 /** Lê um valor numérico de um formulário. */
