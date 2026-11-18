@@ -195,6 +195,16 @@ export function actionEntryField() {
       initial: "all",
       choices: ["all", "B", "A", "E"],
     }),
+    // MOSTRAR NA FICHA mesmo sendo alvo de uma cadeia.
+    //
+    // Uma ação que só existe para ser disparada por outra (a cura que vem
+    // depois do golpe) não precisa de botão próprio na ficha — ela sai
+    // sozinha quando a hora chega. Por isso, ser alvo de cadeia esconde o
+    // botão, a menos que esta caixa esteja marcada.
+    //
+    // Só vale para ações encadeadas: uma ação que ninguém encadeia aparece
+    // sempre, marcada ou não.
+    showInSheet: new fields.BooleanField({ initial: false }),
     canRoll: new fields.BooleanField({ initial: true }),
     rollAttr: new fields.StringField({ blank: true, initial: "forca" }),
     rollBonus: new fields.StringField({ blank: true, initial: "0" }),
@@ -385,13 +395,17 @@ export function actionEntryField() {
           initial: "hit",
           choices: ["always", "hit", "miss", "crit", "damage", "heal"],
         }),
-        // Em quem a ação encadeada age: nos mesmos alvos que esta atingiu,
-        // ou nos que ela mesma escolher (alvos atuais / modo próprio dela,
-        // como "em si").
+        // Em quem a ação encadeada age:
+        //   own     — o que a própria ação definir (mira atual, "em si"...)
+        //   same    — os mesmos alvos que esta ação atingiu
+        //   hitOnly — só os que esta acertou
+        //   pick    — VARIÁVEL: pergunta na hora. Antes de executar, o
+        //             jogador mira outro alvo ou reposiciona a área, o que
+        //             permite encadear duas magias em inimigos diferentes.
         targets: new fields.StringField({
           required: false,
           initial: "own",
-          choices: ["same", "hitOnly", "own"],
+          choices: ["same", "hitOnly", "own", "pick"],
         }),
         enabled: new fields.BooleanField({ initial: true }),
       }),

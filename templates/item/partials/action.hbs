@@ -13,6 +13,14 @@
     <div style="margin-bottom: 10px;">
       <input type="text" name="system.actions.{{i}}.label" value="{{act.label}}" placeholder="Nome da ação" class="lig-action-label"/>
     </div>
+    {{!-- Ação encadeada por outra: sem botão na ficha, a menos que peça --}}
+    {{#if act.isChainTarget}}
+    <label class="lig-inline-check lig-show-in-sheet" title="Esta ação é disparada por outra em cadeia, então ela sai sozinha e não precisa de botão na ficha. Marque para dar um botão a ela mesmo assim.">
+      <input type="checkbox" name="system.actions.{{i}}.showInSheet" {{checked act.showInSheet}}/>
+      Mostrar botão na ficha
+      <span class="lig-hint lig-chained-by">— encadeada por {{act.chainedBy}}</span>
+    </label>
+    {{/if}}
     <div class="lig-action-head">
       {{#if ../showEffectLevel}}
       <select name="system.actions.{{i}}.level" class="lig-fx-level" title="A partir de qual nível da habilidade esta ação existe">
@@ -454,7 +462,9 @@
       {{/each}}
       {{#if act.chainActions.length}}
       <p class="lig-hint">Disparam depois desta ação resolver, na ordem. Cada uma roda por
-        inteiro — com os próprios custos, rolagem e efeitos.</p>
+        inteiro — com os próprios custos, rolagem e efeitos.
+        Em <strong>Variável</strong>, o jogo para antes de cada uma para você mirar outro
+        alvo ou reposicionar a área.</p>
       {{else}}
       <div class="lig-empty">Nenhuma ação dispara depois desta.</div>
       {{/if}}

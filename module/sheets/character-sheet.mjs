@@ -9,7 +9,8 @@ import { placeTemplateForAction, scheduleTransientCleanup } from "../helpers/tem
 import { computeXpSpent, computeXpGained } from "../helpers/xp.mjs";
 import { performRest, performMedicalCare, DEATH_HP } from "../helpers/wounds.mjs";
 import { effectIsActive, availableActionsOf, resolveEffectValue, WORD_TARGET_PREFIX, tipagensComoAlvos,
-         activationLevelChoices, activationLevelOf, LEVELED_TYPES } from "../helpers/effects.mjs";
+         activationLevelChoices, activationLevelOf, LEVELED_TYPES,
+         chainTargetKeys, actionShowsInSheet } from "../helpers/effects.mjs";
 import { artRowsFor, tokenArtFor, healthPercent } from "../helpers/token-art.mjs";
 import { pedirItemParaEncantar, applyEnchantment, removeEnchantment } from "../helpers/enchant.mjs";
 import { theatreRowsFor, theatreActive } from "../helpers/theatre-art.mjs";
@@ -393,6 +394,10 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       };
     });
 
+    // Quais ações desta ficha são alvo de alguma cadeia — elas não ganham
+    // botão, a menos que peçam (ver actionShowsInSheet).
+    const alvosDeCadeia = chainTargetKeys(actor);
+
     // Anota em cada efeito de cada item se ele está ativo agora (considerando
     // modo do item, enabled e — para habilidades — o nível adquirido vs.
     // o nível exigido pelo efeito).
@@ -405,10 +410,14 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
         }));
         // Ações disponíveis no nível atual (mantendo o índice original, que
         // é o que a execução usa).
-        item._actionsView = availableActionsOf(item).map(({ action, index }) => ({
-          label: action.label,
-          index,
-        }));
+        // Ações encadeadas não ganham botão: elas saem sozinhas quando a
+        // ação que as chama resolve. Só aparecem se pedirem (showInSheet).
+        item._actionsView = availableActionsOf(item)
+          .filter(({ action, index }) => actionShowsInSheet(item, action, index, alvosDeCadeia))
+          .map(({ action, index }) => ({
+            label: action.label,
+            index,
+          }));
       }
     }
 

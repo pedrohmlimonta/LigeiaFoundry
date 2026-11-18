@@ -53,6 +53,47 @@ export function currentTargetActors() {
   return Array.from(game.user?.targets ?? []).map((t) => t.actor).filter(Boolean);
 }
 
+/**
+ * Pede ao jogador que escolha alvos NOVOS no mapa, e espera a confirmação.
+ *
+ * Usado pelas ações em cadeia marcadas como "escolher na hora": a segunda
+ * magia pode ir para outro inimigo que não o da primeira. A janela não
+ * bloqueia o mapa — o jogador mira os tokens normalmente e então confirma.
+ *
+ * A mira anterior é LIMPA ao abrir, para que esquecer de mirar não repita
+ * o alvo passado sem querer; cancelar devolve a mira como estava.
+ *
+ * @param {string} titulo  nome da ação que vai ser executada
+ * @param {string} [dica]
+ * @returns {Promise<Actor[]|null>} atores escolhidos, ou null se cancelou
+ */
+export async function pedirNovosAlvos(titulo, dica = "") {
+  const user = game.user;
+  if (!user) return null;
+  const anteriores = Array.from(user.targets ?? []);
+  // Limpa a mira atual (sem avisar os outros clientes de cada passo).
+  for (const t of anteriores) t.setTarget(false, { releaseOthers: false, groupSelection: true });
+  user.broadcastActivity({ targets: [] });
+
+  const ok = await foundry.applications.api.DialogV2.wait({
+    window: { title: `${titulo} — escolher alvo` },
+    content: `<p class="lig-hint">Mire o(s) alvo(s) no mapa e confirme.${dica ? ` ${dica}` : ""}</p>`,
+    buttons: [
+      { action: "ok", label: "Confirmar alvos", default: true, callback: () => true },
+      { action: "cancel", label: "Pular esta ação", callback: () => false },
+    ],
+    rejectClose: false,
+  });
+
+  if (ok !== true) {
+    // Devolve a mira anterior: cancelar não deve deixar o jogador sem alvo.
+    for (const t of anteriores) t.setTarget(true, { releaseOthers: false, groupSelection: true });
+    user.broadcastActivity({ targets: anteriores.map((t) => t.id) });
+    return null;
+  }
+  return currentTargetActors();
+}
+
 /** Lê um valor numérico de um formulário. */
 function num(form, name, fallback = 0) {
   const el = form?.elements?.[name];

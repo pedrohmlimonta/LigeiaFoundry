@@ -42,7 +42,10 @@ import { enchantmentMods, applyEnchantment, pedirItemParaEncantar, removeEnchant
 import { privateResource } from "./chat-privacy.mjs";
 // Re-export: outros módulos importam estas funções daqui.
 export { actorRollData, resolveEffectValue };
-import { promptRollConfig, shouldPromptRoll } from "../apps/roll-dialog.mjs";
+import { promptRollConfig, shouldPromptRoll, pedirNovosAlvos } from "../apps/roll-dialog.mjs";
+// template.mjs importa daqui (passesAreaFilter), então trazê-lo no topo
+// fecharia um ciclo de módulos. Ele é carregado sob demanda, só quando uma
+// ação em cadeia precisa reposicionar uma área — ver pedirAlvoDaCadeia.
 import { requestRollConfig } from "./roll-request.mjs";
 
 /**
@@ -1292,6 +1295,38 @@ export function chainConditionMet(when, { hits = [], isCrit = false } = {}) {
   }
 }
 
+/** Modos de alvo que desenham uma REGIÃO no mapa (área, linha, cone...). */
+const MODOS_DE_REGIAO = ["area", "aura", "line", "cone", "lineCustom"];
+
+/**
+ * Pergunta o alvo da ação encadeada, do jeito que ela precisa.
+ *
+ * Uma ação de ÁREA pede o template de novo: o jogador reposiciona o círculo
+ * (ou o cone, ou a linha) onde quiser, e os alvos saem de lá. Uma ação de
+ * ALVO abre a janela de mira, e o jogador escolhe outro inimigo. Uma ação
+ * "em si" ou sem alvo não tem o que perguntar e segue direto.
+ *
+ * @returns {Promise<{proceed:boolean, actors:Actor[]|null, templateId:string|null}>}
+ */
+async function pedirAlvoDaCadeia(actor, item, action) {
+  const modo = action.targetMode || "target";
+
+  if (MODOS_DE_REGIAO.includes(modo)) {
+    const { placeTemplateForAction } = await import("./template.mjs");
+    const { proceed, actors, templateId } = await placeTemplateForAction(actor, item, action);
+    return { proceed, actors: actors ?? null, templateId: templateId ?? null };
+  }
+
+  if (modo === "target") {
+    const escolhidos = await pedirNovosAlvos(`${item.name} — ${action.label || "Ação"}`);
+    if (escolhidos === null) return { proceed: false, actors: null, templateId: null };
+    return { proceed: true, actors: escolhidos, templateId: null };
+  }
+
+  // "self" / "none": não há alvo a escolher.
+  return { proceed: true, actors: null, templateId: null };
+}
+
 /**
  * Dispara as AÇÕES EM CADEIA depois que esta ação se resolveu.
  *
@@ -1333,9 +1368,20 @@ export async function runChainActions({ actor, item, action, hidden, preChain, h
     //   same    — os mesmos alvos desta ação
     //   hitOnly — só os que esta acertou
     //   own     — o que a própria ação definir (alvos atuais, "em si"...)
+    //   pick    — VARIÁVEL: pergunta agora, antes de executar
     let override = null;
+    let templateId = null;
     if (elo.targets === "same") override = hits.map((h) => h.actor);
     else if (elo.targets === "hitOnly") override = hits.filter((h) => h.acertou).map((h) => h.actor);
+    else if (elo.targets === "pick") {
+      const escolha = await pedirAlvoDaCadeia(actor, alvo.item, alvo.action);
+      if (!escolha.proceed) {
+        avisos.push(`${alvo.label} (alvo não escolhido)`);
+        continue;
+      }
+      override = escolha.actors;
+      templateId = escolha.templateId;
+    }
     if (override && !override.length) {
       avisos.push(`${alvo.label} (sem alvos para encadear)`);
       continue;
@@ -1346,7 +1392,15 @@ export async function runChainActions({ actor, item, action, hidden, preChain, h
         actor, item: alvo.item, action: alvo.action, hidden,
         overrideTargets: override, preChain: cadeia,
       });
-      disparadas.push(`${alvo.label} <span class="lig-chain-when">(${CHAIN_WHEN_LABELS[elo.when] || elo.when})</span>`);
+      // A área reposicionada é um retrato do momento, como nas ações
+      // normais: some do mapa depois de resolver (a não ser que a ação
+      // seja uma emanação contínua, que fica).
+      if (templateId && !alvo.action.persistArea) {
+        const { scheduleTransientCleanup } = await import("./template.mjs");
+        scheduleTransientCleanup(templateId);
+      }
+      const marca = elo.targets === "pick" ? " <span class=\"lig-chain-when\">(alvo escolhido)</span>" : "";
+      disparadas.push(`${alvo.label} <span class="lig-chain-when">(${CHAIN_WHEN_LABELS[elo.when] || elo.when})</span>${marca}`);
     } catch (e) {
       console.warn("Ligeia | falha ao encadear a ação:", alvo.label, e);
       avisos.push(`${alvo.label} (falhou)`);

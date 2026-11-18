@@ -843,6 +843,52 @@ export function costsForLevel(item, nivelAtivacao = null) {
 }
 
 /**
+ * AÇÕES QUE SÃO ALVO DE ALGUMA CADEIA nesta ficha.
+ *
+ * Varre todas as ações de todos os itens do personagem e devolve as que
+ * aparecem como destino de uma cadeia, na forma "idDoItem:índice". A
+ * resolução usa a mesma regra das referências (id, com o nome como
+ * reserva), então uma habilidade copiada de outra ficha continua sendo
+ * reconhecida.
+ *
+ * Só conta a cadeia LIGADA: uma entrada desmarcada não esconde nada.
+ *
+ * @param {Actor} actor
+ * @returns {Set<string>}
+ */
+export function chainTargetKeys(actor) {
+  const chaves = new Set();
+  for (const it of actor?.items || []) {
+    for (const acao of it.system?.actions || []) {
+      for (const elo of acao?.chainActions || []) {
+        if (!elo || elo.enabled === false || !elo.ref) continue;
+        const alvo = resolvePreActivation(actor, elo.ref);
+        if (alvo?.kind === "action") chaves.add(`${alvo.item.id}:${alvo.index}`);
+      }
+    }
+  }
+  return chaves;
+}
+
+/**
+ * A ação deve aparecer com botão na ficha do personagem?
+ *
+ * Esconde apenas o que é alvo de uma cadeia e não pediu para aparecer. Uma
+ * ação que ninguém encadeia aparece sempre — a primária não precisa de
+ * permissão para existir.
+ *
+ * @param {Item} item
+ * @param {object} action
+ * @param {number} index
+ * @param {Set<string>} alvosDeCadeia  saída de chainTargetKeys
+ * @returns {boolean}
+ */
+export function actionShowsInSheet(item, action, index, alvosDeCadeia) {
+  if (!alvosDeCadeia?.has(`${item?.id}:${index}`)) return true;
+  return !!action?.showInSheet;
+}
+
+/**
  * Ações disponíveis de um item, preservando o ÍNDICE original de cada uma
  * (a execução na ficha e as emanações referenciam ações por índice).
  * @param {Item} item

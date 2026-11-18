@@ -2083,3 +2083,15 @@ select.lig-actlevel:hover {
 /* Dreno: o dano convertido em recurso para quem conjura */
 .lig-drain-row { margin-top: 0.2rem; }
 .lig-atk-drain { font-size: 0.85rem; color: #b9a0d8; margin-top: 0.1rem; }
+
+/* Caixa "mostrar botão na ficha", só nas ações encadeadas */
+.lig-show-in-sheet {
+  margin-bottom: 0.4rem;
+  gap: 0.35rem;
+}
+
+.lig-chained-by {
+  margin: 0;
+  opacity: 0.75;
+  font-style: italic;
+}

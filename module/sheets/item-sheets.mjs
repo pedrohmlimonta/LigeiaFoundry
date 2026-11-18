@@ -7,7 +7,7 @@ import { WORDS_BY_TIER, WORD_TARGET_PREFIX, tipagensComoAlvos, weaponTagsOf, wea
          weaponTagId, WEAPON_TAG_PREFIX, costsForLevel, LEVELED_TYPES, COST_LEVEL_MODES,
          LEVEL_SEQUENCE, levelMeets, activationLevelOf,
          buildPreActivationRef, parsePreActivation, resolvePreActivation,
-         REMOVE_FX_MODES } from "../helpers/effects.mjs";
+         REMOVE_FX_MODES, chainTargetKeys } from "../helpers/effects.mjs";
 import { activateTagInputs } from "../apps/tag-input.mjs";
 import { CHAIN_WHEN_LABELS } from "../helpers/dice.mjs";
 import { removeEnchantment } from "../helpers/enchant.mjs";
@@ -281,6 +281,10 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
           if (arr[i].aaConfig === undefined) arr[i].aaConfig = cur.aaConfig ?? null;
           if (arr[i].aaName === undefined) arr[i].aaName = cur.aaName || "";
           if (arr[i].aaEnabled === undefined) arr[i].aaEnabled = cur.aaEnabled ?? true;
+          // A caixa "mostrar botão na ficha" só é desenhada enquanto a ação
+          // for alvo de uma cadeia. Tirar a cadeia faria o campo sumir do
+          // formulário e voltar ao padrão — preserva o que estava escolhido.
+          if (arr[i].showInSheet === undefined) arr[i].showInSheet = cur.showInSheet ?? false;
           // Cada ação pode ter appliesEffects como objeto indexado {0:{...}}
           // vindo do form → converte para array.
           const fx = arr[i].appliesEffects;
@@ -626,10 +630,34 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       own: "Alvos dela mesma",
       same: "Os mesmos desta",
       hitOnly: "Só os acertados",
+      pick: "Variável (escolher na hora)",
     };
 
-    context.actions = (item.system?.actions || []).map((a) => ({
+    // Quais ações DESTE item são alvo de alguma cadeia da ficha: só nelas
+    // a caixa "mostrar botão" faz diferença, então só nelas ela aparece.
+    const alvosDeCadeia = ator ? chainTargetKeys(ator) : new Set();
+    const quemEncadeia = (idx) => {
+      if (!ator) return "";
+      const nomes = [];
+      for (const it of ator.items || []) {
+        for (const acao of it.system?.actions || []) {
+          for (const elo of acao?.chainActions || []) {
+            if (!elo || elo.enabled === false || !elo.ref) continue;
+            const alvo = resolvePreActivation(ator, elo.ref);
+            if (alvo?.kind !== "action") continue;
+            if (alvo.item.id !== item.id || alvo.index !== idx) continue;
+            const nome = `${it.name} — ${acao.label || "Ação"}`;
+            if (!nomes.includes(nome)) nomes.push(nome);
+          }
+        }
+      }
+      return nomes.join(", ");
+    };
+
+    context.actions = (item.system?.actions || []).map((a, idx) => ({
       ...a,
+      isChainTarget: alvosDeCadeia.has(`${item.id}:${idx}`),
+      chainedBy: alvosDeCadeia.has(`${item.id}:${idx}`) ? quemEncadeia(idx) : "",
       // Tem animação PUXADA do item? (cópia não-vazia)
       hasAnim: !!(a.aaConfig && typeof a.aaConfig === "object" && Object.keys(a.aaConfig).length > 0),
       // Cada linha carrega o próprio HTML de opções, com a dela marcada —
