@@ -14,6 +14,7 @@ import { registerTokenRuler } from "./helpers/token-ruler.mjs";
 import { registerMovementHooks, registerMovementSocket, registerForcedMovementActions } from "./helpers/movement.mjs";
 import { registerRollRequestSocket } from "./helpers/roll-request.mjs";
 import { registerGmProxySocket } from "./helpers/gm-proxy.mjs";
+import { registerSummonHooks } from "./helpers/summon.mjs";
 import { registerTokenLinkSettings, registerTokenLinkHooks, migrateTokenLinks, registerTokenSizeHooks, syncTokenSize } from "./helpers/token-link.mjs";
 import { registerTokenBarSettings, registerTokenBarHooks } from "./helpers/token-bars.mjs";
 import { registerTokenArtHooks } from "./helpers/token-art.mjs";
@@ -446,6 +447,8 @@ Hooks.once("ready", function () {
   registerRollRequestSocket();
   // Relé: alterações em fichas de terceiros passam pelo Mestre.
   registerGmProxySocket();
+  // Criaturas conjuradas com duração: saem da cena quando a duração acaba.
+  registerSummonHooks();
   // Vincula fichas de token já existentes (uma vez, preservando os valores).
   migrateTokenLinks();
   // Acerta o tamanho dos tokens já colocados conforme a categoria atual.

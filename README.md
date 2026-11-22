@@ -59,8 +59,13 @@ reinicie o Foundry.
 ### Sistema de efeitos (passivo / ativo)
 Cada Item pode conceder **efeitos mecânicos** quando ativo:
 - `dice` (+dados de melhoria), `bonus` (+resultado), `stat` (modifica valor
-  derivado), `set` (define valor fixo), `damage`, `rd` (redução de dano) e
-  `info` (condição textual).
+  derivado), `set` (define valor fixo), `damage`, `rd` (redução de dano),
+  `autocrit` (crítico garantido na rolagem escolhida), `immune` (imunidade a
+  tipo de dano, condição, circunstância ou item) e `info` (condição textual).
+- O alvo de cada efeito pode ser um atributo, uma categoria de rolagem
+  (ataque e defesa separados por corpo a corpo, distância e magia), uma
+  tipagem de arma, uma palavra arcana, **resistir a uma condição** ou
+  **outro item da ficha** (vale em todas as ações daquele item).
 - **Passivo**: sempre ativo. **Ativo**: o jogador liga/desliga quando precisar.
 - Cada efeito pode ser ligado/desligado individualmente.
 - **Custos** de recurso (PM, PV, PV temporário, Heroico) por ativação/uso.

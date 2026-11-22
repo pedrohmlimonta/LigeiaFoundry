@@ -371,6 +371,53 @@
       </label>
     </div>
 
+    {{!-- CUSTO ESCOLHIDO NA ATIVAÇÃO: a ação pergunta quanto canalizar --}}
+    <div class="lig-varcost-editor">
+      <label class="lig-inline-check" title="Em vez de (ou além de) um custo fixo, a ação pergunta quanto recurso gastar, e o que você marcar abaixo cresce com o gasto.">
+        <input type="checkbox" name="system.actions.{{i}}.variableCost.enabled" {{checked act.variableCost.enabled}}/>
+        Perguntar quanto gastar na ativação
+      </label>
+      <div class="lig-item-row">
+        <label>Recurso
+          <select name="system.actions.{{i}}.variableCost.resource">
+            <option value="mp" {{#if (eq act.variableCost.resource "mp")}}selected{{/if}}>PM (mana)</option>
+            <option value="hp" {{#if (eq act.variableCost.resource "hp")}}selected{{/if}}>PV (vida)</option>
+            <option value="hpTemp" {{#if (eq act.variableCost.resource "hpTemp")}}selected{{/if}}>Sobrevida</option>
+            <option value="heroic" {{#if (eq act.variableCost.resource "heroic")}}selected{{/if}}>PH (heroico)</option>
+          </select>
+        </label>
+        <label>Mínimo
+          <input type="text" value="{{act.variableCost.min}}" title="O menor gasto aceito. Aceita fórmula com @variáveis." name="system.actions.{{i}}.variableCost.min"/>
+        </label>
+        <label>Máximo
+          <input type="text" value="{{act.variableCost.max}}" title="O maior gasto aceito. Vazio ou 0 = o que o personagem tiver." name="system.actions.{{i}}.variableCost.max" placeholder="o que tiver"/>
+        </label>
+      </div>
+      <div class="lig-item-row">
+        <label>Dano +
+          <input type="text" value="{{act.variableCost.damageBonus}}" title="Somado ao dano. Aceita dados: @gastod6 com 3 gastos vira 3d6; @gasto*2 soma o dobro do gasto." name="system.actions.{{i}}.variableCost.damageBonus" placeholder="@gasto"/>
+        </label>
+        <label>Cura +
+          <input type="text" value="{{act.variableCost.healBonus}}" title="Somado à cura. Aceita dados, como o dano." name="system.actions.{{i}}.variableCost.healBonus" placeholder="@gastod4"/>
+        </label>
+        <label>Área +
+          <input type="text" value="{{act.variableCost.areaBonus}}" title="Metros somados ao raio/comprimento da área. Precisa dar um número (sem dados)." name="system.actions.{{i}}.variableCost.areaBonus" placeholder="@gasto"/>
+        </label>
+      </div>
+      <div class="lig-item-row">
+        <label>Alcance +
+          <input type="text" value="{{act.variableCost.rangeBonus}}" title="Metros somados ao alcance. Precisa dar um número (sem dados)." name="system.actions.{{i}}.variableCost.rangeBonus" placeholder="@gasto*3"/>
+        </label>
+        <label>Bônus na rolagem +
+          <input type="text" value="{{act.variableCost.rollBonus}}" title="Somado ao bônus da rolagem desta ação. Precisa dar um número (sem dados)." name="system.actions.{{i}}.variableCost.rollBonus" placeholder="@gasto"/>
+        </label>
+        <label>Explicação na caixa
+          <input type="text" value="{{act.variableCost.label}}" title="O que aparece escrito na caixa que pergunta o gasto. Vazio = o sistema resume sozinho." name="system.actions.{{i}}.variableCost.label" placeholder="Cada PM amplia a explosão"/>
+        </label>
+      </div>
+      <p class="lig-hint">Nas fórmulas, <strong>@gasto</strong> é quanto a pessoa escolheu gastar, e valem as @variáveis do personagem (@nivel, @mente...). O gasto se soma ao custo fixo acima quando os dois são do mesmo recurso.</p>
+    </div>
+
     {{!-- ATIVAÇÕES PRÉVIAS: o que entra em jogo antes desta ação rolar --}}
     <div class="lig-preact-editor">
       <div class="lig-subtitle">
@@ -639,6 +686,55 @@
         {{/unless}}
       </div>
       {{/each}}
+    </div>
+
+    {{!-- CONJURAÇÃO: criaturas que a ação invoca --}}
+    <div class="lig-summon-section">
+      <div class="lig-subtitle">Conjuração (invocar criaturas)</div>
+      {{#each act.summons as |sum si|}}
+      <div class="lig-summon-row {{#unless sum.enabled}}off{{/unless}}">
+        <div class="lig-summon-head">
+          <span class="lig-summon-name" title="{{sum.actorUuid}}">🧿 {{#if sum.actorName}}{{sum.actorName}}{{else}}(ficha removida){{/if}}</span>
+          <label class="lig-inline-check" title="Ativa">
+            <input type="checkbox" name="system.actions.{{i}}.summons.{{si}}.enabled" {{checked sum.enabled}}/>
+          </label>
+          <button type="button" class="lig-mini-btn danger" data-action="removeSummon" data-action-index="{{i}}" data-index="{{si}}" title="Remover esta conjuração">✕</button>
+        </div>
+        <input type="hidden" name="system.actions.{{i}}.summons.{{si}}.actorUuid" value="{{sum.actorUuid}}"/>
+        <input type="hidden" name="system.actions.{{i}}.summons.{{si}}.actorName" value="{{sum.actorName}}"/>
+        <div class="lig-summon-fields">
+          <label title="Quantas criaturas aparecem. Aceita fórmula: @nivel, ceil(@nivel/3), @gasto.">Quantas
+            <input type="text" name="system.actions.{{i}}.summons.{{si}}.count" value="{{sum.count}}"/>
+          </label>
+          <label title="De que lado a criatura fica. 'Como quem conjurou' copia a atitude de quem invocou.">Atitude
+            <select name="system.actions.{{i}}.summons.{{si}}.disposition">
+              <option value="same" {{#if (eq sum.disposition "same")}}selected{{/if}}>Como quem conjurou</option>
+              <option value="friendly" {{#if (eq sum.disposition "friendly")}}selected{{/if}}>Amigável</option>
+              <option value="neutral" {{#if (eq sum.disposition "neutral")}}selected{{/if}}>Neutra</option>
+              <option value="hostile" {{#if (eq sum.disposition "hostile")}}selected{{/if}}>Hostil</option>
+              <option value="secret" {{#if (eq sum.disposition "secret")}}selected{{/if}}>Secreta</option>
+            </select>
+          </label>
+          <label title="Quantas rodadas a criatura fica. 0 = até ser removida à mão.">Rodadas
+            <input type="text" name="system.actions.{{i}}.summons.{{si}}.rounds" value="{{sum.rounds}}"/>
+          </label>
+          <div class="lig-summon-checks">
+            <label class="lig-inline-check" title="Entrega o controle do token a quem conjurou.">
+              <input type="checkbox" name="system.actions.{{i}}.summons.{{si}}.giveControl" {{checked sum.giveControl}}/> controle
+            </label>
+            <label class="lig-inline-check" title="A criatura aparece escondida (só o Mestre a vê até revelá-la).">
+              <input type="checkbox" name="system.actions.{{i}}.summons.{{si}}.hidden" {{checked sum.hidden}}/> oculta
+            </label>
+          </div>
+        </div>
+      </div>
+      {{/each}}
+      <div class="lig-summon-drop" data-action-index="{{i}}">
+        Arraste aqui a ficha (personagem, NPC ou veículo) que esta ação conjura
+      </div>
+      {{#if act.summons.length}}
+      <p class="lig-hint">Ao executar a ação, você escolhe no mapa onde cada criatura aparece — o alcance da ação limita a distância. O token conjurado é avulso: feri-lo não mexe na ficha original.</p>
+      {{/if}}
     </div>
 
     {{!-- Macro executada ao rodar a ação --}}

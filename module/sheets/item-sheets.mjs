@@ -194,6 +194,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       removeAppliesEffect: LigeiaItemSheetBase._onRemoveAppliesEffect,
       addExtraDamage: LigeiaItemSheetBase._onAddExtraDamage,
       removeExtraDamage: LigeiaItemSheetBase._onRemoveExtraDamage,
+      removeSummon: LigeiaItemSheetBase._onRemoveSummon,
       removeMacro: LigeiaItemSheetBase._onRemoveMacro,
       toggleMacro: LigeiaItemSheetBase._onToggleMacro,
       openMacro: LigeiaItemSheetBase._onOpenMacro,
@@ -295,6 +296,24 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
           if (arr[i].aaConfig === undefined) arr[i].aaConfig = cur.aaConfig ?? null;
           if (arr[i].aaName === undefined) arr[i].aaName = cur.aaName || "";
           if (arr[i].aaEnabled === undefined) arr[i].aaEnabled = cur.aaEnabled ?? true;
+          // Criaturas conjuradas: a lista é montada por drag&drop, então um
+          // submit parcial não a traz. Objeto indexado → array; ausente →
+          // preserva o que está no documento.
+          const su = arr[i].summons;
+          if (su && !Array.isArray(su) && typeof su === "object") {
+            arr[i].summons = indexedToArray(su);
+          } else if (su === undefined) {
+            arr[i].summons = foundry.utils.deepClone(cur.summons || []);
+          }
+          // Custo escolhido na ativação: um submit parcial (vindo de um
+          // botão, não do formulário inteiro) não traz o sub-objeto, e o
+          // DataModel o devolveria aos valores iniciais — desligando a
+          // configuração a cada clique. Preserva o que está no documento.
+          if (arr[i].variableCost === undefined) {
+            arr[i].variableCost = foundry.utils.deepClone(cur.variableCost || {});
+          } else if (cur.variableCost) {
+            arr[i].variableCost = { ...cur.variableCost, ...arr[i].variableCost };
+          }
           // A caixa "mostrar botão na ficha" só é desenhada enquanto a ação
           // for alvo de uma cadeia. Tirar a cadeia faria o campo sumir do
           // formulário e voltar ao padrão — preserva o que estava escolhido.
@@ -840,6 +859,15 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         callbacks: { drop: this._onDropMacro.bind(this) },
       });
       dd.bind(root);
+
+      // ----- Drag & drop de FICHA sobre a conjuração das ações -----
+      const ddSummon = new DragDropCls({
+        dragSelector: null,
+        dropSelector: ".lig-summon-drop",
+        permissions: { drop: () => this.isEditable },
+        callbacks: { drop: this._onDropSummon.bind(this) },
+      });
+      ddSummon.bind(root);
     }
 
     // ----- Preservação de scroll -----
@@ -985,7 +1013,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       targetMode: "target", includeSelf: false, defenseAttr: "esquiva", defenseAttr2: "",
       damage: "", damageType: "", damageResource: "hp", scalingDamage: false, extraDamage: [],
       skipRollDialog: true,
-      appliesEffects: [], range: 0, area: 0, costMp: 0, costHp: 0, costHeroic: 0,
+      appliesEffects: [], summons: [], range: 0, area: 0, costMp: 0, costHp: 0, costHeroic: 0,
       persistArea: false, persistRounds: 1, persistAffectsSelf: false,
       persistRerollAttack: false, persistTrigger: "both",
       animFile: "", animPlacement: "target", animScale: 1, animEnabled: true, animAttach: false,
@@ -1119,6 +1147,63 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
     if (!actions[ai]?.extraDamage) return;
     actions[ai].extraDamage.splice(di, 1);
     await this._replaceActions(actions);
+  }
+
+  /* ---- Criaturas conjuradas pela ação ---- */
+  static async _onRemoveSummon(event, target) {
+    const ai = Number(target.dataset.actionIndex);
+    const si = Number(target.dataset.index);
+    const actions = foundry.utils.deepClone(this.document.system.actions || []);
+    if (!actions[ai]?.summons) return;
+    actions[ai].summons.splice(si, 1);
+    await this._replaceActions(actions);
+  }
+
+  /**
+   * Recebe uma FICHA arrastada para a zona de conjuração de uma ação.
+   * Qualquer tipo serve — personagem, NPC ou veículo —, e a mesma ação pode
+   * conjurar mais de uma criatura.
+   */
+  async _onDropSummon(event) {
+    let data;
+    try {
+      data = JSON.parse(event.dataTransfer.getData("text/plain"));
+    } catch (e) {
+      return;
+    }
+    if (data?.type !== "Actor") {
+      ui.notifications?.warn("Arraste uma ficha (personagem, NPC ou veículo) para este campo.");
+      return;
+    }
+    const zone = event.target?.closest?.(".lig-summon-drop");
+    const ai = Number(zone?.dataset?.actionIndex);
+    if (!Number.isInteger(ai)) return;
+
+    let ficha;
+    try {
+      ficha = await Actor.implementation.fromDropData(data);
+    } catch (e) {
+      ficha = null;
+    }
+    if (!ficha) {
+      ui.notifications?.warn("Não foi possível ler a ficha arrastada.");
+      return;
+    }
+
+    const actions = foundry.utils.deepClone(this.document.system.actions || []);
+    if (!actions[ai]) return;
+    const lista = Array.isArray(actions[ai].summons) ? actions[ai].summons : [];
+    if (lista.some((s) => s?.actorUuid === ficha.uuid)) {
+      ui.notifications?.info(`${ficha.name} já é conjurada por esta ação.`);
+      return;
+    }
+    lista.push({
+      actorUuid: ficha.uuid, actorName: ficha.name, count: "1",
+      disposition: "same", rounds: "0", giveControl: true, hidden: false, enabled: true,
+    });
+    actions[ai].summons = lista;
+    await this._replaceActions(actions);
+    ui.notifications?.info(`${ficha.name} será conjurada por esta ação.`);
   }
 
   /* ---- Macro vinculada à ação ---- */

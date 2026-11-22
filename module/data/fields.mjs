@@ -516,6 +516,65 @@ export function actionEntryField() {
     costMp: new fields.StringField({ blank: true, initial: "0" }),
     costHp: new fields.StringField({ blank: true, initial: "0" }),
     costHeroic: new fields.StringField({ blank: true, initial: "0" }),
+    // --- CUSTO ESCOLHIDO NA ATIVAÇÃO ---
+    // Em vez de um custo fixo, a ação pergunta quanto recurso o personagem
+    // quer gastar, e dano/área/alcance crescem com o gasto. É o molde da
+    // magia que "você pode canalizar mais mana para ampliar".
+    variableCost: new fields.SchemaField({
+      enabled: new fields.BooleanField({ initial: false }),
+      // Qual recurso é gasto na escolha.
+      resource: new fields.StringField({
+        initial: "mp",
+        choices: ["mp", "hp", "hpTemp", "heroic"],
+      }),
+      // Mínimo e máximo que a caixa aceita (fórmula com @variáveis).
+      // Máximo vazio ou 0 = o que o personagem tiver.
+      min: new fields.StringField({ blank: true, initial: "1" }),
+      max: new fields.StringField({ blank: true, initial: "" }),
+      // Rótulo da caixa, para explicar o que o gasto faz.
+      label: new fields.StringField({ blank: true, initial: "" }),
+      // O que o gasto AMPLIA. Cada fórmula usa @gasto (o que foi escolhido)
+      // e as @variáveis do personagem, e o resultado é SOMADO ao campo.
+      //   dano    → a parcela principal de dano
+      //   cura    → o que a ação cura
+      //   área    → raio/comprimento da área
+      //   alcance → alcance da ação
+      //   bônus   → bônus na rolagem
+      // Dano e cura aceitam dados ("@gastod6" com 3 gastos vira "3d6"); os
+      // outros três têm de dar um número.
+      damageBonus: new fields.StringField({ blank: true, initial: "" }),
+      healBonus: new fields.StringField({ blank: true, initial: "" }),
+      areaBonus: new fields.StringField({ blank: true, initial: "" }),
+      rangeBonus: new fields.StringField({ blank: true, initial: "" }),
+      rollBonus: new fields.StringField({ blank: true, initial: "" }),
+    }),
+    // --- CONJURAÇÃO DE ATORES ---
+    // A ação invoca criaturas: arrasta-se a ficha (personagem, NPC ou
+    // veículo) para a ação, e na execução escolhe-se no mapa, dentro do
+    // alcance, onde cada token aparece.
+    summons: new fields.ArrayField(
+      new fields.SchemaField({
+        actorUuid: new fields.StringField({ blank: true, initial: "" }),
+        actorName: new fields.StringField({ blank: true, initial: "" }),
+        // Quantos tokens aparecem (fórmula com @variáveis e @gasto, quando a
+        // ação tem custo escolhido na ativação).
+        count: new fields.StringField({ blank: true, initial: "1" }),
+        // De que lado a criatura fica. "same" copia a atitude de quem
+        // conjurou — é o que se quer num aliado invocado por um NPC.
+        disposition: new fields.StringField({
+          initial: "same",
+          choices: ["same", "friendly", "neutral", "hostile", "secret"],
+        }),
+        // Quantas rodadas a criatura dura. 0 = fica até ser removida.
+        rounds: new fields.StringField({ blank: true, initial: "0" }),
+        // Entrega o controle do token a quem conjurou.
+        giveControl: new fields.BooleanField({ initial: true }),
+        // Aparece escondida (só o Mestre vê até ser revelada).
+        hidden: new fields.BooleanField({ initial: false }),
+        enabled: new fields.BooleanField({ initial: true }),
+      }),
+      { initial: [] },
+    ),
     // --- Área/aura PERSISTENTE (emanação) ---
     // Quando a ação é de área ou aura, ela pode deixar a área no canvas por
     // uma duração. Enquanto ativa, todo token que INICIAR o turno dentro da

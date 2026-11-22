@@ -29,18 +29,18 @@ const EPS = 1e-6;
 /*  Geometria                                                          */
 /* ------------------------------------------------------------------ */
 
-function gridSize() { return canvas?.grid?.size || 100; }
+export function gridSize() { return canvas?.grid?.size || 100; }
 function gridDistance() { return canvas?.grid?.distance || 1; }
 
 /** Metros → pixels da cena. */
 
 import { resolveEffectValue } from "./effects.mjs";
-function metersToPx(m) { return (Number(m) || 0) / gridDistance() * gridSize(); }
+export function metersToPx(m) { return (Number(m) || 0) / gridDistance() * gridSize(); }
 /** Pixels → metros da cena. */
 function pxToMeters(px) { return (px / gridSize()) * gridDistance(); }
 
 /** Centro (px) de um token. */
-function centerOf(tokenDoc) {
+export function centerOf(tokenDoc) {
   const obj = tokenDoc?.object;
   if (obj?.center) return { x: obj.center.x, y: obj.center.y };
   const gs = gridSize();
@@ -244,7 +244,7 @@ export function registerMovementSocket() {
  * Botão direito cancela.
  * @returns {Promise<{x,y}|null>} centro escolhido (px) ou null se cancelado.
  */
-function pickPoint(originCenter, maxPx, hint) {
+export function pickPoint(originCenter, maxPx, hint) {
   if (!canvas?.ready) return Promise.resolve(null);
   ui.notifications?.info(hint || "Clique para escolher o destino (botão direito cancela).");
 

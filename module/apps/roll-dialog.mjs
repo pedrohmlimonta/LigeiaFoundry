@@ -54,6 +54,53 @@ export function currentTargetActors() {
 }
 
 /**
+ * Pergunta QUANTO recurso o personagem quer gastar nesta ação.
+ *
+ * Para as ações de custo escolhido: a pessoa decide quanta mana (ou vida,
+ * ou pontos heroicos) canalizar, e a ação cresce com isso. A caixa mostra
+ * o que o personagem tem, o mínimo e o máximo, e o que cada ponto amplia.
+ *
+ * @param {Actor} actor
+ * @param {object} cfg  { titulo, recurso, min, max, disponivel, explica }
+ * @returns {Promise<number|null>} quanto gastar, ou null se cancelou
+ */
+export async function pedirGastoVariavel(actor, { titulo, recurso, min, max, disponivel, explica }) {
+  const nomes = { mp: "PM", hp: "PV", hpTemp: "PV temporário", heroic: "PH" };
+  const curto = nomes[recurso] || recurso;
+  const teto = max > 0 ? Math.min(max, disponivel) : disponivel;
+
+  // Sem recurso suficiente nem para o mínimo, nem adianta perguntar.
+  if (teto < min) {
+    ui.notifications?.warn(`${actor?.name || "O personagem"} não tem ${min} ${curto} para usar ${titulo}.`);
+    return null;
+  }
+
+  const escolhido = await foundry.applications.api.DialogV2.wait({
+    window: { title: `${titulo} — quanto gastar` },
+    content: `
+      <p class="lig-hint">${explica || `Escolha quanto ${curto} canalizar.`}</p>
+      <label>Gastar (${curto})
+        <input type="number" name="gasto" value="${min}" min="${min}" max="${teto}" step="1" autofocus/>
+      </label>
+      <p class="lig-hint">Disponível: <strong>${disponivel}</strong> ${curto} · mínimo ${min}${max > 0 ? ` · máximo ${max}` : ""}</p>`,
+    buttons: [
+      {
+        action: "ok", label: "Usar", default: true,
+        callback: (ev, btn) => {
+          const v = Math.round(Number(btn.form.elements.gasto?.value) || 0);
+          return Math.max(min, Math.min(teto, v));
+        },
+      },
+      { action: "cancel", label: "Cancelar" },
+    ],
+    rejectClose: false,
+  });
+
+  if (escolhido === "cancel" || escolhido == null || Number.isNaN(Number(escolhido))) return null;
+  return Number(escolhido);
+}
+
+/**
  * Arma a mira: o PRÓXIMO CLIQUE num token escolhe o alvo e já dispara.
  *
  * Usado pelas ações em cadeia marcadas como "Variável". Não há janela nem

@@ -35,7 +35,8 @@ async function waitForDiceAnimation(fallbackMs = 1100) {
 import { conditionModifiers, attributeConditionDice, actorHasCondition, coverDefenseDice, hasFullCover } from "./conditions.mjs";
 import { playActionAnimation } from "./integrations.mjs";
 import { executeActionMovement } from "./movement.mjs";
-import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvailable, activeEffectsOf, arcaneWordsOf, weaponTagsOf, WEAPON_ANY_TARGET, costsForLevel, resolvePreActivation, parsePreActivation, matchEffectsToRemove, removeEffectsAt, DEFENSE_ATTRS, normalizeKey, immuneToDamage, immuneToCondition, immunityReasonFor } from "./effects.mjs";
+import { executarConjuracoes, conjuracoesDaAcao } from "./summon.mjs";
+import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvailable, actionIndexOf, activeEffectsOf, arcaneWordsOf, weaponTagsOf, WEAPON_ANY_TARGET, costsForLevel, resolvePreActivation, parsePreActivation, matchEffectsToRemove, removeEffectsAt, DEFENSE_ATTRS, normalizeKey, immuneToDamage, immuneToCondition, immunityReasonFor } from "./effects.mjs";
 import { DEATH_HP, WOUND_LEVELS, woundLevelFor, setWoundLevel } from "./wounds.mjs";
 import { updateActorAsGM, canAffectActor } from "./gm-proxy.mjs";
 import { enchantmentMods, applyEnchantment, pedirItemParaEncantar, removeEnchantment } from "./enchant.mjs";
@@ -1204,34 +1205,142 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
   return dmgText + healText + remText + fxText;
 }
 
+/* ======================================================================== */
+/*  Custo escolhido na ativação                                             */
+/* ======================================================================== */
+
+/** Quanto o personagem tem do recurso agora (mp, hp, hpTemp, heroic). */
+export function recursoAtual(actor, resource) {
+  const res = actor?.system?.resources || {};
+  if (resource === "hpTemp") return Number(res.hp?.temp) || 0;
+  return Number(res[resource]?.value) || 0;
+}
+
+/**
+ * Pergunta quanto recurso canalizar nesta ação.
+ *
+ * Devolve `null` quando a ação não tem custo escolhido (ou quando não há
+ * ninguém para perguntar), `{ cancelado: true }` quando a pessoa desistiu, e
+ * `{ resource, amount }` com a escolha. O gasto em si fica para
+ * `spendActionCosts`, junto dos custos fixos, para sair numa linha só.
+ */
+export async function promptVariableCost(actor, item, action) {
+  const vc = action?.variableCost;
+  if (!vc?.enabled) return null;
+
+  const min = Math.max(0, Math.round(resolveEffectValue(vc.min, actor)));
+  const maxCfg = Math.max(0, Math.round(resolveEffectValue(vc.max, actor)));
+  const disponivel = recursoAtual(actor, vc.resource);
+
+  // Sem permissão para gastar (o Mestre rolando pelo NPC de outro, por
+  // exemplo): usa o mínimo e não incomoda ninguém com a caixa.
+  if (!actor?.isOwner) return min > 0 ? { resource: vc.resource, amount: min } : null;
+
+  const { pedirGastoVariavel } = await import("../apps/roll-dialog.mjs");
+  const escolhido = await pedirGastoVariavel(actor, {
+    titulo: `${item?.name || "Ação"} — ${action.label || "Ação"}`,
+    recurso: vc.resource,
+    min, max: maxCfg, disponivel,
+    explica: vc.label || resumoDoGasto(vc),
+  });
+  if (escolhido == null) return { cancelado: true };
+  return { resource: vc.resource, amount: escolhido };
+}
+
+/** Frase curta dizendo o que cada ponto gasto amplia (para a caixa). */
+export function resumoDoGasto(vc) {
+  const partes = [];
+  if (String(vc?.damageBonus || "").trim()) partes.push(`dano +${vc.damageBonus}`);
+  if (String(vc?.healBonus || "").trim()) partes.push(`cura +${vc.healBonus}`);
+  if (String(vc?.areaBonus || "").trim()) partes.push(`área +${vc.areaBonus}m`);
+  if (String(vc?.rangeBonus || "").trim()) partes.push(`alcance +${vc.rangeBonus}m`);
+  if (String(vc?.rollBonus || "").trim()) partes.push(`rolagem +${vc.rollBonus}`);
+  if (!partes.length) return "Escolha quanto gastar.";
+  return `Cada escolha amplia: ${partes.join(", ")} (@gasto = o que você gastar).`;
+}
+
+/**
+ * Devolve uma CÓPIA da ação com o gasto escolhido já somado nos campos que a
+ * configuração mandou ampliar. Nada é gravado no item: a cópia vale só para
+ * esta execução, e leva `_actionIndex` para continuar reconhecível (cadeias
+ * de ação e emanações procuram a ação pelo índice).
+ *
+ * As fórmulas usam `@gasto` e as @variáveis do personagem. No dano e na cura
+ * o acréscimo entra como TERMO da fórmula, então pode ter dados
+ * ("@gastod6" com 3 gastos vira "3d6"); nos demais, vira número.
+ */
+export function applyVariableCost(item, action, gasto, actor) {
+  const vc = action?.variableCost || {};
+  const qtd = Math.max(0, Math.round(Number(gasto?.amount) || 0));
+  const copia = { ...action, _actionIndex: actionIndexOf(item, action), _varSpent: gasto };
+  if (!qtd) return copia;
+
+  const extra = { gasto: qtd };
+  // Termo somado a uma fórmula de dados: só troca @gasto pelo número e
+  // deixa o resto das @variáveis para o Roll resolver.
+  const termo = (f) => String(f).replace(/@gasto/g, String(qtd));
+  const somarFormula = (base, bonus) => {
+    const b = String(bonus || "").trim();
+    if (!b) return base;
+    const atual = String(base || "").trim();
+    return atual ? `${atual} + (${termo(b)})` : termo(b);
+  };
+  const somarNumero = (base, bonus) => {
+    const b = String(bonus || "").trim();
+    if (!b) return base;
+    return String(resolveEffectValue(base, actor) + resolveEffectValue(b, actor, extra));
+  };
+
+  copia.damage = somarFormula(action.damage, vc.damageBonus);
+  copia.heal = somarFormula(action.heal, vc.healBonus);
+  copia.area = somarNumero(action.area, vc.areaBonus);
+  copia.range = somarNumero(action.range, vc.rangeBonus);
+  copia.rollBonus = somarNumero(action.rollBonus, vc.rollBonus);
+  return copia;
+}
+
 /**
  * Gasta os custos de uma ação (PM/PV/PH) do personagem que a executa.
  * Desconta do valor de cada recurso (clampando em 0) e devolve o HTML
  * resumindo o gasto. Pago ao executar, independente de acertar.
+ *
+ * `gastoVar` é o que a caixa de custo escolhido devolveu ({resource, amount}).
+ * Ele soma ao custo fixo do MESMO recurso em vez de disputar a atualização, e
+ * aparece no chat marcado como canalizado.
+ *
  * @returns {Promise<string>} HTML do resumo (vazio se não há custo)
  */
-export async function spendActionCosts(actor, action) {
-  const cfg = [
-    { key: "mp", label: "PM", value: resolveEffectValue(action.costMp, actor) },
-    { key: "hp", label: "PV", value: resolveEffectValue(action.costHp, actor) },
-    { key: "heroic", label: "PH", value: resolveEffectValue(action.costHeroic, actor) },
-  ].filter((c) => c.value > 0);
-  if (!cfg.length) return "";
+export async function spendActionCosts(actor, action, gastoVar = null) {
+  // Total por recurso, para que custo fixo e gasto escolhido se somem.
+  const total = new Map();
+  const somar = (key, value) => {
+    if (!(value > 0)) return;
+    total.set(key, (total.get(key) || 0) + value);
+  };
+  somar("mp", resolveEffectValue(action.costMp, actor));
+  somar("hp", resolveEffectValue(action.costHp, actor));
+  somar("heroic", resolveEffectValue(action.costHeroic, actor));
+  const canalizado = Math.max(0, Math.round(Number(gastoVar?.amount) || 0));
+  if (canalizado > 0) somar(gastoVar.resource, canalizado);
+  if (!total.size) return "";
+
+  const rotulo = (key) => (canalizado > 0 && key === gastoVar.resource
+    ? `${total.get(key)} ${resLabel(key)} <span class="lig-cond-note">(${canalizado} canalizado)</span>`
+    : `${total.get(key)} ${resLabel(key)}`);
+  const parts = [...total.keys()].map(rotulo);
 
   if (!actor.isOwner) {
-    return `<div class="lig-cost-line muted">Custo: ${cfg.map((c) => `${c.value} ${c.label}`).join(", ")} (não aplicado)</div>`;
+    return `<div class="lig-cost-line muted">Custo: ${parts.join(", ")} (não aplicado)</div>`;
   }
 
   const update = {};
-  const parts = [];
   let insufficient = false;
-  for (const c of cfg) {
-    const res = actor.system?.resources?.[c.key];
-    if (!res) continue;
-    const cur = res.value || 0;
-    if (cur < c.value) insufficient = true;
-    update[`system.resources.${c.key}.value`] = Math.max(0, cur - c.value);
-    parts.push(`${c.value} ${c.label}`);
+  for (const [key, value] of total) {
+    const cur = recursoAtual(actor, key);
+    if (cur < value) insufficient = true;
+    const alvo = Math.max(0, cur - value);
+    if (key === "hpTemp") update["system.resources.hp.temp"] = alvo;
+    else if (actor.system?.resources?.[key]) update[`system.resources.${key}.value`] = alvo;
   }
   if (Object.keys(update).length) await actor.update(update);
   return `<div class="lig-cost-line">Custo: ${parts.join(", ")}${insufficient ? ' <span class="lig-insufficient">(recurso insuficiente!)</span>' : ""}</div>`;
@@ -1302,7 +1411,7 @@ export async function runPreActivations({ actor, item, action, hidden, preChain 
 
   // Marca esta ação como já visitada antes de chamar as outras.
   const cadeia = preChain instanceof Set ? preChain : new Set();
-  cadeia.add(`${item?.id || ""}:${(item?.system?.actions || []).indexOf(action)}`);
+  cadeia.add(`${item?.id || ""}:${actionIndexOf(item, action)}`);
 
   const ligados = [];
   const avisos = [];
@@ -1449,7 +1558,7 @@ export async function runChainActions({ actor, item, action, hidden, preChain, h
   if (!lista.length) return "";
 
   const cadeia = preChain instanceof Set ? preChain : new Set();
-  cadeia.add(`${item?.id || ""}:${(item?.system?.actions || []).indexOf(action)}`);
+  cadeia.add(`${item?.id || ""}:${actionIndexOf(item, action)}`);
 
   const disparadas = [];
   const avisos = [];
@@ -1658,6 +1767,17 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     return;
   }
 
+  // CUSTO ESCOLHIDO NA ATIVAÇÃO: pergunta quanto canalizar e já trabalha com
+  // uma cópia da ação ampliada pelo gasto. Perguntar aqui, antes das
+  // ativações prévias e de qualquer desconto, deixa o cancelamento limpo.
+  // Disparo por turno de emanação não pergunta: o gasto foi feito na criação.
+  let gastoVar = null;
+  if (action.variableCost?.enabled && frozenAttackTotal == null) {
+    gastoVar = await promptVariableCost(actor, item, action);
+    if (gastoVar?.cancelado) return;
+    if (gastoVar) action = applyVariableCost(item, action, gastoVar, actor);
+  }
+
   const mode = action.targetMode || "target";
   // Modos que atingem uma REGIÃO do mapa (os alvos vêm da mira do template).
   const isRegion = mode === "area" || mode === "line" || mode === "cone" || mode === "lineCustom";
@@ -1674,8 +1794,9 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
   // para que os bônus dessas habilidades/itens já estejam valendo.
   const preText = await runPreActivations({ actor, item, action, hidden, preChain });
 
-  // Gasta os custos da ação (PM/PV/PH) do executor.
-  const costText = await spendActionCosts(actor, action);
+  // Gasta os custos da ação (PM/PV/PH) do executor, somando o que foi
+  // canalizado na caixa de custo escolhido.
+  const costText = await spendActionCosts(actor, action, gastoVar);
 
   // Executa a macro vinculada à ação (se houver e estiver ativa).
   await executeActionMacro({ actor, item, action, overrideTargets });
@@ -2206,6 +2327,20 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
       if (!moveLines) playActionAnimation({ actor, item, action, targetActors: animTargets });
     } catch (e) {
       console.warn("Ligeia | falha no efeito de movimento:", e);
+    }
+  }
+
+  // CONJURAÇÃO: a ação invoca criaturas. Acontece depois de a ação se
+  // resolver — primeiro o golpe (ou a magia) acontece, depois o jogador
+  // escolhe no mapa, dentro do alcance, onde cada criatura aparece.
+  if (conjuracoesDaAcao(action).length) {
+    try {
+      const sumLines = await executarConjuracoes({
+        actor, item, action, gasto: Number(gastoVar?.amount) || 0,
+      });
+      if (sumLines) lines.push(sumLines);
+    } catch (e) {
+      console.warn("Ligeia | falha na conjuração:", e);
     }
   }
 

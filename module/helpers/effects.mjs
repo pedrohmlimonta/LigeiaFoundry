@@ -126,18 +126,37 @@ export function actorRollData(actor) {
  * fórmulas, @bloqueio/@esquiva/@conjuracao/@iniciativa/@deslocamento podem
  * valer 0 (ou o valor do preparo anterior). Prefira atributos e @nivel.
  */
-export function resolveEffectValue(raw, actor) {
+export function resolveEffectValue(raw, actor, extra = null) {
   if (raw === null || raw === undefined || raw === "") return 0;
   const direct = Number(raw);
   if (Number.isFinite(direct)) return direct;
   try {
     const R = globalThis.Roll;
-    const expr = R.replaceFormulaData(String(raw), actorRollData(actor), { missing: "0", warn: false });
+    // `extra` acrescenta variáveis além das do personagem — é por aqui que
+    // @gasto (o recurso escolhido na ativação) entra nas fórmulas.
+    const dados = extra && typeof extra === "object"
+      ? { ...actorRollData(actor), ...extra }
+      : actorRollData(actor);
+    const expr = R.replaceFormulaData(String(raw), dados, { missing: "0", warn: false });
     const v = R.safeEval(expr);
     return Number.isFinite(v) ? v : 0;
   } catch (e) {
     return 0;
   }
+}
+
+/**
+ * Índice de uma ação dentro do item.
+ *
+ * O normal é procurar pelo próprio objeto, mas a execução pode trabalhar
+ * sobre uma CÓPIA da ação (é o que o custo escolhido na ativação faz, para
+ * somar o gasto no dano e na área sem gravar nada no item). A cópia carrega
+ * `_actionIndex`, e é ele que vale quando existe.
+ */
+export function actionIndexOf(item, action) {
+  const i = Number(action?._actionIndex);
+  if (Number.isInteger(i) && i >= 0) return i;
+  return (item?.system?.actions || []).indexOf(action);
 }
 
 /* ======================================================================== */

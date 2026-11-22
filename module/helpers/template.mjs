@@ -22,7 +22,7 @@
 
 import { measuredTemplatesAvailable } from "./compat.mjs";
 import { passesAreaFilter } from "./dice.mjs";
-import { areaFilterOverrideFor, resolveEffectValue } from "./effects.mjs";
+import { areaFilterOverrideFor, resolveEffectValue, actionIndexOf } from "./effects.mjs";
 
 function MTObjectClass() {
   return (
@@ -135,7 +135,7 @@ function buildEmanationFlags(actor, item, action) {
     itemUuid: item?.uuid || null,
     actionLabel: action.label || "",
     // Índice da ação dentro do item (para reencontrá-la na execução por turno).
-    actionIndex: (item?.system?.actions || []).indexOf(action),
+    actionIndex: actionIndexOf(item, action),
     isAura: action.targetMode === "aura",
     sourceTokenId: token?.id || null,
     affectsSelf: !!action.persistAffectsSelf,
