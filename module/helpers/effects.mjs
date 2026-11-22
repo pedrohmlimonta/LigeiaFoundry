@@ -151,6 +151,19 @@ export const WORDS_BY_TIER = { "Menor": 1, "Intermediária": 2, "Maior": 3 };
 export const WORD_TARGET_PREFIX = "conjuracao:";
 
 /**
+ * Prefixo dos alvos que valem só nas rolagens para RESISTIR a efeitos de
+ * uma condição: "resistir:cego" dá bônus nos testes contra o que cega.
+ */
+export const RESIST_TARGET_PREFIX = "resistir:";
+
+/**
+ * Prefixo dos alvos que valem só nas ações de um ITEM da ficha:
+ * "item:Espada Longa" dá o bônus em qualquer ação daquela espada.
+ * Casa pelo nome, normalizado, para sobreviver a cópias entre fichas.
+ */
+export const ITEM_TARGET_PREFIX = "item:";
+
+/**
  * Palavras arcanas VÁLIDAS de uma magia: as preenchidas, até o limite do
  * círculo (Menor 1, Intermediária 2, Maior 3). Baixar o círculo deixa de
  * contar as palavras excedentes, em vez de manter um bônus invisível.
@@ -279,6 +292,76 @@ export function weaponTagLabel(guardado) {
 }
 
 /**
+ * As categorias de DEFESA como alvos de efeito, com rótulo legível.
+ *
+ * Além de "Defesa (qualquer)", há a origem do ataque (corpo a corpo, à
+ * distância, magia) e a combinação dela com o atributo que defende —
+ * "Esquiva contra magia", "Bloqueio corpo a corpo".
+ *
+ * @returns {Record<string,string>}
+ */
+export function defesasComoAlvos() {
+  const rotuloOrigem = { Melee: "corpo a corpo", Ranged: "à distância", Magia: "magia" };
+  const rotuloAttr = { esquiva: "Esquiva", bloqueio: "Bloqueio" };
+  const out = {
+    defense: "Defesa (qualquer)",
+    defenseMelee: "Defesa (corpo a corpo)",
+    defenseRanged: "Defesa (à distância)",
+    defenseMagia: "Defesa (magia)",
+  };
+  for (const a of DEFENSE_ATTRS) {
+    for (const o of ATTACK_ORIGINS) {
+      out[`${a}${o}`] = `${rotuloAttr[a]} (${rotuloOrigem[o]})`;
+    }
+  }
+  return out;
+}
+
+/**
+ * Tipagens que o mundo já conhece, para sugerir no campo de texto.
+ *
+ * O alvo de arma é digitado (ver tipagensComoAlvos), então a lista do livro
+ * vira sugestão de autocompletar em vez de um seletor.
+ *
+ * @returns {string[]} rótulos em ordem alfabética
+ */
+export function tipagensConhecidas() {
+  const vistos = new Map();
+  for (const [id, label] of Object.entries(CONFIG?.LIGEIA?.weaponTags || {})) vistos.set(id, label);
+  const varrer = (itens) => {
+    for (const it of itens || []) {
+      const guardadas = [
+        ...(Array.isArray(it?.system?.tags) ? it.system.tags : []),
+        ...String(it?.system?.tagsExtra || "").split(","),
+      ];
+      for (const t of guardadas) {
+        const id = weaponTagId(t);
+        if (id && !vistos.has(id)) vistos.set(id, weaponTagLabel(t));
+      }
+    }
+  };
+  try {
+    varrer(globalThis.game?.items);
+    for (const a of globalThis.game?.actors || []) varrer(a.items);
+  } catch (e) { /* fora de um mundo carregado */ }
+  return [...vistos.values()].sort((a, b) => a.localeCompare(b, "pt-BR"));
+}
+
+/**
+ * Condições como alvos de RESISTÊNCIA: "resistir:cego" dá bônus nas
+ * rolagens para se livrar do que cega.
+ *
+ * @returns {Record<string,string>}
+ */
+export function resistenciasComoAlvos() {
+  const out = {};
+  for (const [id, def] of Object.entries(CONFIG?.LIGEIA?.conditions || {})) {
+    out[`${RESIST_TARGET_PREFIX}${id}`] = `Resistir — ${def?.label || id}`;
+  }
+  return out;
+}
+
+/**
  * Tipagens de arma como ALVOS de efeito, para os seletores das fichas.
  *
  * Além das tipagens do livro, inclui as que o mundo já usa em alguma arma
@@ -291,7 +374,9 @@ export function weaponTagLabel(guardado) {
  * @returns {Record<string,string>} alvo → rótulo
  */
 export function tipagensComoAlvos() {
-  const out = { [WEAPON_ANY_TARGET]: "Arma (qualquer tipagem)" };
+  // "Arma — digite a tipagem" é um prefixo com argumento: escolhido no
+  // seletor, o nome da tipagem vai no campo ao lado (ver mergeTargetArg).
+  const out = { [WEAPON_TAG_PREFIX]: "Arma — tipagem (digite)" };
   const ids = Object.keys(CONFIG?.LIGEIA?.weaponTags || {});
   // tipagem inventada → rótulo como foi digitado (a primeira grafia vista)
   const extras = new Map();
@@ -311,13 +396,6 @@ export function tipagensComoAlvos() {
     varrer(globalThis.game?.items);
     for (const a of globalThis.game?.actors || []) varrer(a.items);
   } catch (e) { /* fora de um mundo carregado: só a lista do livro */ }
-  for (const id of ids) {
-    out[`${WEAPON_TAG_PREFIX}${id}`] = `Arma — ${weaponTagLabel(id)}`;
-  }
-  // As inventadas vão depois, em ordem, com a grafia que foi digitada.
-  for (const [id, rotulo] of [...extras].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"))) {
-    out[`${WEAPON_TAG_PREFIX}${id}`] = `Arma — ${rotulo}`;
-  }
   return out;
 }
 
@@ -334,9 +412,19 @@ const SECONDARY_ATTRS = ["bloqueio", "esquiva", "conjuracao", "iniciativa"];
 //  - attackMelee/Ranged : só ataques de ações marcadas (ou não) como
 //                         "esta ação é corpo a corpo"
 //  - defenseMelee/Ranged: só defesas CONTRA ataques corpo a corpo / à distância
+// Atributos de defesa que ganham categorias próprias por origem do ataque.
+export const DEFENSE_ATTRS = ["esquiva", "bloqueio"];
+// Origens de um ataque, do ponto de vista de quem se defende.
+export const ATTACK_ORIGINS = ["Melee", "Ranged", "Magia"];
+
 const ROLL_CATEGORIES = [
   "all", "attack", "defense",
-  "attackMelee", "attackRanged", "defenseMelee", "defenseRanged",
+  "attackMelee", "attackRanged",
+  // Defesa por ORIGEM do ataque: corpo a corpo, à distância e magia.
+  "defenseMelee", "defenseRanged", "defenseMagia",
+  // E a combinação ATRIBUTO × ORIGEM: "esquiva contra magias",
+  // "bloqueio contra ataques à distância"...
+  ...DEFENSE_ATTRS.flatMap((a) => ATTACK_ORIGINS.map((o) => `${a}${o}`)),
 ];
 // Recursos/derivados que aceitam +N via efeito "stat".
 const STAT_TARGETS = ["hp", "mp", "heroic", "deslocamento"];
@@ -363,7 +451,16 @@ function emptyMods() {
   // Bônus restritos a uma TIPAGEM de arma, no mesmo molde. A chave
   // WEAPON_ANY_TARGET ("arma") guarda o que vale para qualquer arma tipada.
   const weapon = {};
-  return { attr, roll, stat, size, word, weapon };
+  // Bônus para RESISTIR a efeitos de uma condição: condição → modificadores.
+  const resist = {};
+  // Bônus nas ações de um ITEM específico: nome normalizado → modificadores.
+  const perItem = {};
+  // IMUNIDADES declaradas por efeitos: cada balde guarda chaves normalizadas.
+  const immune = { damage: new Set(), condition: new Set(), label: new Set(), item: new Set() };
+  // CRÍTICO AUTOMÁTICO: conjunto de alvos de rolagem em que o personagem
+  // crita sem precisar dos dados (mesmos alvos do bônus de rolagem).
+  const autocrit = new Set();
+  return { attr, roll, stat, size, word, weapon, resist, perItem, immune, autocrit };
 }
 
 /**
@@ -415,6 +512,72 @@ function applyEffectToMods(mods, effect, actor) {
       case "crit": alvo.critBonus += v; break;
       case "fumble": alvo.failBonus += v; break;
       default: break; // os demais tipos não fazem sentido por palavra
+    }
+    return;
+  }
+
+  // IMUNIDADE: não é um número, é uma trava. O alvo diz a QUE se é imune.
+  if (effect.type === "immune") {
+    const bruto = String(effect.target || "").trim();
+    if (!bruto) return;
+    // "dano:fogo", "condicao:cego", "efeito:Maldição", "item:Espada"
+    const sep = bruto.indexOf(":");
+    const tipo = sep > 0 ? bruto.slice(0, sep) : "dano";
+    const chave = sep > 0 ? bruto.slice(sep + 1) : bruto;
+    if (!chave) return;
+    const balde = { dano: "damage", condicao: "condition", efeito: "label", item: "item" }[tipo];
+    if (!balde) return;
+    // Tipo de dano e condição são ids; nome de efeito e de item são texto
+    // digitado, então entram normalizados para casar sem acento nem caixa.
+    mods.immune[balde].add(balde === "damage" || balde === "condition" ? chave : normalizeKey(chave));
+    return;
+  }
+
+  // CRÍTICO AUTOMÁTICO: marca o alvo de rolagem em que o personagem crita
+  // sem depender dos dados. Aceita os mesmos alvos do bônus de rolagem.
+  if (effect.type === "autocrit") {
+    mods.autocrit.add(String(effect.target || "all"));
+    return;
+  }
+
+  // Alvo "resistir:<condicao>": vale nas rolagens para se livrar de um
+  // efeito que aplica aquela condição.
+  if (t.startsWith(RESIST_TARGET_PREFIX)) {
+    const cond = t.slice(RESIST_TARGET_PREFIX.length);
+    if (!cond) return;
+    const alvo = (mods.resist[cond] ||= {
+      bonus: 0, dice: 0, rollDice: 0, reroll1: 0, reroll6: 0, critBonus: 0, failBonus: 0,
+    });
+    switch (effect.type) {
+      case "bonus": case "attr": alvo.bonus += v; break;
+      case "dice": alvo.dice += v; break;
+      case "rollDice": alvo.rollDice += v; break;
+      case "reroll1": alvo.reroll1 = combineReroll(alvo.reroll1, effect.rerollAll ? "all" : v); break;
+      case "reroll6": alvo.reroll6 = combineReroll(alvo.reroll6, effect.rerollAll ? "all" : v); break;
+      case "crit": alvo.critBonus += v; break;
+      case "fumble": alvo.failBonus += v; break;
+      default: break;
+    }
+    return;
+  }
+
+  // Alvo "item:<nome>": vale em qualquer ação daquele item da ficha.
+  if (t.startsWith(ITEM_TARGET_PREFIX)) {
+    const nome = normalizeKey(t.slice(ITEM_TARGET_PREFIX.length));
+    if (!nome) return;
+    const alvo = (mods.perItem[nome] ||= {
+      bonus: 0, dice: 0, rollDice: 0, reroll1: 0, reroll6: 0, critBonus: 0, failBonus: 0, damage: 0,
+    });
+    switch (effect.type) {
+      case "bonus": case "attr": alvo.bonus += v; break;
+      case "dice": alvo.dice += v; break;
+      case "rollDice": alvo.rollDice += v; break;
+      case "reroll1": alvo.reroll1 = combineReroll(alvo.reroll1, effect.rerollAll ? "all" : v); break;
+      case "reroll6": alvo.reroll6 = combineReroll(alvo.reroll6, effect.rerollAll ? "all" : v); break;
+      case "crit": alvo.critBonus += v; break;
+      case "fumble": alvo.failBonus += v; break;
+      case "damage": alvo.damage += v; break;
+      default: break;
     }
     return;
   }
@@ -563,6 +726,145 @@ export function actionIsAvailable(item, action) {
   return true;
 }
 
+/**
+ * Modificadores para RESISTIR a um efeito, conforme a condição que ele
+ * aplica.
+ *
+ * Assim como há bônus para rolar magia ou para rolar com certas armas, aqui
+ * há bônus para se livrar do que cega, do que envenena, do que atordoa.
+ * Vale tanto na rolagem de encerramento quanto no teste de resistência.
+ *
+ * @param {Actor} actor  quem está resistindo
+ * @param {string} condId  condição que o efeito aplica ("" se nenhuma)
+ * @returns {{bonus:number, dice:number, rollDice:number, critBonus:number,
+ *            failBonus:number, reroll1:(number|string), reroll6:(number|string)}}
+ */
+export function resistMods(actor, condId) {
+  const vazio = {
+    bonus: 0, dice: 0, rollDice: 0, critBonus: 0, failBonus: 0, reroll1: 0, reroll6: 0,
+  };
+  const mapa = actor?.system?.resistMods;
+  if (!mapa || !condId) return vazio;
+  const m = mapa[condId];
+  if (!m) return vazio;
+  return {
+    bonus: m.bonus || 0, dice: m.dice || 0, rollDice: m.rollDice || 0,
+    critBonus: m.critBonus || 0, failBonus: m.failBonus || 0,
+    reroll1: m.reroll1 || 0, reroll6: m.reroll6 || 0,
+  };
+}
+
+/* ======================================================================== */
+/*  Alvos com argumento digitado                                            */
+/* ======================================================================== */
+
+/**
+ * Prefixos de alvo que pedem um TEXTO para completar.
+ *
+ * O seletor oferece o prefixo ("Item desta ficha", "Arma — tipagem…") e um
+ * campo ao lado recebe o nome. O que fica guardado é a junção dos dois:
+ * "item:Espada Longa", "arma:haste", "efeito:Maldição".
+ */
+export const TARGET_ARG_PREFIXES = [ITEM_TARGET_PREFIX, WEAPON_TAG_PREFIX, "efeito:", "item:"];
+
+/** O alvo pede um texto para completar? Devolve o prefixo, ou "". */
+export function targetArgPrefix(alvo) {
+  const t = String(alvo || "");
+  // O mais longo primeiro, para "item:" não engolir um prefixo maior.
+  const achado = [...new Set(TARGET_ARG_PREFIXES)]
+    .sort((a, b) => b.length - a.length)
+    .find((p) => t.startsWith(p));
+  return achado || "";
+}
+
+/** Separa "item:Espada Longa" em { prefixo: "item:", arg: "Espada Longa" }. */
+export function splitTargetArg(alvo) {
+  const prefixo = targetArgPrefix(alvo);
+  if (!prefixo) return { prefixo: "", arg: "" };
+  return { prefixo, arg: String(alvo || "").slice(prefixo.length) };
+}
+
+/**
+ * Junta o prefixo escolhido no seletor com o texto digitado ao lado.
+ *
+ * O formulário manda os dois separados (`target` com o prefixo, `targetArg`
+ * com o texto) porque um select e um input não podem dividir o mesmo nome.
+ * Aqui eles voltam a ser um valor só, e o campo auxiliar é descartado.
+ *
+ * @param {object} entrada  um efeito, com target/targetArg (ou fxTarget/fxTargetArg)
+ * @param {string} [campo]  "target" ou "fxTarget"
+ */
+export function mergeTargetArg(entrada, campo = "target") {
+  if (!entrada || typeof entrada !== "object") return entrada;
+  const campoArg = `${campo}Arg`;
+  if (!(campoArg in entrada)) return entrada;
+  const arg = String(entrada[campoArg] ?? "").trim();
+  delete entrada[campoArg];
+  const prefixo = targetArgPrefix(entrada[campo]);
+  if (!prefixo) return entrada;
+  // Tipagem de arma em branco quer dizer "qualquer arma tipada", que é o
+  // alvo próprio para isso — e não "arma:" , que não casaria com nada.
+  if (prefixo === WEAPON_TAG_PREFIX) {
+    // A tipagem é comparada pelo id normalizado ("Duas Mãos" → duas_maos).
+    entrada[campo] = arg ? `${prefixo}${weaponTagId(arg)}` : WEAPON_ANY_TARGET;
+  } else {
+    entrada[campo] = `${prefixo}${arg}`;
+  }
+  return entrada;
+}
+
+/* ======================================================================== */
+/*  Imunidades                                                              */
+/* ======================================================================== */
+
+/**
+ * O personagem é imune a um TIPO DE DANO?
+ * @param {Actor} actor
+ * @param {string} tipo  id do tipo ("fogo", "corte"...)
+ */
+export function immuneToDamage(actor, tipo) {
+  const lista = actor?.system?.immunities?.damage;
+  if (!Array.isArray(lista) || !lista.length || !tipo) return false;
+  return lista.includes(tipo);
+}
+
+/**
+ * O personagem é imune a uma CONDIÇÃO?
+ * @param {Actor} actor
+ * @param {string} condId
+ */
+export function immuneToCondition(actor, condId) {
+  const lista = actor?.system?.immunities?.condition;
+  if (!Array.isArray(lista) || !lista.length || !condId) return false;
+  return lista.includes(condId);
+}
+
+/**
+ * O personagem é imune a um efeito por CIRCUNSTÂNCIA (o nome do efeito) ou
+ * por ITEM de origem?
+ *
+ * A circunstância casa por TRECHO do nome, sem acento nem caixa: uma
+ * imunidade a "maldição" alcança "Maldição do Lodo". O item casa pelo nome
+ * inteiro, normalizado.
+ *
+ * @param {Actor} actor
+ * @param {{label?:string, itemName?:string}} oque
+ * @returns {string} o motivo da imunidade, ou "" se não há
+ */
+export function immunityReasonFor(actor, { label = "", itemName = "" } = {}) {
+  const imm = actor?.system?.immunities;
+  if (!imm) return "";
+  const nome = normalizeKey(label);
+  if (nome) {
+    for (const trecho of imm.label || []) {
+      if (trecho && nome.includes(trecho)) return `imune a "${trecho}"`;
+    }
+  }
+  const item = normalizeKey(itemName);
+  if (item && (imm.item || []).includes(item)) return `imune a ${itemName}`;
+  return "";
+}
+
 /* ======================================================================== */
 /*  Remoção de efeitos ativos (dissipar / purificar)                        */
 /* ======================================================================== */
@@ -574,6 +876,17 @@ export const REMOVE_FX_MODES = {
   mine: "Os que eu apliquei",
   all: "Todos",
 };
+
+/**
+ * Normaliza um texto digitado para servir de chave: sem acento, minúsculo,
+ * sem espaços nas pontas. É o que faz "Espada Longa" casar com
+ * "espada longa" entre fichas diferentes.
+ */
+export function normalizeKey(s) {
+  return String(s || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .trim().toLowerCase().replace(/\s+/g, " ");
+}
 
 /** Normaliza para comparar nome de efeito: sem acento, minúsculo. */
 function dobrarNome(s) {

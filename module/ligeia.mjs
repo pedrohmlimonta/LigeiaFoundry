@@ -146,6 +146,10 @@ Hooks.once("init", function () {
     complicationXp: { B: 20, A: 40, E: 80 },
     // Multiplicador quando a habilidade está fora das listas conhecidas
     offListMultiplier: 2,
+    // ACERTO CRÍTICO: além do que a rolagem já dá, um crítico que cause dano
+    // soma o NÍVEL de quem atacou ao dano, no tipo de dano base do ataque.
+    // Vale para qualquer ataque — magia, arma, desarmado. Em false, some.
+    critAddsLevelToDamage: true,
     // 28 palavras arcanas
     arcaneWords: [
       "acida", "augurado", "carmo", "devena", "energio", "exitium",

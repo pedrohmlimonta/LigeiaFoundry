@@ -2095,3 +2095,6 @@ select.lig-actlevel:hover {
   opacity: 0.75;
   font-style: italic;
 }
+
+/* Nível somado ao dano por acerto crítico */
+.lig-crit-dmg { color: #e8c76a; font-size: 0.85em; }

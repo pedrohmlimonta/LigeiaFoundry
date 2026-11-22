@@ -35,7 +35,7 @@ async function waitForDiceAnimation(fallbackMs = 1100) {
 import { conditionModifiers, attributeConditionDice, actorHasCondition, coverDefenseDice, hasFullCover } from "./conditions.mjs";
 import { playActionAnimation } from "./integrations.mjs";
 import { executeActionMovement } from "./movement.mjs";
-import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvailable, activeEffectsOf, arcaneWordsOf, weaponTagsOf, WEAPON_ANY_TARGET, costsForLevel, resolvePreActivation, parsePreActivation, matchEffectsToRemove, removeEffectsAt } from "./effects.mjs";
+import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvailable, activeEffectsOf, arcaneWordsOf, weaponTagsOf, WEAPON_ANY_TARGET, costsForLevel, resolvePreActivation, parsePreActivation, matchEffectsToRemove, removeEffectsAt, DEFENSE_ATTRS, normalizeKey, immuneToDamage, immuneToCondition, immunityReasonFor } from "./effects.mjs";
 import { DEATH_HP, WOUND_LEVELS, woundLevelFor, setWoundLevel } from "./wounds.mjs";
 import { updateActorAsGM, canAffectActor } from "./gm-proxy.mjs";
 import { enchantmentMods, applyEnchantment, pedirItemParaEncantar, removeEnchantment } from "./enchant.mjs";
@@ -71,6 +71,9 @@ export async function rollLigeia({
   critBonus = 0,
   failBonus = 0,
   baseDice = 2,
+  // CRÍTICO AUTOMÁTICO: um efeito garante o crítico nesta rolagem, sem
+  // depender dos dados (ver hasAutoCrit).
+  forceCrit = false,
 } = {}) {
   // Dados BÁSICOS: normalmente 2. Podem ser reduzidos até 1 (penalidade forte)
   // quando não há dados de melhoria para remover.
@@ -131,8 +134,10 @@ export async function rollLigeia({
   // com 1 dado → 6 e 1.
   const critThreshold = (6 * base) - Math.max(0, Number(critBonus) || 0);
   const failThreshold = base + Math.max(0, Number(failBonus) || 0);
-  const isCritSuccessDice = kept.length >= base && keptSum >= critThreshold;
-  const isCritFail = kept.length >= base && keptSum <= failThreshold;
+  const isCritSuccessDice = (kept.length >= base && keptSum >= critThreshold) || !!forceCrit;
+  // Com o crítico garantido não há falha crítica: as duas coisas juntas não
+  // fazem sentido, e o crítico foi prometido por um efeito.
+  const isCritFail = !forceCrit && kept.length >= base && keptSum <= failThreshold;
 
   const total = roll.total;
 
@@ -143,8 +148,10 @@ export async function rollLigeia({
 
   // Sucesso crítico só vale se igualar/superar a dificuldade (quando há uma).
   // Sem dificuldade, atingir o limiar de dados já conta como crítico.
-  const isCritSuccess =
-    isCritSuccessDice && (difficulty == null || total >= difficulty);
+  // O crítico garantido dispensa a dificuldade: o efeito promete o crítico,
+  // não "crítico se você já teria acertado".
+  const isCritSuccess = forceCrit
+    || (isCritSuccessDice && (difficulty == null || total >= difficulty));
 
   // Se os limiares se sobrepõem (config extrema), o sucesso crítico tem
   // prioridade: não marca falha crítica ao mesmo tempo.
@@ -157,6 +164,8 @@ export async function rollLigeia({
     total,
     isCritSuccess,
     isCritFail: isCritFailFinal,
+    // Marca para a mensagem distinguir o crítico de dados do garantido.
+    critForced: !!forceCrit,
     outcome,
     difficulty,
     flat,
@@ -233,7 +242,7 @@ function sumKept(dieTerm) {
 /**
  * Combina dois valores de reroll (número ≥0 ou "all"/Infinity). "all" vence.
  */
-function mergeReroll(a, b) {
+export function mergeReroll(a, b) {
   const aAll = a === "all" || a === Infinity;
   const bAll = b === "all" || b === Infinity;
   if (aAll || bAll) return Infinity;
@@ -307,6 +316,57 @@ export function arcaneWordMods(actor, item, attrKey) {
  *            failBonus:number, reroll1:(number|string), reroll6:(number|string),
  *            damage:number, tipagens:string[]}}
  */
+/**
+ * Modificadores que valem nas ações de UM ITEM específico.
+ *
+ * Um efeito pode mirar "Item — Espada Longa": a partir daí toda ação
+ * daquela espada ganha o bônus, seja ela qual for. Casa pelo NOME
+ * normalizado, então a espada continua reconhecida se o item for copiado
+ * para outra ficha, onde o id é outro.
+ *
+ * @param {Actor} actor
+ * @param {Item}  item
+ * @returns {{bonus:number, dice:number, rollDice:number, critBonus:number,
+ *            failBonus:number, reroll1:(number|string), reroll6:(number|string),
+ *            damage:number}}
+ */
+export function itemTargetMods(actor, item) {
+  const vazio = {
+    bonus: 0, dice: 0, rollDice: 0, critBonus: 0, failBonus: 0,
+    reroll1: 0, reroll6: 0, damage: 0,
+  };
+  const mapa = actor?.system?.itemMods;
+  if (!mapa || !item?.name) return vazio;
+  const m = mapa[normalizeKey(item.name)];
+  if (!m) return vazio;
+  return {
+    bonus: m.bonus || 0, dice: m.dice || 0, rollDice: m.rollDice || 0,
+    critBonus: m.critBonus || 0, failBonus: m.failBonus || 0,
+    reroll1: m.reroll1 || 0, reroll6: m.reroll6 || 0, damage: m.damage || 0,
+  };
+}
+
+/**
+ * O personagem crita AUTOMATICAMENTE nesta rolagem?
+ *
+ * Um efeito do tipo "crítico automático" marca alvos de rolagem (os mesmos
+ * do bônus: um atributo, "todas", uma categoria de ataque/defesa...). Se
+ * qualquer um dos alvos desta rolagem estiver marcado, o acerto é crítico
+ * sem depender dos dados.
+ *
+ * @param {Actor} actor
+ * @param {string} attrKey
+ * @param {string|string[]} [categorias]
+ * @returns {boolean}
+ */
+export function hasAutoCrit(actor, attrKey, categorias = null) {
+  const marcados = actor?.system?.autoCrit;
+  if (!Array.isArray(marcados) || !marcados.length) return false;
+  const cats = Array.isArray(categorias) ? categorias : (categorias ? [categorias] : []);
+  const alvos = ["all", attrKey, ...cats].filter(Boolean);
+  return alvos.some((a) => marcados.includes(a));
+}
+
 export function weaponTagMods(actor, item) {
   const vazio = {
     bonus: 0, dice: 0, rollDice: 0, critBonus: 0, failBonus: 0,
@@ -361,8 +421,21 @@ export function attackCategories(isMelee) {
  * @param {boolean} isMelee O ataque recebido é corpo a corpo?
  * @returns {string[]}
  */
-export function defenseCategories(isMelee) {
-  return ["defense", isMelee ? "defenseMelee" : "defenseRanged"];
+export function defenseCategories(isMelee, attrKey = "", fromMagic = false) {
+  // A origem física (corpo a corpo OU à distância) e, por cima, "magia"
+  // quando o ataque veio de uma magia. São ACUMULATIVAS de propósito: um
+  // toque mágico é corpo a corpo E magia, então um bônus contra qualquer
+  // uma das duas coisas deve valer.
+  const origens = [isMelee ? "Melee" : "Ranged"];
+  if (fromMagic) origens.push("Magia");
+
+  const out = ["defense"];
+  for (const o of origens) {
+    out.push(`defense${o}`);
+    // Combinação com o atributo usado para se defender.
+    if (DEFENSE_ATTRS.includes(attrKey)) out.push(`${attrKey}${o}`);
+  }
+  return out;
 }
 
 /**
@@ -441,7 +514,7 @@ export function critFor(actor, key, category = null) {
 export function buildRollFlavor({ label, result }) {
   let tag = "";
   if (result.isCritSuccess) {
-    tag = `<span class="ligeia-crit success">✦ Sucesso Crítico ✦</span>`;
+    tag = `<span class="ligeia-crit success">✦ Sucesso Crítico${result.critForced ? " garantido" : ""} ✦</span>`;
   } else if (result.isCritFail) {
     tag = `<span class="ligeia-crit fail">✗ Falha Crítica ✗</span>`;
   } else if (result.outcome === "success") {
@@ -766,7 +839,7 @@ export async function applyConditionsToActor(actor, ids = []) {
  * personagem (self/area/aura com includeSelf). `acertou` indica se a defesa
  * falhou (ou se não houve defesa, em self/auto).
  */
-async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls = [], healRoll = null, atkTotal, defTotal, dcTotal = null, acertou, cfg, attackerMods, caster, item = null, outcome = null }) {
+async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls = [], healRoll = null, atkTotal, defTotal, dcTotal = null, acertou, cfg, attackerMods, caster, item = null, outcome = null, isCrit = false }) {
   let dmgText = "";
 
   const hasExtra = Array.isArray(extraDamageRolls) && extraDamageRolls.length > 0;
@@ -783,8 +856,20 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
     const multNote = multBits.length ? ` <span class="lig-cond-note">(${multBits.join(", ")})</span>` : "";
 
     // Aplica UMA parcela de dano (tipo/recurso/fórmula) e devolve a linha HTML.
+    // CRÍTICO: soma o nível de quem atacou ao dano, no tipo de dano base.
+    // Só na parcela PRINCIPAL (é ela que carrega o tipo base) e só quando o
+    // ataque de fato acertou criticamente.
+    const critLevel = (isCrit && (cfg.critAddsLevelToDamage !== false))
+      ? Math.max(0, Number(caster?.system?.details?.level) || 0)
+      : 0;
+
     const applyParcel = async (total, type, resource, scaling, isMain) => {
       const isHp = resource === "hp";
+      // IMUNIDADE ao tipo de dano: a parcela inteira não acontece.
+      if (isHp && type && immuneToDamage(tActor, type)) {
+        const tl = dmgTypeLabel(type) || type;
+        return `<div class="lig-atk-dmg muted">Imune a ${tl} — sem dano.</div>`;
+      }
       const rd = isHp ? damageReductionFor(tActor, type || "") : 0;
       // Vulnerabilidade do ALVO ao tipo de dano: entra depois da RD (a armadura
       // reduz, a fraqueza amplifica o que passou).
@@ -798,7 +883,9 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       // TIPAGEM da arma: "+1 de dano com armas de Haste". Como o
       // encantamento, só na parcela principal e só em dano de PV.
       const tagDmg = (isMain && isHp) ? (weaponTagMods(caster, item).damage || 0) : 0;
-      let amount = (total + (scaling || 0) + sizeDmg + enchDmg + tagDmg) * dealtMult;
+      // CRÍTICO: o nível entra como dano base, não como parcela à parte.
+      const critDmg = isMain ? critLevel : 0;
+      let amount = (total + (scaling || 0) + sizeDmg + enchDmg + tagDmg + critDmg) * dealtMult;
       amount = amount - rd;
       amount = (amount + vuln.flat) * vuln.mult;
       amount = amount * takenMult;
@@ -823,6 +910,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       const typeNote = isHp && typeLabel ? " " + typeLabel : "";
       const sizeNote = sizeDmg ? ` <span class="lig-scale">(${sizeDmg > 0 ? "+" : ""}${sizeDmg} por tamanho)</span>` : "";
       const enchNote = enchDmg ? ` <span class="lig-scale">(${enchDmg > 0 ? "+" : ""}${enchDmg} por encantamento)</span>` : "";
+      const critNote = critDmg ? ` <span class="lig-crit-dmg">(+${critDmg} crítico, nível)</span>` : "";
       const rdNote = rd ? ` <span class="lig-rd">(RD ${rd})</span>` : "";
       const vulnBits = [];
       if (vuln.flat) vulnBits.push(`+${vuln.flat}`);
@@ -846,7 +934,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
         applyNote = `<div class="lig-dmg-applied muted">${relayFailNote(applied)}</div>`;
       }
       const tag = isMain ? "" : ' <span class="lig-extra-tag">extra</span>';
-      return `<div class="lig-atk-dmg">${resWord}: <strong>${dealt}</strong>${typeNote}${tag}${scaleNote}${sizeNote}${enchNote}${rdNote}${vulnNote}${isMain ? multNote : ""}</div>${applyNote}`;
+      return `<div class="lig-atk-dmg">${resWord}: <strong>${dealt}</strong>${typeNote}${tag}${scaleNote}${critNote}${sizeNote}${enchNote}${rdNote}${vulnNote}${isMain ? multNote : ""}</div>${applyNote}`;
     };
 
     // Valor do escalonamento (bônus por superar a defesa) — calculado uma vez;
@@ -980,7 +1068,19 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       const conds = foundry.utils.deepClone(tActor.system?.conditions || []);
       const condsBefore = conds.length;
       const names = [];
+      const imunes = [];
       for (const ae of fxList) {
+        // IMUNIDADES: o alvo pode recusar este efeito por condição, pelo
+        // nome dele (circunstância) ou pelo item de onde ele veio.
+        const porCondicao = ae.fxType === "condition" && ae.fxTarget
+          && immuneToCondition(tActor, ae.fxTarget);
+        const motivo = porCondicao
+          ? `imune a ${CONFIG.LIGEIA?.conditions?.[ae.fxTarget]?.label || ae.fxTarget}`
+          : immunityReasonFor(tActor, { label: ae.label || "", itemName: item?.name || "" });
+        if (motivo) {
+          imunes.push(`${ae.label || "Efeito"} (${motivo})`);
+          continue;
+        }
         // "restore": recuperação INSTANTÂNEA de recurso ao aplicar — sobe o
         // recurso na hora (como a cura faz) e NÃO gera efeito duradouro.
         if (ae.fxType === "restore") {
@@ -1090,9 +1190,12 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       const encText = encantados.length
         ? `<div class="lig-atk-fx">Encantou: <strong>${encantados.join(", ")}</strong></div>`
         : "";
+      const immText = imunes.length
+        ? `<div class="lig-atk-fx muted">Sem efeito: ${imunes.join(", ")}</div>`
+        : "";
       fxText = (names.length
         ? `<div class="lig-atk-fx">Efeitos aplicados: <strong>${names.join(", ")}</strong></div>`
-        : "") + encText + barrierNote;
+        : "") + immText + encText + barrierNote;
     } else {
       fxText = `<div class="lig-atk-fx muted">Efeitos a aplicar: ${fxList.map((e) => e.label || "Efeito").join(", ")} — nenhum Mestre conectado para aplicar no alvo.</div>`;
     }
@@ -1600,10 +1703,11 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     const wordPre = arcaneWordMods(actor, item, atkKey);
     const enchPre = enchantmentMods(item, actor, atkKey);
     const tagPre = weaponTagMods(actor, item);
+    const itemPre = itemTargetMods(actor, item);
     const impPre =
       atkPre.dice + resolveEffectValue(action.rollDice, actor) + atkCond.atkDice +
       rmPre.dice + wordPre.dice + wordPre.rollDice + enchPre.dice + enchPre.rollDice +
-      tagPre.dice + tagPre.rollDice +
+      tagPre.dice + tagPre.rollDice + itemPre.dice + itemPre.rollDice +
       attributeConditionDice(actor, atkKey) +
       surpriseDiceFor(actor, action, overrideTargets);
     const cfg2 = await promptRollConfig({
@@ -1638,6 +1742,8 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     const enchM = enchantmentMods(item, actor, atkKey);
     // O que as TIPAGENS desta arma somam (Militar, Haste, Duas Mãos...).
     const tagM = weaponTagMods(actor, item);
+    // O que um efeito mirado NESTE ITEM soma (vale em qualquer ação dele).
+    const itemM = itemTargetMods(actor, item);
     // Surdo: -1D em rolagens de Conjuração.
     const attrCondDice = attributeConditionDice(actor, atkKey);
     // Surpreso: +1D para o atacante se o(s) alvo(s) diretos estão surpresos.
@@ -1646,19 +1752,22 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
       attribute: atk.value,
       improvement: dlgImprovement != null
         ? dlgImprovement
-        : atk.dice + (atk.rollDice || 0) + resolveEffectValue(action.rollDice, actor) + atkCond.atkDice + rmDice + attrCondDice + surpriseDice + wordM.dice + wordM.rollDice + enchM.dice + enchM.rollDice + tagM.dice + tagM.rollDice,
+        : atk.dice + (atk.rollDice || 0) + resolveEffectValue(action.rollDice, actor) + atkCond.atkDice + rmDice + attrCondDice + surpriseDice + wordM.dice + wordM.rollDice + enchM.dice + enchM.rollDice + tagM.dice + tagM.rollDice + itemM.dice + itemM.rollDice,
       // O bônus da ação aceita fórmula com @variáveis ("2+ceil(@nivel/2)"),
       // como os demais campos — Number() sozinho devolvia NaN → 0.
-      bonus: resolveEffectValue(action.rollBonus, actor) + rmBonus + dlgBonus + (atk.rollBonus || 0) + wordM.bonus + enchM.bonus + tagM.bonus,
+      bonus: resolveEffectValue(action.rollBonus, actor) + rmBonus + dlgBonus + (atk.rollBonus || 0) + wordM.bonus + enchM.bonus + tagM.bonus + itemM.bonus,
       baseDice: dlgBaseDice,
       // Passa a CD fixa (quando houver) para marcar sucesso/falha e crítico.
       difficulty: fixedDC,
       // Rerrolagem: atributo/categorias + palavras arcanas + encantamentos
-      // + tipagens da arma.
-      reroll1: (() => { const v = mergeReroll(mergeReroll(mergeReroll(atkRr.reroll1, wordM.reroll1), enchM.reroll1), tagM.reroll1); return v === Infinity ? "all" : v; })(),
-      reroll6: (() => { const v = mergeReroll(mergeReroll(mergeReroll(atkRr.reroll6, wordM.reroll6), enchM.reroll6), tagM.reroll6); return v === Infinity ? "all" : v; })(),
-      critBonus: atkCrit.critBonus + wordM.critBonus + enchM.critBonus + tagM.critBonus,
-      failBonus: atkCrit.failBonus + wordM.failBonus + enchM.failBonus + tagM.failBonus,
+      // + tipagens da arma + efeitos mirados neste item.
+      reroll1: (() => { const v = mergeReroll(mergeReroll(mergeReroll(mergeReroll(atkRr.reroll1, wordM.reroll1), enchM.reroll1), tagM.reroll1), itemM.reroll1); return v === Infinity ? "all" : v; })(),
+      reroll6: (() => { const v = mergeReroll(mergeReroll(mergeReroll(mergeReroll(atkRr.reroll6, wordM.reroll6), enchM.reroll6), tagM.reroll6), itemM.reroll6); return v === Infinity ? "all" : v; })(),
+      critBonus: atkCrit.critBonus + wordM.critBonus + enchM.critBonus + tagM.critBonus + itemM.critBonus,
+      failBonus: atkCrit.failBonus + wordM.failBonus + enchM.failBonus + tagM.failBonus + itemM.failBonus,
+      // CRÍTICO AUTOMÁTICO: um efeito pode garantir o crítico nesta rolagem,
+      // sem depender dos dados.
+      forceCrit: hasAutoCrit(actor, atkKey, atkCats),
     });
     atkRolls.push(atkRoll.roll);
   }
@@ -1834,7 +1943,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     : "";
   const atkHeader = atkRoll
     ? `<span class="lig-atk-attr">${atkLabel} → ${atkRoll.total}${atkCondNote}${dcHeader}</span>
-       ${atkRoll.isCritSuccess ? '<span class="ligeia-crit success">✦ Crítico ✦</span>' : ""}
+       ${atkRoll.isCritSuccess ? `<span class="ligeia-crit success">✦ Crítico${atkRoll.critForced ? " garantido" : ""} ✦</span>` : ""}
        ${atkRoll.isCritFail ? '<span class="ligeia-crit fail">✗ Falha Crítica ✗</span>' : ""}`
     : (isFrozen
         ? `<span class="lig-atk-attr lig-emanation-tag">Emanação · CD ${atkTotal} (ataque da criação)</span>`
@@ -1918,9 +2027,11 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
           ? ` <span class="lig-def-choice">(melhor de ${cands.map((c) => cfg.defenseAttrs?.[c.key] || c.key).join(" / ")})</span>`
           : "";
 
-        // "defense" + a variante conforme o ATAQUE recebido seja corpo a
-        // corpo ou à distância (quem decide é a ação do atacante).
-        const defCats = defenseCategories(action.isMelee);
+        // "defense" + as variantes conforme o ATAQUE recebido: corpo a
+        // corpo ou à distância (quem decide é a ação do atacante), magia
+        // quando vem de uma magia, e a combinação com o atributo que está
+        // defendendo (esquiva contra magia, bloqueio corpo a corpo...).
+        const defCats = defenseCategories(action.isMelee, def.key, item?.type === "magia");
         const defRr = rerollFor(tActor, def.key, defCats);
         const defCrit = critFor(tActor, def.key, defCats);
         // Surdo: -1D se a defesa usar Conjuração.
@@ -2005,7 +2116,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
 
       // O desfecho por alvo alimenta as condições das ações em cadeia.
       const outcome = { dealtDamage: false, healed: false, drainBase: 0, drainScaling: 0 };
-      const detail = await resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls, healRoll, atkTotal, defTotal, dcTotal: effectiveDCFor(tActor), acertou, cfg, attackerMods: atkCond, caster: actor, item, outcome });
+      const detail = await resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls, healRoll, atkTotal, defTotal, dcTotal: effectiveDCFor(tActor), acertou, cfg, attackerMods: atkCond, caster: actor, item, outcome, isCrit: !!atkRoll?.isCritSuccess });
       hits.push({ actor: tActor, acertou, isSelf, ...outcome });
       lines.push(`<div class="lig-atk-target"><div class="lig-atk-line"><strong>${tActor.name}</strong>${defInfo}</div>${detail}</div>`);
     }

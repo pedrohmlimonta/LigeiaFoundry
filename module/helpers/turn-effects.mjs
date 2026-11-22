@@ -11,9 +11,9 @@
  * rolagens/remoções duplicadas em mesa com vários jogadores.
  */
 
-import { rollLigeia, resolveAttr, rerollFor, critFor, applyHealingToActor, applyDamageToActor, attackCategories, categoryMods } from "./dice.mjs";
+import { rollLigeia, resolveAttr, rerollFor, critFor, applyHealingToActor, applyDamageToActor, attackCategories, categoryMods, mergeReroll, hasAutoCrit } from "./dice.mjs";
 import { processWoundRollAtTurnStart } from "./wounds.mjs";
-import { resolveEffectValue } from "./effects.mjs";
+import { resolveEffectValue, resistMods } from "./effects.mjs";
 import { privateResource } from "./chat-privacy.mjs";
 import { tickEnchantmentsAtTurnStart } from "./enchant.mjs";
 
@@ -76,15 +76,24 @@ async function rollEndForEffect(actor, ae) {
     }
   }
 
+  // Bônus para RESISTIR à condição que este efeito aplica: "+2 para se
+  // livrar do que cega". Só vale se o efeito marca alguma condição.
+  const res = resistMods(actor, ae.conditionId || "");
+  const resNote = (res.bonus || res.dice || res.rollDice)
+    ? ` <span class="lig-dc-note">(resistência${res.bonus ? ` ${res.bonus > 0 ? "+" : ""}${res.bonus}` : ""}${(res.dice + res.rollDice) ? ` ${res.dice + res.rollDice > 0 ? "+" : ""}${res.dice + res.rollDice}D` : ""})</span>`
+    : "";
+
   const result = await rollLigeia({
     attribute: r.value,
-    improvement: r.dice + rDados + (rm.all?.dice || 0),
-    bonus: (rm.all?.bonus || 0) + rBonus,
+    improvement: r.dice + rDados + (rm.all?.dice || 0) + res.dice + res.rollDice,
+    bonus: (rm.all?.bonus || 0) + rBonus + res.bonus,
     difficulty: dc,
-    reroll1: rr.reroll1,
-    reroll6: rr.reroll6,
-    critBonus: cr.critBonus,
-    failBonus: cr.failBonus,
+    reroll1: mergeReroll(rr.reroll1, res.reroll1),
+    reroll6: mergeReroll(rr.reroll6, res.reroll6),
+    critBonus: cr.critBonus + res.critBonus,
+    failBonus: cr.failBonus + res.failBonus,
+    // Um efeito pode garantir o crítico também aqui.
+    forceCrit: hasAutoCrit(actor, attrKey),
   });
   const success = result.total >= dc;
   const label = (CONFIG.LIGEIA?.attackAttrs?.[attrKey]) || attrKey;
@@ -93,7 +102,7 @@ async function rollEndForEffect(actor, ae) {
     : `<span class="lig-outcome ko">Persiste</span>`;
   await ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
-    flavor: `<div class="ligeia-roll-flavor"><strong>${actor.name}</strong> — encerrar <em>${ae.label}</em> (início do turno · ${label} vs CD ${dc}${atkNote}): ${result.total} ${note}</div>`,
+    flavor: `<div class="ligeia-roll-flavor"><strong>${actor.name}</strong> — encerrar <em>${ae.label}</em> (início do turno · ${label} vs CD ${dc}${atkNote}${resNote}): ${result.total} ${note}</div>`,
     rolls: [result.roll],
     sound: CONFIG.sounds.dice,
   });

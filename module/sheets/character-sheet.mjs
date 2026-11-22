@@ -10,7 +10,10 @@ import { computeXpSpent, computeXpGained } from "../helpers/xp.mjs";
 import { performRest, performMedicalCare, DEATH_HP } from "../helpers/wounds.mjs";
 import { effectIsActive, availableActionsOf, resolveEffectValue, WORD_TARGET_PREFIX, tipagensComoAlvos,
          activationLevelChoices, activationLevelOf, LEVELED_TYPES,
-         chainTargetKeys, actionShowsInSheet } from "../helpers/effects.mjs";
+         chainTargetKeys, actionShowsInSheet, defesasComoAlvos, resistenciasComoAlvos,
+         ITEM_TARGET_PREFIX, WEAPON_ANY_TARGET, WEAPON_TAG_PREFIX,
+         splitTargetArg, mergeTargetArg, tipagensConhecidas } from "../helpers/effects.mjs";
+
 import { artRowsFor, tokenArtFor, healthPercent } from "../helpers/token-art.mjs";
 import { pedirItemParaEncantar, applyEnchantment, removeEnchantment } from "../helpers/enchant.mjs";
 import { theatreRowsFor, theatreActive } from "../helpers/theatre-art.mjs";
@@ -134,6 +137,10 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
             if (ae && ae.effects && !Array.isArray(ae.effects) && typeof ae.effects === "object") {
               ae.effects = Object.keys(ae.effects).sort((a, b) => Number(a) - Number(b)).map((k) => ae.effects[k]);
             }
+          }
+          // Alvos com argumento: o seletor manda o prefixo, o campo o texto.
+          for (const ae of sys.appliedEffects) {
+            for (const e of (Array.isArray(ae?.effects) ? ae.effects : [])) mergeTargetArg(e, "target");
           }
           sys.appliedEffects = this.#mergeAppliedEffects(sys.appliedEffects);
         }
@@ -302,9 +309,14 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       esquiva: "Esquiva", bloqueio: "Bloqueio", iniciativa: "Iniciativa",
       // Ataque/defesa: além das versões "(qualquer)", as variantes que só
       // valem conforme a ação seja corpo a corpo ou à distância.
-      attack: "Ataque (qualquer)", defense: "Defesa (qualquer)",
+      attack: "Ataque (qualquer)",
       attackMelee: "Ataque (corpo a corpo)", attackRanged: "Ataque (à distância)",
-      defenseMelee: "Defesa (corpo a corpo)", defenseRanged: "Defesa (à distância)",
+      // Defesa por origem do ataque e por atributo que defende.
+      ...defesasComoAlvos(),
+      // Resistir a efeitos de uma condição.
+      ...resistenciasComoAlvos(),
+      // Um ITEM da ficha: toda ação dele recebe o bônus.
+      [ITEM_TARGET_PREFIX]: "Item desta ficha (digite o nome)",
       // Conjuração restrita a uma palavra arcana: vale só para as magias que
       // tenham aquela palavra, e acumula quando a magia tem mais de uma.
       ...(CONFIG.LIGEIA?.arcaneWords || []).reduce((acc, w) => {
@@ -319,7 +331,17 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       forca: "Força", agilidade: "Agilidade", vigor: "Vigor", mente: "Mente", percepcao: "Percepção",
       bloqueio: "Bloqueio", esquiva: "Esquiva", conjuracao: "Conjuração", iniciativa: "Iniciativa", deslocamento: "Deslocamento",
     };
+    context.weaponTagSuggestions = tipagensConhecidas();
     const dmgTargets = { all: "Qualquer", ...(CONFIG.LIGEIA?.damageTypes || {}) };
+    // IMUNIDADE: a que se é imune (dano, condição, circunstância, item).
+    const immuneTargets = {
+      ...Object.fromEntries(Object.entries(CONFIG.LIGEIA?.damageTypes || {})
+        .map(([id, l]) => [`dano:${id}`, `Dano — ${l}`])),
+      ...Object.fromEntries(Object.entries(CONFIG.LIGEIA?.conditions || {})
+        .map(([id, d]) => [`condicao:${id}`, `Condição — ${d.label || id}`])),
+      "efeito:": "Circunstância (digite o nome do efeito)",
+      "item:": "Item (digite o nome)",
+    };
     // Listas dos campos de dano contínuo / regeneração por rodada.
     context.damageTypeChoices = { ...(CONFIG.LIGEIA?.damageTypes || {}) };
     context.tickResourceChoices = { hp: "PV", mp: "PM", heroic: "PH" };
@@ -337,7 +359,9 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     };
     const targetsFor = (type) => {
       switch (type) {
-        case "bonus": case "attr": case "dice": case "rollDice": case "reroll1": case "reroll6": case "crit": case "fumble": return rollTargets;
+        case "bonus": case "attr": case "dice": case "rollDice": case "reroll1": case "reroll6": case "crit": case "fumble":
+        case "autocrit": return rollTargets;
+        case "immune": return immuneTargets;
         case "stat": return statTargets;
         case "set": return setTargets;
         // Dano por tipo OU por tipagem de arma (ver item-sheets.mjs).
@@ -359,6 +383,18 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
         fx0: e0,
         fx0Type: type0,
         fx0TargetChoices: targetsFor(type0),
+        // Alvos com argumento digitado (tipagem de arma, item, circunstância).
+        ...(() => {
+          const { prefixo, arg } = splitTargetArg(e0?.target);
+          const pref = prefixo || (e0?.target === WEAPON_ANY_TARGET ? WEAPON_TAG_PREFIX : "");
+          const dicas = {
+            [WEAPON_TAG_PREFIX]: ["vazio = qualquer tipagem", "Vazio vale para qualquer arma tipada; escreva a tipagem para restringir."],
+            [ITEM_TARGET_PREFIX]: ["nome do item", "Nome do item na ficha. Toda ação dele recebe este efeito."],
+            "efeito:": ["nome do efeito", "Casa por trecho do nome, sem acento nem maiúscula."],
+          };
+          const [hint, title] = dicas[pref] || ["", ""];
+          return { fx0TargetSel: pref || e0?.target, fx0ArgPrefix: pref, fx0Arg: arg, fx0ArgHint: hint, fx0ArgTitle: title };
+        })(),
         fx0IsReroll: type0 === "reroll1" || type0 === "reroll6",
         fx0IsVuln: type0 === "vuln",
         // Nome do item que este efeito encantou (para mostrar na ficha).

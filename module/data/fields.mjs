@@ -18,7 +18,7 @@ export function effectField() {
       type: new fields.StringField({
         required: true,
         initial: "bonus",
-        choices: ["dice", "rollDice", "bonus", "attr", "stat", "set", "damage", "rd", "vuln", "reroll1", "reroll6", "crit", "fumble", "tempHp", "areaFilter", "condition", "size", "restore", "info"],
+        choices: ["dice", "rollDice", "bonus", "attr", "stat", "set", "damage", "rd", "vuln", "reroll1", "reroll6", "crit", "fumble", "autocrit", "immune", "tempHp", "areaFilter", "condition", "size", "restore", "info"],
       }),
       target: new fields.StringField({ required: true, initial: "all" }),
       // Número OU fórmula determinística com @variáveis do dono — ex.:
@@ -420,7 +420,7 @@ export function actionEntryField() {
         // Tipo do modificador (mesma lista dos efeitos de itens + condição)
         fxType: new fields.StringField({
           initial: "bonus",
-          choices: ["bonus", "dice", "rollDice", "attr", "stat", "set", "damage", "rd", "vuln", "reroll1", "reroll6", "crit", "fumble", "restore", "condition", "size"],
+          choices: ["bonus", "dice", "rollDice", "attr", "stat", "set", "damage", "rd", "vuln", "reroll1", "reroll6", "crit", "fumble", "autocrit", "immune", "restore", "condition", "size"],
         }),
         // Alvo do modificador — depende do tipo (atributo, recurso, tipo de
         // dano ou id de condição). Sempre escolhido por select.

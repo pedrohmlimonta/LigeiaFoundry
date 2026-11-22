@@ -1,6 +1,11 @@
 {{!-- Partial: editor de efeitos. Cada efeito já vem com targetChoices e
       targetApplies calculados em _prepareContext conforme seu tipo.
       showEffectLevel = true apenas em habilidades (efeito por nível B/A/E). --}}
+{{#if weaponTagSuggestions.length}}
+<datalist id="lig-tipagens">
+  {{#each weaponTagSuggestions as |t|}}<option value="{{t}}"></option>{{/each}}
+</datalist>
+{{/if}}
 <div class="lig-effects">
   <div class="lig-section-title">
     Efeitos
@@ -13,8 +18,15 @@
     </select>
     {{#if eff.targetApplies}}
     <select name="system.effects.{{i}}.target">
-      {{selectOptions eff.targetChoices selected=eff.target}}
+      {{selectOptions eff.targetChoices selected=eff.targetSel}}
     </select>
+    {{!-- Alvos que pedem um nome: tipagem de arma, item da ficha,
+          circunstância... O que fica guardado é prefixo + texto. --}}
+    {{#if eff.targetArgPrefix}}
+    <input type="text" name="system.effects.{{i}}.targetArg" value="{{eff.targetArg}}"
+           class="lig-target-arg" list="lig-tipagens"
+           placeholder="{{eff.targetArgHint}}" title="{{eff.targetArgTitle}}"/>
+    {{/if}}
     {{else}}
     <select name="system.effects.{{i}}.target" disabled>
       <option value="all" selected>—</option>

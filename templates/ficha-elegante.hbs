@@ -565,6 +565,8 @@
                 <option value="reroll6" {{#if (eq ae.fx0Type "reroll6")}}selected{{/if}}>Rerrolar dados que caem 6</option>
                 <option value="crit" {{#if (eq ae.fx0Type "crit")}}selected{{/if}}>Crítico aprimorado</option>
                 <option value="fumble" {{#if (eq ae.fx0Type "fumble")}}selected{{/if}}>Falha crítica piorada</option>
+                <option value="autocrit" {{#if (eq ae.fx0Type "autocrit")}}selected{{/if}}>Crítico automático</option>
+                <option value="immune" {{#if (eq ae.fx0Type "immune")}}selected{{/if}}>Imunidade</option>
                 <option value="condition" {{#if (eq ae.fx0Type "condition")}}selected{{/if}}>Condição</option>
                 <option value="size" {{#if (eq ae.fx0Type "size")}}selected{{/if}}>Tamanho</option>
                 <option value="restore" {{#if (eq ae.fx0Type "restore")}}selected{{/if}}>Recuperar recurso (ao aplicar)</option>
@@ -577,8 +579,13 @@
               </select>
               {{else}}
               <select name="system.appliedEffects.{{ae.index}}.effects.0.target">
-                {{selectOptions ae.fx0TargetChoices selected=ae.fx0.target}}
+                {{selectOptions ae.fx0TargetChoices selected=ae.fx0TargetSel}}
               </select>
+              {{#if ae.fx0ArgPrefix}}
+              <input type="text" name="system.appliedEffects.{{ae.index}}.effects.0.targetArg"
+                     value="{{ae.fx0Arg}}" class="lig-target-arg" list="lig-tipagens"
+                     placeholder="{{ae.fx0ArgHint}}" title="{{ae.fx0ArgTitle}}"/>
+              {{/if}}
               {{/if}}
             </label>
             <label>{{#if ae.fx0IsReroll}}Qtd. dados{{else}}Valor{{/if}}

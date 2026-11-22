@@ -280,6 +280,19 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
     this.wordMods = mods.word;
     // Bônus restritos a tipagens de arma (tipagem → modificadores).
     this.weaponMods = mods.weapon;
+    // Bônus para resistir a efeitos de uma condição (condição → modificadores).
+    this.resistMods = mods.resist;
+    // Bônus nas ações de um item específico (nome normalizado → modificadores).
+    this.itemMods = mods.perItem;
+    // Imunidades declaradas (dano, condição, nome de efeito, item).
+    this.immunities = {
+      damage: [...mods.immune.damage],
+      condition: [...mods.immune.condition],
+      label: [...mods.immune.label],
+      item: [...mods.immune.item],
+    };
+    // Alvos de rolagem em que o crítico sai automaticamente.
+    this.autoCrit = [...mods.autocrit];
     // Reroll por atributo (primários + secundários) para as rolagens.
     this.attrReroll = {};
     this.attrCrit = {};

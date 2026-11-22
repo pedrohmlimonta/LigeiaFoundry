@@ -7,7 +7,9 @@ import { WORDS_BY_TIER, WORD_TARGET_PREFIX, tipagensComoAlvos, weaponTagsOf, wea
          weaponTagId, WEAPON_TAG_PREFIX, costsForLevel, LEVELED_TYPES, COST_LEVEL_MODES,
          LEVEL_SEQUENCE, levelMeets, activationLevelOf,
          buildPreActivationRef, parsePreActivation, resolvePreActivation,
-         REMOVE_FX_MODES, chainTargetKeys } from "../helpers/effects.mjs";
+         REMOVE_FX_MODES, chainTargetKeys, defesasComoAlvos, resistenciasComoAlvos,
+         ITEM_TARGET_PREFIX, WEAPON_ANY_TARGET,
+         splitTargetArg, mergeTargetArg, tipagensConhecidas } from "../helpers/effects.mjs";
 import { activateTagInputs } from "../apps/tag-input.mjs";
 import { CHAIN_WHEN_LABELS } from "../helpers/dice.mjs";
 import { removeEnchantment } from "../helpers/enchant.mjs";
@@ -245,6 +247,18 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         return submitData;
       }
 
+      // ALVOS COM ARGUMENTO: o seletor manda o prefixo e o campo ao lado o
+      // texto; aqui os dois voltam a ser um valor só ("item:Espada Longa").
+      const juntarAlvos = (lista, campo) => {
+        const arr = Array.isArray(lista) ? lista
+          : (lista && typeof lista === "object" ? Object.values(lista) : []);
+        for (const e of arr) mergeTargetArg(e, campo);
+      };
+      juntarAlvos(sys.effects, "target");
+      const acoesBrutas = Array.isArray(sys.actions) ? sys.actions
+        : (sys.actions && typeof sys.actions === "object" ? Object.values(sys.actions) : []);
+      for (const a of acoesBrutas) juntarAlvos(a?.appliesEffects, "fxTarget");
+
       // Converte um objeto indexado do form ({0:{...},1:{...}}) em array.
       // Ignora chaves que não sejam índices inteiros: um `name` malformado no
       // template (ex.: "system.actions..extraDamage.0.formula") vira a chave ""
@@ -425,6 +439,8 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       reroll6: "Rerrolar dados que caem 6",
       crit: "Crítico aprimorado",
       fumble: "Falha crítica piorada",
+      autocrit: "Crítico automático (garante o crítico)",
+      immune: "Imunidade",
       tempHp: "Sobrevida ao ativar",
       areaFilter: "Filtro de área (força só aliados/inimigos)",
       condition: "Condição (marca enquanto durar)",
@@ -514,9 +530,14 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         // Categorias de ataque/defesa. As variantes "corpo a corpo" e
         // "à distância" só valem em ações marcadas (ou não) com
         // "esta ação é corpo a corpo"; as versões "(qualquer)" valem sempre.
-        attack: "Ataque (qualquer)", defense: "Defesa (qualquer)",
+        attack: "Ataque (qualquer)",
         attackMelee: "Ataque (corpo a corpo)", attackRanged: "Ataque (à distância)",
-        defenseMelee: "Defesa (corpo a corpo)", defenseRanged: "Defesa (à distância)",
+        // Defesa: por origem do ataque e por atributo que defende.
+        ...defesasComoAlvos(),
+        // Resistir a efeitos de uma condição ("+2 contra o que cega").
+        ...resistenciasComoAlvos(),
+        // Um ITEM da ficha: toda ação dele recebe o bônus.
+        [`${ITEM_TARGET_PREFIX}`]: "Item desta ficha (digite o nome)",
         // Conjuração restrita a uma palavra arcana: só as magias que tenham
         // aquela palavra recebem o bônus (e acumulam, se tiverem mais de uma).
         ...palavrasComoAlvos(),
@@ -532,6 +553,16 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         deslocamento: "Deslocamento", percepcao_passiva: "Percepção Passiva",
       },
       areaFilter: { enemies: "Só inimigos", allies: "Só aliados" },
+      // IMUNIDADE: a que se é imune. Tipo de dano e condição vêm de listas;
+      // circunstância e item são texto digitado ao lado.
+      immune: {
+        ...Object.fromEntries(Object.entries(CONFIG.LIGEIA?.damageTypes || {})
+          .map(([id, l]) => [`dano:${id}`, `Dano — ${l}`])),
+        ...Object.fromEntries(Object.entries(condDefs)
+          .map(([id, d]) => [`condicao:${id}`, `Condição — ${d.label || id}`])),
+        "efeito:": "Circunstância (digite o nome do efeito)",
+        "item:": "Item (digite o nome)",
+      },
       condition: condChoices,
       size: sizeTargets,
       restore: { hp: "Vida (PV)", mp: "Mana (PM)", heroic: "Pontos Heroicos" },
@@ -550,7 +581,10 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         case "reroll1":
         case "reroll6":
         case "crit":
-        case "fumble": return TARGETS.roll;
+        case "fumble":
+        // O crítico automático aceita os mesmos alvos do bônus de rolagem.
+        case "autocrit": return TARGETS.roll;
+        case "immune": return TARGETS.immune;
         case "stat": return TARGETS.stat;
         case "set": return TARGETS.set;
         // Dano: por TIPO de dano (fogo, corte...) ou por TIPAGEM de arma
@@ -619,6 +653,8 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       .filter((g) => g.entradas.length);
     context.chainWhenChoices = CHAIN_WHEN_LABELS;
     context.removeFxModes = REMOVE_FX_MODES;
+    // Sugestões do campo de tipagem de arma (datalist).
+    context.weaponTagSuggestions = tipagensConhecidas();
     context.drainResources = { hp: "Vida (PV)", mp: "Mana (PM)", heroic: "Pontos Heroicos", hpTemp: "Sobrevida" };
     context.drainFromChoices = {
       both: "Todo o dano",
@@ -731,6 +767,28 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         targetSet: setKey,
         targetChoices: choices,
         targetApplies: setKey !== "none",
+        // Alvos com argumento digitado: o seletor fica no prefixo e o texto
+        // vai num campo ao lado (ver mergeTargetArg em effects.mjs).
+        ...(() => {
+          const { prefixo, arg } = splitTargetArg(e.target);
+          // "arma" sem dois-pontos é o legado "qualquer tipagem": mostra o
+          // mesmo seletor, com o campo vazio.
+          const ehArmaQualquer = e.target === WEAPON_ANY_TARGET;
+          const pref = prefixo || (ehArmaQualquer ? WEAPON_TAG_PREFIX : "");
+          const dicas = {
+            [WEAPON_TAG_PREFIX]: ["vazio = qualquer tipagem", "Deixe vazio para valer em qualquer arma tipada, ou escreva a tipagem (Militar, Haste, Duas Mãos...)."],
+            [ITEM_TARGET_PREFIX]: ["nome do item", "Nome do item na ficha. Toda ação dele recebe este efeito."],
+            "efeito:": ["nome do efeito", "Casa por trecho do nome, sem acento nem maiúscula."],
+          };
+          const [hint, title] = dicas[pref] || ["", ""];
+          return {
+            targetSel: pref || e.target,
+            targetArgPrefix: pref,
+            targetArg: arg,
+            targetArgHint: hint,
+            targetArgTitle: title,
+          };
+        })(),
         // damage, rd e vuln têm tipo de dano associado
         isDamageType: e.type === "damage" || e.type === "rd" || e.type === "vuln",
         // vuln mostra o toggle de valor percentual
