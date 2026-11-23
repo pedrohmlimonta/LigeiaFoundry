@@ -233,6 +233,10 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
         movement: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
         simple: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
         reaction: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
+        // Quantos METROS o personagem já andou neste turno. É o que diz se
+        // o próximo passo ainda está no verde ou já entrou no amarelo —
+        // dois trechos curtos somam, não se cobram como dois começos.
+        moved: new fields.NumberField({ initial: 0, min: 0 }),
       }),
       // Condições ativas (lista de ids; ver CONFIG.LIGEIA.conditions)
       conditions: new fields.ArrayField(new fields.StringField({ blank: false }), { initial: [] }),
@@ -542,6 +546,10 @@ export class NpcData extends PersonagemData {
         movement: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
         simple: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
         reaction: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
+        // Quantos METROS o personagem já andou neste turno. É o que diz se
+        // o próximo passo ainda está no verde ou já entrou no amarelo —
+        // dois trechos curtos somam, não se cobram como dois começos.
+        moved: new fields.NumberField({ initial: 0, min: 0 }),
       }),
       // Condições ativas (lista de ids; ver CONFIG.LIGEIA.conditions)
       conditions: new fields.ArrayField(new fields.StringField({ blank: false }), { initial: [] }),

@@ -326,6 +326,8 @@ export async function restoreActions(actor) {
   for (const t of COUNTED_ACTIONS) {
     if (pool[t].value !== max[t]) update[`system.actions.${t}`] = max[t];
   }
+  // O turno novo começa parado: o acumulado de metros zera junto.
+  if ((Number(actor.system?.actions?.moved) || 0) !== 0) update["system.actions.moved"] = 0;
   if (!Object.keys(update).length) return false;
   if (actor.isOwner) await actor.update(update);
   return true;
@@ -335,14 +337,57 @@ export async function restoreActions(actor) {
 /*  Correr: o duplo deslocamento                                            */
 /* ======================================================================== */
 
+/** Tolerância para a comparação de distâncias (medições do grid). */
+const EPS = 1e-6;
+
 /**
- * O que correr custa a este personagem.
+ * O que correr custa a este personagem, partindo do lugar.
  * Normalmente movimento + padrão; com um efeito de CORRIDA ativo, só a de
  * movimento.
  * @returns {string[]}
  */
 export function runCost(actor) {
   return canRunFreely(actor) ? ["movement"] : ["movement", "standard"];
+}
+
+/**
+ * Quais ações um deslocamento cobra, dado o que o personagem JÁ ANDOU neste
+ * turno e onde ele vai parar.
+ *
+ * A regra tem duas faixas, as mesmas cores do medidor do token:
+ *
+ *   VERDE  (até o deslocamento) — uma ação. A de movimento, se houver; se
+ *          ela já tiver sido gasta (ou não existir), a PADRÃO serve: quem
+ *          não tem como se mover ainda pode usar a ação principal para isso.
+ *   AMARELO (do deslocamento até o dobro) — a segunda ação, a padrão. É o
+ *          duplo deslocamento, e é por isso que correr custa as duas.
+ *
+ * O que vale é o ACUMULADO do turno: andar 5m e depois mais 6m com 9m de
+ * deslocamento cobra a de movimento no primeiro trecho e a padrão no
+ * segundo, porque o segundo foi o que passou do deslocamento — e não duas
+ * vezes o preço inteiro.
+ *
+ * Um efeito de CORRIDA dispensa a segunda faixa: correr sai pela ação de
+ * movimento sozinha.
+ *
+ * @returns {string[]} as ações a gastar (pode ser vazio)
+ */
+export function movementCostFor(actor, antes, depois) {
+  const desloc = Number(actor?.system?.secondary?.deslocamento) || 0;
+  const de = Math.max(0, Number(antes) || 0);
+  const para = Math.max(0, Number(depois) || 0);
+  if (para <= de) return [];
+
+  const custos = [];
+  // Saiu do lugar: a primeira ação de deslocamento do turno.
+  if (de <= EPS) {
+    custos.push(actionPoolFor(actor).movement.available > 0 ? "movement" : "standard");
+  }
+  // Passou do deslocamento: entrou no amarelo e paga a segunda.
+  if (desloc > 0 && de <= desloc + EPS && para > desloc + EPS && !canRunFreely(actor)) {
+    custos.push("standard");
+  }
+  return custos;
 }
 
 /**
@@ -363,15 +408,25 @@ export async function chargeMovement(actor, metros) {
   if (dist <= 0) return "";
 
   const desloc = Number(actor.system?.secondary?.deslocamento) || 0;
-  const correu = desloc > 0 && dist > desloc + 1e-6;
-  const custo = correu ? runCost(actor) : ["movement"];
+  const antes = Math.max(0, Number(actor.system?.actions?.moved) || 0);
+  const depois = antes + dist;
+  const custo = movementCostFor(actor, antes, depois);
+
+  // O acumulado do turno fica guardado, mesmo quando o trecho não cobra
+  // nada: é ele que sabe quando o próximo passo entra no amarelo.
+  if (actor.isOwner) await actor.update({ "system.actions.moved": depois });
+  if (!custo.length) {
+    return `<div class="lig-action-line muted">Deslocou ${Math.round(dist)}m <span class="lig-cond-note">(${Math.round(depois)}m no turno)</span></div>`;
+  }
+
   // Movimento nunca é barrado: o token já se moveu. Fica o registro — e o
   // aviso, quando a ação não existia.
   const res = await spendActions(actor, custo, { motivo: "se deslocar", force: true });
   if (!res.text) return "";
+  const correu = desloc > 0 && depois > desloc + EPS;
   const nota = correu
-    ? `<span class="lig-cond-note">(corrida: ${Math.round(dist)}m, deslocamento ${desloc}m)</span>`
-    : `<span class="lig-cond-note">(${Math.round(dist)}m)</span>`;
+    ? `<span class="lig-cond-note">(corrida: ${Math.round(depois)}m no turno, deslocamento ${desloc}m)</span>`
+    : `<span class="lig-cond-note">(${Math.round(depois)}m de ${desloc}m)</span>`;
   return res.text.replace("</div>", ` ${nota}</div>`);
 }
 

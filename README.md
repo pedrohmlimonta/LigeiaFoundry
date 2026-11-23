@@ -86,9 +86,15 @@ Desligada por padrão; liga-se em **Configurações → Opções do Sistema →
 - Efeitos do tipo *Ações por rodada* **dão** (+1 simples) ou **tiram**
   (−1 movimento) ações enquanto estiverem ativos, e podem liberar a
   **corrida**.
-- **Correr** — passar do deslocamento, a faixa amarela do medidor — gasta a
-  ação de movimento **e** a padrão, a menos que um efeito de corrida esteja
-  ativo. Só é cobrado em combate, no turno de quem se move.
+- **Deslocamento**, nas mesmas cores do medidor do token: até o
+  deslocamento (**verde**) custa a ação de movimento — ou a **padrão**, se a
+  de movimento já tiver saído ou não existir, de modo que quem não tem como
+  se mover ainda anda usando a ação principal. Passar do deslocamento
+  (**amarelo**) cobra também a padrão: é o duplo deslocamento. Um efeito de
+  **corrida** dispensa essa segunda cobrança. O que vale é o **acumulado do
+  turno** — andar 5m e depois mais 6m com 9m de deslocamento cobra a de
+  movimento no primeiro trecho e a padrão no segundo, não o preço inteiro
+  duas vezes. Só é cobrado em combate, no turno de quem se move.
 - **Condições limitam ações**: Atordoado, Inconsciente e Paralisado tiram as
   ações do turno; Imobilizado (e Agarrado) tira a de movimento; Pasmo (e
   Dominado) deixa só **uma ação por turno**. A tabela vive em

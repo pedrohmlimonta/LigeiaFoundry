@@ -170,6 +170,11 @@
     {{else if actionLimits}}
     <p class="lig-hint lig-action-capped">Ações limitadas por: {{actionLimits}}.</p>
     {{/if}}
+    {{#if canRunFree}}
+    <p class="lig-hint">Deslocamento: até o deslocamento (verde) gasta a ação de movimento — ou a padrão, se a de movimento já tiver saído. <strong>Corrida liberada</strong>: passar do deslocamento não cobra a segunda ação.</p>
+    {{else}}
+    <p class="lig-hint">Deslocamento: até o deslocamento (verde) gasta a ação de movimento — ou a padrão, se a de movimento já tiver saído. Passar dele (amarelo) cobra também a ação padrão.</p>
+    {{/if}}
   </section>
   {{/if}}
 
