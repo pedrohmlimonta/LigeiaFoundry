@@ -76,6 +76,64 @@ Cada Item pode conceder **efeitos mecânicos** quando ativo:
   lista** = custo **dobrado (×2)**.
 - Painel de XP (gasto × disponível) e etiqueta de custo por habilidade.
 
+### Economia de ações (opcional)
+Desligada por padrão; liga-se em **Configurações → Opções do Sistema →
+"Economia de ações"**. Com ela:
+- Cada personagem tem por rodada **1 ação padrão, 1 de movimento, 1 simples,
+  1 reação** e **ações livres à vontade**, tudo recuperado no **início do
+  seu turno**.
+- Cada ação de item e cada ativação de item pode **gastar** uma delas.
+- Efeitos do tipo *Ações por rodada* **dão** (+1 simples) ou **tiram**
+  (−1 movimento) ações enquanto estiverem ativos, e podem liberar a
+  **corrida**.
+- **Correr** — passar do deslocamento, a faixa amarela do medidor — gasta a
+  ação de movimento **e** a padrão, a menos que um efeito de corrida esteja
+  ativo. Só é cobrado em combate, no turno de quem se move.
+- **Condições limitam ações**: Atordoado, Inconsciente e Paralisado tiram as
+  ações do turno; Imobilizado (e Agarrado) tira a de movimento; Pasmo (e
+  Dominado) deixa só **uma ação por turno**. A tabela vive em
+  `CONFIG.LIGEIA.conditionActions` e pode ser reescrita pela mesa.
+- **Sustentação**: tudo o que precisa de ação para continuar de pé — um item
+  ligado, uma área, uma aura, uma criatura conjurada, um efeito posto em
+  alguém — deixa um **vínculo** na lista de Efeitos & Condições de quem
+  sustenta. O vínculo cobra a ação **a cada turno**; sem a ação, ele cai e
+  leva a coisa junto (a área sai do mapa, a criatura some da cena **e da
+  iniciativa**, o item se desliga, o efeito sai da ficha de quem o recebeu).
+  Para largar antes, basta desligar ou remover o vínculo — não há aba de
+  concentração: o que o personagem está segurando está nos efeitos dele.
+
+### Conjuração
+Arraste para a ação as fichas (personagem, NPC ou veículo) que ela pode
+invocar — a lista é um **cardápio**. Ao clicar no botão da ação, uma caixa
+pergunta **qual** criatura conjurar (com uma só no cardápio, ela sai
+direto). Sai **uma** por ativação: três lobos, nunca um lobo e um urso
+juntos. A quantidade é fixa e vem do **número geral** da ação ou do número
+próprio da criatura, conforme a caixinha "geral" da linha dela. Depois você
+escolhe no mapa onde cada cópia aparece, dentro do alcance da ação, e, sendo
+sustentável, **todas as cópias entram num vínculo só**.
+
+Cada criatura conjurada ganha uma **ficha própria** em Atores, na pasta
+*Conjurados* — três lobos são três fichas, com PV, condições e efeitos
+independentes, sem um lobo ferido arrastar os outros. Quem conjurou recebe a
+posse dela. A ficha é apagada quando a criatura é **dispensada** (o vínculo
+foi solto, a ação faltou) ou quando ela **morre**; morrendo uma de três, as
+outras duas continuam e o vínculo encolhe. Desmarcando "ficha própria", o
+token é avulso e nenhuma ficha é criada.
+
+### Emanações
+Uma ação de área ou aura pode deixar a área no mapa e reaplicar-se a quem
+iniciar o turno dentro dela. Além disso, um **efeito do tipo Emanação** cria
+uma aura em volta de quem o carrega: o valor do efeito é o raio, e o texto ao
+lado nomeia a ação que a aura dispara a cada turno (vazio = só o círculo). A
+aura nasce quando o efeito fica ativo e some quando ele sai.
+
+### Caixa de rolagem
+Antes de cada rolagem abre uma caixa para ajustar bônus, dados de melhoria e
+a CD (ou o atributo de defesa do alvo). Com a economia de ações ligada, ela
+mostra também **qual ação aquele uso gasta**, com o que resta de cada tipo, e
+deixa trocar na hora — a troca vale só para aquele uso. Fichas **novas**
+nascem com "sem caixa" ligado; quem quiser a caixa desmarca na ficha.
+
 ### Rolagem 2d6 fiel ao livro
 - 2d6 + atributo + dados de melhoria; entram na soma os **2 maiores** dados.
 - **Sucesso crítico**: os dois dados que entram são ambos **6**.

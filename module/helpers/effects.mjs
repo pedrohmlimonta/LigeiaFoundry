@@ -166,6 +166,20 @@ export function actionIndexOf(item, action) {
 /** Quantas palavras arcanas cada círculo de magia comporta. */
 export const WORDS_BY_TIER = { "Menor": 1, "Intermediária": 2, "Maior": 3 };
 
+/**
+ * Prefixo do alvo do efeito que CRIA UMA EMANAÇÃO — uma aura que acompanha
+ * quem carrega o efeito. O que vem depois do prefixo é o nome da ação que a
+ * aura dispara a cada turno em quem estiver dentro; vazio = a aura é só o
+ * círculo marcado no mapa.
+ */
+export const EMANATION_TARGET_PREFIX = "emanacao:";
+
+/** Prefixo dos alvos de efeito que mexem nas AÇÕES por rodada. */
+export const ACTION_TARGET_PREFIX = "acao:";
+
+/** Alvo do efeito que libera a CORRIDA (duplo deslocamento sem a padrão). */
+export const RUN_TARGET = "corrida";
+
 /** Prefixo dos alvos de efeito que valem só para uma palavra arcana. */
 export const WORD_TARGET_PREFIX = "conjuracao:";
 
@@ -479,7 +493,11 @@ function emptyMods() {
   // CRÍTICO AUTOMÁTICO: conjunto de alvos de rolagem em que o personagem
   // crita sem precisar dos dados (mesmos alvos do bônus de rolagem).
   const autocrit = new Set();
-  return { attr, roll, stat, size, word, weapon, resist, perItem, immune, autocrit };
+  // ECONOMIA DE AÇÕES: quantas ações de cada tipo o efeito dá (ou tira, com
+  // valor negativo) por rodada, e se ele libera a CORRIDA — passar do
+  // deslocamento gastando só a ação de movimento.
+  const actions = { standard: 0, movement: 0, simple: 0, reaction: 0, run: false };
+  return { attr, roll, stat, size, word, weapon, resist, perItem, immune, autocrit, actions };
 }
 
 /**
@@ -556,6 +574,19 @@ function applyEffectToMods(mods, effect, actor) {
   // sem depender dos dados. Aceita os mesmos alvos do bônus de rolagem.
   if (effect.type === "autocrit") {
     mods.autocrit.add(String(effect.target || "all"));
+    return;
+  }
+
+  // AÇÕES POR RODADA: o alvo diz QUAL ação ("acao:standard") e o valor,
+  // quantas a mais — ou a menos, se for negativo. O alvo "corrida" não conta
+  // número nenhum: é a licença de correr pagando só a ação de movimento.
+  if (effect.type === "action") {
+    const bruto = String(effect.target || "").trim();
+    if (bruto === RUN_TARGET) { mods.actions.run = true; return; }
+    const tipo = bruto.startsWith(ACTION_TARGET_PREFIX)
+      ? bruto.slice(ACTION_TARGET_PREFIX.length) : bruto;
+    if (!(tipo in mods.actions) || tipo === "run") return;
+    mods.actions[tipo] += v;
     return;
   }
 
@@ -758,6 +789,83 @@ export function actionIsAvailable(item, action) {
  * @returns {{bonus:number, dice:number, rollDice:number, critBonus:number,
  *            failBonus:number, reroll1:(number|string), reroll6:(number|string)}}
  */
+/**
+ * Quantas ações a mais (ou a menos) os efeitos ativos dão ao personagem.
+ * Lê o que `prepareDerivedData` já calculou na ficha.
+ * @returns {{standard:number, movement:number, simple:number, reaction:number}}
+ */
+export function actionMods(actor) {
+  const m = actor?.system?.actionMods || {};
+  return {
+    standard: Number(m.standard) || 0,
+    movement: Number(m.movement) || 0,
+    simple: Number(m.simple) || 0,
+    reaction: Number(m.reaction) || 0,
+  };
+}
+
+/**
+ * O personagem tem algum efeito de CORRIDA ativo? Com ele, passar do
+ * deslocamento custa só a ação de movimento, sem levar junto a padrão.
+ */
+export function canRunFreely(actor) {
+  return actor?.system?.actionMods?.run === true;
+}
+
+/**
+ * As EMANAÇÕES que os efeitos ativos de um personagem criam.
+ *
+ * Um efeito do tipo "emanation" vira uma aura centrada em quem o carrega:
+ * o valor é o raio em metros e o alvo diz, depois do prefixo, qual ação a
+ * aura dispara a cada turno em quem estiver dentro (vazio = só o círculo).
+ *
+ * Cada entrada vem com uma CHAVE estável — o item ou o efeito aplicado de
+ * onde saiu —, que é como a aura no mapa é reconhecida depois: é por ela
+ * que se sabe o que criar, o que manter e o que apagar.
+ *
+ * @returns {Array<{key:string, radius:number, actionName:string, label:string}>}
+ */
+export function emanationEffectsOf(actor) {
+  const out = [];
+  const ler = (effect, key, rotuloPadrao) => {
+    if (effect?.type !== "emanation") return;
+    const radius = Math.max(0, resolveEffectValue(effect.value, actor));
+    if (!radius) return;
+    const alvo = String(effect.target || "");
+    const actionName = alvo.startsWith(EMANATION_TARGET_PREFIX)
+      ? alvo.slice(EMANATION_TARGET_PREFIX.length).trim() : "";
+    out.push({ key, radius, actionName, label: effect.label || rotuloPadrao });
+  };
+
+  // Efeitos dos itens ligados (ou passivos), um por índice.
+  for (const item of actor?.items || []) {
+    (item.system?.effects || []).forEach((effect, i) => {
+      if (!effectIsActive(item, effect)) return;
+      ler(effect, `item:${item.id}:${i}`, item.name);
+    });
+  }
+  // Efeitos aplicados na ficha (buffs/debuffs), um por efeito do grupo.
+  (actor?.system?.appliedEffects || []).forEach((ae, ai) => {
+    if (ae?.disabled) return;
+    (ae.effects || []).forEach((effect, i) => {
+      if (effect?.enabled === false) return;
+      ler(effect, `fx:${ae.fxId || ai}:${i}`, ae.label || "Efeito");
+    });
+  });
+  return out;
+}
+
+/** Os alvos de efeito que mexem nas ações, para os seletores das fichas. */
+export function acoesComoAlvos() {
+  return {
+    [`${ACTION_TARGET_PREFIX}standard`]: "Ação padrão",
+    [`${ACTION_TARGET_PREFIX}movement`]: "Ação de movimento",
+    [`${ACTION_TARGET_PREFIX}simple`]: "Ação simples",
+    [`${ACTION_TARGET_PREFIX}reaction`]: "Reação",
+    [RUN_TARGET]: "Corrida (correr sem gastar a ação padrão)",
+  };
+}
+
 export function resistMods(actor, condId) {
   const vazio = {
     bonus: 0, dice: 0, rollDice: 0, critBonus: 0, failBonus: 0, reroll1: 0, reroll6: 0,
@@ -784,7 +892,7 @@ export function resistMods(actor, condId) {
  * campo ao lado recebe o nome. O que fica guardado é a junção dos dois:
  * "item:Espada Longa", "arma:haste", "efeito:Maldição".
  */
-export const TARGET_ARG_PREFIXES = [ITEM_TARGET_PREFIX, WEAPON_TAG_PREFIX, "efeito:", "item:"];
+export const TARGET_ARG_PREFIXES = [ITEM_TARGET_PREFIX, WEAPON_TAG_PREFIX, "efeito:", "item:", EMANATION_TARGET_PREFIX];
 
 /** O alvo pede um texto para completar? Devolve o prefixo, ou "". */
 export function targetArgPrefix(alvo) {

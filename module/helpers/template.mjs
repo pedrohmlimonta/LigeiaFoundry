@@ -143,6 +143,10 @@ function buildEmanationFlags(actor, item, action) {
     rerollAttack: !!action.persistRerollAttack,
     // Gatilho: "turn" (início do turno dentro), "enter" (ao entrar) ou "both".
     trigger: action.persistTrigger || "both",
+    // SUSTENTAÇÃO: ação cobrada de quem criou a área, a cada turno dela,
+    // para a área continuar de pé ("none" = se mantém sozinha).
+    sustain: action.persistSustain && action.persistSustain !== "none"
+      ? action.persistSustain : "",
     radius: resolveEffectValue(action.area, actor),
     // Total do ataque rolado na CRIAÇÃO (congelado). Preenchido logo após a
     // primeira rolagem; usado como CD das defesas por turno. null = ainda não

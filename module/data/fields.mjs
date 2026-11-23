@@ -18,7 +18,7 @@ export function effectField() {
       type: new fields.StringField({
         required: true,
         initial: "bonus",
-        choices: ["dice", "rollDice", "bonus", "attr", "stat", "set", "damage", "rd", "vuln", "reroll1", "reroll6", "crit", "fumble", "autocrit", "immune", "tempHp", "areaFilter", "condition", "size", "restore", "info"],
+        choices: ["dice", "rollDice", "bonus", "attr", "stat", "set", "damage", "rd", "vuln", "reroll1", "reroll6", "crit", "fumble", "autocrit", "immune", "action", "emanation", "tempHp", "areaFilter", "condition", "size", "restore", "info"],
       }),
       target: new fields.StringField({ required: true, initial: "all" }),
       // Número OU fórmula determinística com @variáveis do dono — ex.:
@@ -142,6 +142,19 @@ export function activatableFields() {
       choices: ["passive", "active"],
     }),
     active: new fields.BooleanField({ initial: false }),
+    // ECONOMIA DE AÇÕES (opcional): que ação LIGAR este item consome.
+    // "none" = não consome nenhuma. Só pesa com a economia de ações ligada.
+    actionCost: new fields.StringField({
+      initial: "none",
+      choices: ["none", "standard", "movement", "simple", "reaction", "free"],
+    }),
+    // SUSTENTAÇÃO: o item ligado cobra uma ação a cada turno para CONTINUAR
+    // ligado. Quem não tiver a ação na hora, perde o item — ele se desfaz
+    // sozinho. Só pesa com a economia de ações ligada.
+    sustain: new fields.SchemaField({
+      enabled: new fields.BooleanField({ initial: false }),
+      action: new fields.StringField({ initial: "simple", choices: ["none", "standard", "movement", "simple", "reaction", "free"] }),
+    }),
     effects: effectField(),
     costs: costField(),
   };
@@ -420,7 +433,7 @@ export function actionEntryField() {
         // Tipo do modificador (mesma lista dos efeitos de itens + condição)
         fxType: new fields.StringField({
           initial: "bonus",
-          choices: ["bonus", "dice", "rollDice", "attr", "stat", "set", "damage", "rd", "vuln", "reroll1", "reroll6", "crit", "fumble", "autocrit", "immune", "restore", "condition", "size"],
+          choices: ["bonus", "dice", "rollDice", "attr", "stat", "set", "damage", "rd", "vuln", "reroll1", "reroll6", "crit", "fumble", "autocrit", "immune", "action", "emanation", "restore", "condition", "size"],
         }),
         // Alvo do modificador — depende do tipo (atributo, recurso, tipo de
         // dano ou id de condição). Sempre escolhido por select.
@@ -433,6 +446,12 @@ export function actionEntryField() {
         // Duração: "rounds" (em rodadas) ou "scene" (até o fim da cena)
         durationMode: new fields.StringField({ initial: "scene", choices: ["rounds", "scene"] }),
         durationRounds: new fields.StringField({ blank: true, initial: "1" }),
+        // SUSTENTAÇÃO: quem conjurou paga esta ação a cada turno para o
+        // efeito continuar de pé no alvo. "none" = não precisa sustentar.
+        fxSustain: new fields.StringField({
+          initial: "none",
+          choices: ["none", "standard", "movement", "simple", "reaction", "free"],
+        }),
         // Resistência por rodada
         resist: new fields.BooleanField({ initial: false }),
         resistAttr: new fields.StringField({ blank: true, initial: "vigor" }),
@@ -516,6 +535,12 @@ export function actionEntryField() {
     costMp: new fields.StringField({ blank: true, initial: "0" }),
     costHp: new fields.StringField({ blank: true, initial: "0" }),
     costHeroic: new fields.StringField({ blank: true, initial: "0" }),
+    // ECONOMIA DE AÇÕES (opcional): que ação esta AÇÃO consome ao ser
+    // executada. "none" = nenhuma; "free" = ação livre (infinitas).
+    actionCost: new fields.StringField({
+      initial: "none",
+      choices: ["none", "standard", "movement", "simple", "reaction", "free"],
+    }),
     // --- CUSTO ESCOLHIDO NA ATIVAÇÃO ---
     // Em vez de um custo fixo, a ação pergunta quanto recurso o personagem
     // quer gastar, e dano/área/alcance crescem com o gasto. É o molde da
@@ -549,16 +574,31 @@ export function actionEntryField() {
       rollBonus: new fields.StringField({ blank: true, initial: "" }),
     }),
     // --- CONJURAÇÃO DE ATORES ---
-    // A ação invoca criaturas: arrasta-se a ficha (personagem, NPC ou
+    // A ação invoca criaturas: arrastam-se as fichas (personagem, NPC ou
     // veículo) para a ação, e na execução escolhe-se no mapa, dentro do
     // alcance, onde cada token aparece.
+    //
+    // A lista é um CARDÁPIO: a ação conjura UMA das criaturas, não todas, e
+    // quem escolhe é quem executa — a caixa aparece depois do clique no
+    // botão da ação, não antes. Três lobos, nunca um lobo e um urso juntos.
+    //
+    // QUANTAS saem: o número GERAL abaixo vale para toda criatura que
+    // marcar "seguir o geral"; as demais usam o número próprio. Assim uma
+    // ação que invoca "três do que for" se escreve uma vez só, e a criatura
+    // que foge à regra (um urso, nunca três) guarda o número dela.
+    summonCount: new fields.StringField({ blank: true, initial: "1" }),
     summons: new fields.ArrayField(
       new fields.SchemaField({
         actorUuid: new fields.StringField({ blank: true, initial: "" }),
         actorName: new fields.StringField({ blank: true, initial: "" }),
         // Quantos tokens aparecem (fórmula com @variáveis e @gasto, quando a
-        // ação tem custo escolhido na ativação).
+        // ação tem custo escolhido na ativação). Ignorado quando a entrada
+        // segue o número geral da ação.
         count: new fields.StringField({ blank: true, initial: "1" }),
+        // Segue o número GERAL da ação em vez do próprio. As entradas que
+        // já existiam continuam no número delas (initial false); as novas
+        // nascem seguindo o geral, que é o caso comum.
+        useGlobalCount: new fields.BooleanField({ initial: false }),
         // De que lado a criatura fica. "same" copia a atitude de quem
         // conjurou — é o que se quer num aliado invocado por um NPC.
         disposition: new fields.StringField({
@@ -569,6 +609,19 @@ export function actionEntryField() {
         rounds: new fields.StringField({ blank: true, initial: "0" }),
         // Entrega o controle do token a quem conjurou.
         giveControl: new fields.BooleanField({ initial: true }),
+        // FICHA PRÓPRIA: cada criatura conjurada ganha uma ficha nova em
+        // Atores (na pasta "Conjurados"), apagada quando ela é dispensada
+        // ou morre. É o que evita dois lobos dividindo os mesmos PV no
+        // combate. Desmarcado, o token é avulso e nenhuma ficha é criada.
+        ownSheet: new fields.BooleanField({ initial: true }),
+        // SUSTENTAÇÃO: ação cobrada por rodada para a criatura CONTINUAR em
+        // campo. Sem a ação, a conjuração se desfaz: o token sai da cena e
+        // o combatente sai da iniciativa. "none" = a criatura se mantém
+        // sozinha (fica até a duração acabar ou ser removida à mão).
+        sustain: new fields.StringField({
+          initial: "none",
+          choices: ["none", "standard", "movement", "simple", "reaction", "free"],
+        }),
         // Aparece escondida (só o Mestre vê até ser revelada).
         hidden: new fields.BooleanField({ initial: false }),
         enabled: new fields.BooleanField({ initial: true }),
@@ -592,6 +645,14 @@ export function actionEntryField() {
     persistTrigger: new fields.StringField({
       initial: "both",
       choices: ["turn", "enter", "both"],
+    }),
+    // SUSTENTAÇÃO da emanação: a cada turno de quem a criou, esta ação é
+    // cobrada para a área CONTINUAR de pé. Sem a ação, a área se desfaz.
+    // "none" = a área se mantém sozinha (o normal). Só pesa com a economia
+    // de ações ligada.
+    persistSustain: new fields.StringField({
+      initial: "none",
+      choices: ["none", "standard", "movement", "simple", "reaction", "free"],
     }),
   });
 }

@@ -549,6 +549,7 @@
             <button type="button" class="lig-mini-btn danger" data-action="removeAppliedEffect" data-index="{{ae.index}}" title="Remover">✕</button>
           </div>
           {{#if ae.summary}}<div class="lig-applied-summary">{{ae.summary}}</div>{{/if}}
+          {{#if ae.isSustain}}<div class="lig-sustain-note">⛓ {{ae.sustainNote}}</div>{{/if}}
           <div class="lig-applied-config">
             <label>Tipo
               <select name="system.appliedEffects.{{ae.index}}.effects.0.type">
@@ -566,6 +567,8 @@
                 <option value="crit" {{#if (eq ae.fx0Type "crit")}}selected{{/if}}>Crítico aprimorado</option>
                 <option value="fumble" {{#if (eq ae.fx0Type "fumble")}}selected{{/if}}>Falha crítica piorada</option>
                 <option value="autocrit" {{#if (eq ae.fx0Type "autocrit")}}selected{{/if}}>Crítico automático</option>
+                <option value="action" {{#if (eq ae.fx0Type "action")}}selected{{/if}}>Ações por rodada</option>
+                <option value="emanation" {{#if (eq ae.fx0Type "emanation")}}selected{{/if}}>Emanação (aura)</option>
                 <option value="immune" {{#if (eq ae.fx0Type "immune")}}selected{{/if}}>Imunidade</option>
                 <option value="condition" {{#if (eq ae.fx0Type "condition")}}selected{{/if}}>Condição</option>
                 <option value="size" {{#if (eq ae.fx0Type "size")}}selected{{/if}}>Tamanho</option>
@@ -684,6 +687,44 @@
         </div>
         {{else}}<div class="lig-empty">Nenhum efeito ativo.</div>{{/each}}
       </section>
+
+      {{!-- AÇÕES DA RODADA (só com a economia de ações ligada) --}}
+      {{#if actionEconomy}}
+      <section class="lig-actions-panel">
+        <div class="lig-section-title">
+          Ações da rodada
+          <button type="button" class="lig-mini-btn" data-action="restoreActions" title="Devolve todas as ações — é o que acontece sozinho no início do turno.">recuperar</button>
+        </div>
+        <div class="lig-actions-grid">
+          {{#each actionPool as |a|}}
+          <div class="lig-action-slot {{#unless a.available}}empty{{/unless}}" title="{{a.label}} — {{a.value}} de {{a.max}}{{#if a.cappedBy}} · travada por {{a.cappedBy}}{{/if}}. Clique para gastar, clique com o direito para devolver.">
+            <button type="button" class="lig-action-btn" data-action="spendAction" data-action-type="{{a.key}}">
+              <span class="lig-action-icon">{{a.icon}}</span>
+              <span class="lig-action-name">{{a.short}}</span>
+              <span class="lig-action-pips">
+                {{#each a.pips as |cheio|}}<i class="lig-pip {{#if cheio}}on{{/if}}"></i>{{/each}}
+                {{#unless a.max}}<i class="lig-pip none"></i>{{/unless}}
+              </span>
+            </button>
+          </div>
+          {{/each}}
+          <div class="lig-action-slot free" title="Ações livres não têm limite.">
+            <span class="lig-action-icon">∞</span>
+            <span class="lig-action-name">Livres</span>
+          </div>
+        </div>
+        {{#if actionCap}}
+        <p class="lig-hint lig-action-capped">Só <strong>{{actionCap.total}}</strong> ação por turno ({{actionCap.motivosTexto}}) — resta {{actionCap.left}}.</p>
+        {{else if actionLimits}}
+        <p class="lig-hint lig-action-capped">Ações limitadas por: {{actionLimits}}.</p>
+        {{/if}}
+        {{#if canRunFree}}
+        <p class="lig-hint">Corrida liberada: passar do deslocamento gasta só a ação de movimento.</p>
+        {{else}}
+        <p class="lig-hint">Correr (passar do deslocamento) gasta a ação de movimento <strong>e</strong> a padrão.</p>
+        {{/if}}
+      </section>
+      {{/if}}
 
       {{!-- Condições --}}
       <section class="lig-conditions">

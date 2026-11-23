@@ -14,18 +14,18 @@
  */
 
 import { rollItemAction, passesAreaFilter } from "./dice.mjs";
-import { areaFilterOverrideFor, actionIsAvailable } from "./effects.mjs";
+import { areaFilterOverrideFor, actionIsAvailable, emanationEffectsOf, normalizeKey } from "./effects.mjs";
 
 const FLAG_SCOPE = "ligeia-rpg";
 const FLAG_KEY = "emanation";
 
 /** Lê a flag de emanação de um template (ou null). */
-function emanationOf(template) {
+export function emanationOf(template) {
   return template?.flags?.[FLAG_SCOPE]?.[FLAG_KEY] || null;
 }
 
 /** Todos os templates de emanação da cena ativa. */
-function emanationTemplates(scene) {
+export function emanationTemplates(scene) {
   const sc = scene || canvas?.scene;
   if (!sc) return [];
   // V14 removeu os Measured Templates: scene.templates pode não existir.
@@ -323,6 +323,124 @@ function isResponsibleClient() {
   if (!activeGMs.length) return game.user.isGM; // fallback
   const responsible = activeGMs.sort((a, b) => a.id.localeCompare(b.id))[0];
   return responsible?.id === game.user.id;
+}
+
+/* ======================================================================== */
+/*  Emanações criadas por EFEITOS                                           */
+/* ======================================================================== */
+
+/**
+ * Acha, na ficha, a ação que uma emanação de efeito deve disparar.
+ * O efeito guarda o NOME; aqui ele vira o item e o índice que a emanação
+ * precisa. Aceita "Item — Ação" ou só o nome da ação.
+ * @returns {{item, index:number, label:string}|null}
+ */
+export function findActionByName(actor, nome) {
+  const procurado = normalizeKey(nome);
+  if (!procurado) return null;
+  // "Bola de Fogo — Explosão": o lado esquerdo estreita a busca ao item.
+  const partes = String(nome).split(/\s+[—-]\s+/);
+  const itemAlvo = partes.length > 1 ? normalizeKey(partes[0]) : "";
+  const acaoAlvo = partes.length > 1 ? normalizeKey(partes.slice(1).join(" - ")) : procurado;
+
+  for (const item of actor?.items || []) {
+    if (itemAlvo && normalizeKey(item.name) !== itemAlvo) continue;
+    const lista = item.system?.actions || [];
+    for (let i = 0; i < lista.length; i++) {
+      if (normalizeKey(lista[i]?.label) !== acaoAlvo) continue;
+      if (!actionIsAvailable(item, lista[i])) continue;
+      return { item, index: i, label: lista[i].label || "" };
+    }
+  }
+  return null;
+}
+
+/**
+ * Põe as auras de EFEITO deste personagem no estado que a ficha pede.
+ *
+ * Um efeito do tipo "emanação" projeta uma aura em volta de quem o carrega
+ * enquanto estiver ativo. Esta função é idempotente: cria o que falta,
+ * atualiza o raio do que mudou e apaga o que o efeito não pede mais. É por
+ * isso que ela pode ser chamada em qualquer mudança de ficha sem medo.
+ */
+export async function resyncEffectAuras(actor) {
+  const scene = globalThis.canvas?.scene;
+  if (!scene || !actor) return;
+  const token = actor.getActiveTokens?.(true)?.[0] || actor.getActiveTokens?.()?.[0];
+
+  // O que a ficha pede agora, por chave.
+  const pedidas = new Map(emanationEffectsOf(actor).map((e) => [e.key, e]));
+  // O que já existe no mapa vindo de efeitos DESTE personagem.
+  const existentes = new Map();
+  for (const template of emanationTemplates(scene)) {
+    const ema = emanationOf(template);
+    if (!ema?.fromEffect || ema.actorUuid !== actor.uuid) continue;
+    existentes.set(ema.fromEffect, template);
+  }
+
+  // Sem token na cena não há onde centrar a aura: recolhe o que havia.
+  const paraApagar = [];
+  if (!token) {
+    for (const t of existentes.values()) paraApagar.push(t.id);
+    if (paraApagar.length) await deleteTemplates(scene, paraApagar);
+    return;
+  }
+
+  for (const [key, template] of existentes) {
+    if (!pedidas.has(key)) paraApagar.push(template.id);
+  }
+
+  const paraCriar = [];
+  const paraAtualizar = [];
+  for (const [key, pedida] of pedidas) {
+    const antiga = existentes.get(key);
+    const alvo = pedida.actionName ? findActionByName(actor, pedida.actionName) : null;
+    const flags = {
+      actorUuid: actor.uuid,
+      itemUuid: alvo?.item?.uuid || null,
+      actionLabel: alvo?.label || pedida.label,
+      actionIndex: alvo ? alvo.index : -1,
+      isAura: true,
+      sourceTokenId: token.id,
+      affectsSelf: false,
+      rerollAttack: true,
+      trigger: "both",
+      radius: pedida.radius,
+      attackTotal: null,
+      // A duração é a do efeito: enquanto ele estiver ativo, a aura está.
+      rounds: 0,
+      createdRound: globalThis.game?.combat?.round ?? null,
+      remaining: 0,
+      // Marca de nascença: esta aura veio de um efeito, e é por esta chave
+      // que ela é reconhecida nas próximas conferências.
+      fromEffect: key,
+      // Aura de efeito não se sustenta por ação: quem paga é o efeito.
+      sustain: "",
+    };
+    if (!antiga) {
+      paraCriar.push({ pedida, flags });
+    } else if (Number(antiga.distance) !== Number(pedida.radius)) {
+      paraAtualizar.push({
+        _id: antiga.id,
+        distance: pedida.radius,
+        [`flags.${FLAG_SCOPE}.${FLAG_KEY}.radius`]: pedida.radius,
+      });
+    }
+  }
+
+  if (paraApagar.length) await deleteTemplates(scene, paraApagar);
+  if (paraAtualizar.length) {
+    try { await scene.updateEmbeddedDocuments("MeasuredTemplate", paraAtualizar); }
+    catch (e) { console.warn("Ligeia | falha ao ajustar a aura de efeito:", e); }
+  }
+  for (const { pedida, flags } of paraCriar) {
+    try {
+      const { placeAuraTemplate } = await import("./template.mjs");
+      await placeAuraTemplate(actor, pedida.radius, flags);
+    } catch (e) {
+      console.warn("Ligeia | falha ao criar a aura de efeito:", e);
+    }
+  }
 }
 
 export function registerEmanationHooks() {

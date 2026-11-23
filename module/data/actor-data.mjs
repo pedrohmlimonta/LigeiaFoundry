@@ -108,6 +108,55 @@ function appliedEffectsField() {
       // Mantém a animação no token enquanto o efeito durar.
       fxAaPersist: new fields.BooleanField({ initial: true }),
       source: new fields.StringField({ blank: true, initial: "" }),
+      // SUSTENTAÇÃO — o VÍNCULO.
+      //
+      // Tudo o que precisa de ação para continuar de pé (um item ligado, uma
+      // área, uma aura, uma criatura conjurada, um efeito posto em outra
+      // ficha) deixa aqui um efeito-vínculo na ficha de quem sustenta. É ele
+      // que paga a ação a cada turno — e desligá-lo desfaz a coisa.
+      //
+      // Assim não há aba nova: o que o personagem está segurando aparece na
+      // lista de Efeitos & Condições, e larga-se soltando o efeito.
+      // Ver helpers/sustain.mjs. Só pesa com a economia de ações ligada.
+      sustain: new fields.SchemaField({
+        enabled: new fields.BooleanField({ initial: false }),
+        action: new fields.StringField({
+          initial: "simple",
+          choices: ["none", "standard", "movement", "simple", "reaction", "free"],
+        }),
+        // Ficha de quem sustenta (normalmente a que carrega este vínculo).
+        byUuid: new fields.StringField({ blank: true, initial: "" }),
+        // O QUE este vínculo segura, e o que é preciso para desfazê-lo.
+        //   item     → o item volta a ficar desligado
+        //   template → a área/aura sai do mapa
+        //   summon   → os tokens somem da cena e da iniciativa
+        //   effect   → o efeito sai da ficha de quem o recebeu
+        //   none     → não segura nada além de si (efeito sustentado comum)
+        kind: new fields.StringField({
+          initial: "none",
+          choices: ["none", "item", "template", "summon", "effect"],
+        }),
+        itemId: new fields.StringField({ blank: true, initial: "" }),
+        sceneId: new fields.StringField({ blank: true, initial: "" }),
+        templateId: new fields.StringField({ blank: true, initial: "" }),
+        tokenIds: new fields.ArrayField(new fields.StringField({ blank: false }), { initial: [] }),
+        // kind=summon: as fichas criadas para as criaturas (apagadas junto).
+        actorIds: new fields.ArrayField(new fields.StringField({ blank: false }), { initial: [] }),
+        // kind=effect: TODOS os alvos que receberam este efeito. Um conjuro
+        // que marca três inimigos é UMA sustentação com três alvos — soltar
+        // o vínculo limpa os três de uma vez.
+        targets: new fields.ArrayField(
+          new fields.SchemaField({
+            uuid: new fields.StringField({ blank: true, initial: "" }),
+            fxId: new fields.StringField({ blank: true, initial: "" }),
+          }),
+          { initial: [] },
+        ),
+        // Alvo único — como as fichas antigas guardavam. Continua lido no
+        // desfazer, para um vínculo gravado antes não ficar órfão.
+        targetUuid: new fields.StringField({ blank: true, initial: "" }),
+        targetFxId: new fields.StringField({ blank: true, initial: "" }),
+      }),
     }),
     { initial: [] },
   );
@@ -176,6 +225,15 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
         notes: new fields.HTMLField({ blank: true, initial: "" }),
       }),
 
+      // ECONOMIA DE AÇÕES (opcional, ligada nas opções do sistema).
+      // Guarda o que RESTA de cada tipo nesta rodada; o teto sai dos efeitos
+      // ativos (ver helpers/actions.mjs). null = ainda não gastou nada.
+      actions: new fields.SchemaField({
+        standard: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
+        movement: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
+        simple: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
+        reaction: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
+      }),
       // Condições ativas (lista de ids; ver CONFIG.LIGEIA.conditions)
       conditions: new fields.ArrayField(new fields.StringField({ blank: false }), { initial: [] }),
 
@@ -293,6 +351,8 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
     };
     // Alvos de rolagem em que o crítico sai automaticamente.
     this.autoCrit = [...mods.autocrit];
+    // Ações por rodada que os efeitos dão (ou tiram), e a licença de correr.
+    this.actionMods = { ...mods.actions };
     // Reroll por atributo (primários + secundários) para as rolagens.
     this.attrReroll = {};
     this.attrCrit = {};
@@ -474,6 +534,15 @@ export class NpcData extends PersonagemData {
         notes: new fields.HTMLField({ blank: true, initial: "" }),
       }),
 
+      // ECONOMIA DE AÇÕES (opcional, ligada nas opções do sistema).
+      // Guarda o que RESTA de cada tipo nesta rodada; o teto sai dos efeitos
+      // ativos (ver helpers/actions.mjs). null = ainda não gastou nada.
+      actions: new fields.SchemaField({
+        standard: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
+        movement: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
+        simple: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
+        reaction: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
+      }),
       // Condições ativas (lista de ids; ver CONFIG.LIGEIA.conditions)
       conditions: new fields.ArrayField(new fields.StringField({ blank: false }), { initial: [] }),
 

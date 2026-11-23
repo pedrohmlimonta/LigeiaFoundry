@@ -136,6 +136,15 @@
           Refazer a rolagem de ataque a cada vez
         </label>
       </div>
+      {{#if ../actionEconomy}}
+      <div class="lig-item-row lig-action-economy">
+        <label title="A cada turno de quem criou a área, esta ação é cobrada para a área CONTINUAR de pé. Sem a ação na hora, a área se desfaz sozinha.">Sustentar custa
+          <select name="system.actions.{{i}}.persistSustain">
+            {{selectOptions ../actionCostChoices selected=act.persistSustain}}
+          </select>
+        </label>
+      </div>
+      {{/if}}
       <p class="lig-hint">{{#if (eq act.targetMode "aura")}}A aura segue o token de origem.{{else}}A área fica fixa no ponto escolhido.{{/if}} O disparo por turno requer um combate ativo; o disparo "ao entrar" funciona a qualquer momento.</p>
       {{/if}}
     </div>
@@ -371,6 +380,17 @@
       </label>
     </div>
 
+    {{#if ../actionEconomy}}
+    <div class="lig-item-row lig-action-economy">
+      <label title="Qual das ações da rodada esta ação consome. Ações livres são infinitas; 'Nenhuma' não cobra nada.">Gasta
+        <select name="system.actions.{{i}}.actionCost">
+          {{selectOptions ../actionCostChoices selected=act.actionCost}}
+        </select>
+      </label>
+      <p class="lig-hint">Cada personagem tem 1 de cada por rodada (livres, infinitas), recuperadas no início do turno. Efeitos podem dar ou tirar ações.</p>
+    </div>
+    {{/if}}
+
     {{!-- CUSTO ESCOLHIDO NA ATIVAÇÃO: a ação pergunta quanto canalizar --}}
     <div class="lig-varcost-editor">
       <label class="lig-inline-check" title="Em vez de (ou além de) um custo fixo, a ação pergunta quanto recurso gastar, e o que você marcar abaixo cresce com o gasto.">
@@ -546,6 +566,8 @@
               <option value="crit" {{#if (eq fx.fxType "crit")}}selected{{/if}}>Crítico aprimorado</option>
               <option value="fumble" {{#if (eq fx.fxType "fumble")}}selected{{/if}}>Falha crítica piorada</option>
             <option value="autocrit" {{#if (eq fx.fxType "autocrit")}}selected{{/if}}>Crítico automático</option>
+            <option value="action" {{#if (eq fx.fxType "action")}}selected{{/if}}>Ações por rodada</option>
+            <option value="emanation" {{#if (eq fx.fxType "emanation")}}selected{{/if}}>Emanação (aura)</option>
             <option value="immune" {{#if (eq fx.fxType "immune")}}selected{{/if}}>Imunidade</option>
               <option value="condition" {{#if (eq fx.fxType "condition")}}selected{{/if}}>Condição</option>
               <option value="size" {{#if (eq fx.fxType "size")}}selected{{/if}}>Tamanho</option>
@@ -586,6 +608,13 @@
           {{#if (eq fx.durationMode "rounds")}}
           <label>Rodadas
             <input type="text" value="{{fx.durationRounds}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.actions.{{i}}.appliesEffects.{{fi}}.durationRounds"/>
+          </label>
+          {{/if}}
+          {{#if ../../actionEconomy}}
+          <label title="Sustentação: quem conjurou paga esta ação a cada turno para o efeito continuar de pé no alvo. Sem a ação, o efeito cai sozinho.">Sustentar custa
+            <select name="system.actions.{{i}}.appliesEffects.{{fi}}.fxSustain">
+              {{selectOptions ../../actionCostChoices selected=fx.fxSustain}}
+            </select>
           </label>
           {{/if}}
         </div>
@@ -691,11 +720,19 @@
     {{!-- CONJURAÇÃO: criaturas que a ação invoca --}}
     <div class="lig-summon-section">
       <div class="lig-subtitle">Conjuração (invocar criaturas)</div>
+      {{#if act.summons.length}}
+      <div class="lig-item-row lig-summon-geral">
+        <label title="Vale para toda criatura que marcar &quot;geral&quot;. Aceita fórmula: @nivel, ceil(@nivel/3), @gasto.">Quantas (geral)
+          <input type="text" name="system.actions.{{i}}.summonCount" value="{{act.summonCount}}"/>
+        </label>
+        <p class="lig-hint">Cada criatura segue este número ou o próprio, pela caixinha "geral" da linha dela.</p>
+      </div>
+      {{/if}}
       {{#each act.summons as |sum si|}}
       <div class="lig-summon-row {{#unless sum.enabled}}off{{/unless}}">
         <div class="lig-summon-head">
           <span class="lig-summon-name" title="{{sum.actorUuid}}">🧿 {{#if sum.actorName}}{{sum.actorName}}{{else}}(ficha removida){{/if}}</span>
-          <label class="lig-inline-check" title="Ativa">
+          <label class="lig-inline-check" title="No cardápio: desmarcada, esta criatura não pode ser escolhida.">
             <input type="checkbox" name="system.actions.{{i}}.summons.{{si}}.enabled" {{checked sum.enabled}}/>
           </label>
           <button type="button" class="lig-mini-btn danger" data-action="removeSummon" data-action-index="{{i}}" data-index="{{si}}" title="Remover esta conjuração">✕</button>
@@ -703,9 +740,14 @@
         <input type="hidden" name="system.actions.{{i}}.summons.{{si}}.actorUuid" value="{{sum.actorUuid}}"/>
         <input type="hidden" name="system.actions.{{i}}.summons.{{si}}.actorName" value="{{sum.actorName}}"/>
         <div class="lig-summon-fields">
+          <label class="lig-inline-check lig-summon-geral-check" title="Seguir o número geral da ação em vez do número desta linha.">
+            <input type="checkbox" name="system.actions.{{i}}.summons.{{si}}.useGlobalCount" {{checked sum.useGlobalCount}}/> geral
+          </label>
+          {{#unless sum.useGlobalCount}}
           <label title="Quantas criaturas aparecem. Aceita fórmula: @nivel, ceil(@nivel/3), @gasto.">Quantas
             <input type="text" name="system.actions.{{i}}.summons.{{si}}.count" value="{{sum.count}}"/>
           </label>
+          {{/unless}}
           <label title="De que lado a criatura fica. 'Como quem conjurou' copia a atitude de quem invocou.">Atitude
             <select name="system.actions.{{i}}.summons.{{si}}.disposition">
               <option value="same" {{#if (eq sum.disposition "same")}}selected{{/if}}>Como quem conjurou</option>
@@ -718,9 +760,19 @@
           <label title="Quantas rodadas a criatura fica. 0 = até ser removida à mão.">Rodadas
             <input type="text" name="system.actions.{{i}}.summons.{{si}}.rounds" value="{{sum.rounds}}"/>
           </label>
+          {{#if ../../actionEconomy}}
+          <label title="Sustentação: a criatura só fica em campo enquanto quem a conjurou pagar esta ação por rodada. Sem a ação, ela some da cena e da iniciativa.">Sustentar
+            <select name="system.actions.{{i}}.summons.{{si}}.sustain">
+              {{selectOptions ../../actionCostChoices selected=sum.sustain}}
+            </select>
+          </label>
+          {{/if}}
           <div class="lig-summon-checks">
             <label class="lig-inline-check" title="Entrega o controle do token a quem conjurou.">
               <input type="checkbox" name="system.actions.{{i}}.summons.{{si}}.giveControl" {{checked sum.giveControl}}/> controle
+            </label>
+            <label class="lig-inline-check" title="Cada criatura conjurada ganha uma ficha nova em Atores (pasta &quot;Conjurados&quot;), apagada quando ela é dispensada ou morre. É o que impede duas criaturas iguais de dividirem os mesmos PV no combate.">
+              <input type="checkbox" name="system.actions.{{i}}.summons.{{si}}.ownSheet" {{checked sum.ownSheet}}/> ficha própria
             </label>
             <label class="lig-inline-check" title="A criatura aparece escondida (só o Mestre a vê até revelá-la).">
               <input type="checkbox" name="system.actions.{{i}}.summons.{{si}}.hidden" {{checked sum.hidden}}/> oculta
@@ -733,7 +785,7 @@
         Arraste aqui a ficha (personagem, NPC ou veículo) que esta ação conjura
       </div>
       {{#if act.summons.length}}
-      <p class="lig-hint">Ao executar a ação, você escolhe no mapa onde cada criatura aparece — o alcance da ação limita a distância. O token conjurado é avulso: feri-lo não mexe na ficha original.</p>
+      <p class="lig-hint">A lista é um <strong>cardápio</strong>: ao clicar no botão da ação, você escolhe numa caixa <strong>qual</strong> criatura conjurar — sai uma por ativação, na quantidade que vale para ela — o número geral acima ou o próprio (três lobos, nunca um lobo e um urso juntos). Depois você escolhe no mapa onde cada cópia aparece, dentro do alcance da ação, e todas entram num vínculo de sustentação só. O token conjurado é avulso: feri-lo não mexe na ficha original.</p>
       {{/if}}
     </div>
 

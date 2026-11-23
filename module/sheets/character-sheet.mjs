@@ -12,8 +12,12 @@ import { effectIsActive, availableActionsOf, resolveEffectValue, WORD_TARGET_PRE
          activationLevelChoices, activationLevelOf, LEVELED_TYPES,
          chainTargetKeys, actionShowsInSheet, defesasComoAlvos, resistenciasComoAlvos,
          ITEM_TARGET_PREFIX, WEAPON_ANY_TARGET, WEAPON_TAG_PREFIX,
-         splitTargetArg, mergeTargetArg, tipagensConhecidas } from "../helpers/effects.mjs";
+         splitTargetArg, mergeTargetArg, tipagensConhecidas, acoesComoAlvos,
+         EMANATION_TARGET_PREFIX } from "../helpers/effects.mjs";
 
+import { createSustainLink, isSustainLink } from "../helpers/sustain.mjs";
+import { actionEconomyOn, spendActions, refundActions, restoreActions, actionPoolFor, poolEntries,
+         conditionActionLimits, ACTION_TYPES } from "../helpers/actions.mjs";
 import { artRowsFor, tokenArtFor, healthPercent } from "../helpers/token-art.mjs";
 import { pedirItemParaEncantar, applyEnchantment, removeEnchantment } from "../helpers/enchant.mjs";
 import { theatreRowsFor, theatreActive } from "../helpers/theatre-art.mjs";
@@ -35,6 +39,8 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       itemToggle: LigeiaCharacterSheet.#onItemToggle,
       effectToggle: LigeiaCharacterSheet.#onEffectToggle,
       conditionToggle: LigeiaCharacterSheet.#onConditionToggle,
+      spendAction: LigeiaCharacterSheet.#onSpendAction,
+      restoreActions: LigeiaCharacterSheet.#onRestoreActions,
       addAppliedEffect: LigeiaCharacterSheet.#onAddAppliedEffect,
       removeAppliedEffect: LigeiaCharacterSheet.#onRemoveAppliedEffect,
       toggleAppliedEffect: LigeiaCharacterSheet.#onToggleAppliedEffect,
@@ -301,6 +307,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       dice: "Dados", rollDice: "Dados (rolagem)", bonus: "Bônus", stat: "Modificar", set: "Definir",
       attr: "Atributo", damage: "Dano", rd: "Red. Dano", vuln: "Vulnerab.", reroll1: "Rerrola 1", reroll6: "Rerrola 6",
       crit: "Crít. apr.", fumble: "Falha pior.", info: "Info",
+      autocrit: "Crít. autom.", immune: "Imunidade", action: "Ações", emanation: "Emanação",
     };
     const rollTargets = {
       all: "Todas as rolagens",
@@ -332,6 +339,17 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       bloqueio: "Bloqueio", esquiva: "Esquiva", conjuracao: "Conjuração", iniciativa: "Iniciativa", deslocamento: "Deslocamento",
     };
     context.weaponTagSuggestions = tipagensConhecidas();
+    // ECONOMIA DE AÇÕES: o painel da rodada só existe com a mecânica ligada.
+    context.actionEconomy = actionEconomyOn();
+    if (context.actionEconomy) {
+      const pool = actionPoolFor(this.document);
+      context.actionPool = poolEntries(pool);
+      context.actionCap = pool.cap ? { ...pool.cap, motivosTexto: pool.cap.motivos.join(", ") } : null;
+      context.canRunFree = this.document.system?.actionMods?.run === true;
+      // Condições como Atordoado, Imobilizado ou Pasmo apertam as ações:
+      // dizer QUAIS evita o "por que não consigo usar isso?".
+      context.actionLimits = conditionActionLimits(this.document).motivos.join(", ");
+    }
     const dmgTargets = { all: "Qualquer", ...(CONFIG.LIGEIA?.damageTypes || {}) };
     // IMUNIDADE: a que se é imune (dano, condição, circunstância, item).
     const immuneTargets = {
@@ -362,6 +380,8 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
         case "bonus": case "attr": case "dice": case "rollDice": case "reroll1": case "reroll6": case "crit": case "fumble":
         case "autocrit": return rollTargets;
         case "immune": return immuneTargets;
+        case "action": return acoesComoAlvos();
+        case "emanation": return { [EMANATION_TARGET_PREFIX]: "Aura (digite a ação que ela dispara)" };
         case "stat": return statTargets;
         case "set": return setTargets;
         // Dano por tipo OU por tipagem de arma (ver item-sheets.mjs).
@@ -391,6 +411,7 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
             [WEAPON_TAG_PREFIX]: ["vazio = qualquer tipagem", "Vazio vale para qualquer arma tipada; escreva a tipagem para restringir."],
             [ITEM_TARGET_PREFIX]: ["nome do item", "Nome do item na ficha. Toda ação dele recebe este efeito."],
             "efeito:": ["nome do efeito", "Casa por trecho do nome, sem acento nem maiúscula."],
+            [EMANATION_TARGET_PREFIX]: ["ação que a aura dispara", "Nome da ação que a aura refaz a cada turno em quem estiver dentro — \"Item — Ação\" ou só a ação. Vazio = a aura é só o círculo no mapa. O VALOR do efeito é o raio, em metros."],
           };
           const [hint, title] = dicas[pref] || ["", ""];
           return { fx0TargetSel: pref || e0?.target, fx0ArgPrefix: pref, fx0Arg: arg, fx0ArgHint: hint, fx0ArgTitle: title };
@@ -399,6 +420,20 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
         fx0IsVuln: type0 === "vuln",
         // Nome do item que este efeito encantou (para mostrar na ficha).
         enchantItemName: ae.enchantItemId ? (actor.items.get(ae.enchantItemId)?.name || "") : "",
+        // VÍNCULO DE SUSTENTAÇÃO: este efeito não modifica nada — ele segura
+        // uma coisa de pé pagando uma ação por rodada. Desligá-lo larga a
+        // coisa, e é isso que a nota na ficha explica.
+        isSustain: isSustainLink(ae),
+        sustainNote: isSustainLink(ae)
+          ? `Custa ${ACTION_TYPES[ae.sustain.action]?.label || ae.sustain.action} por rodada. ${
+            { item: "Soltar desliga o item.", template: "Soltar tira a área do mapa.",
+              summon: "Soltar dispensa a criatura (sai da cena e da iniciativa).",
+              effect: `Soltar tira o efeito de ${
+                (ae.sustain.targets || []).length > 1
+                  ? `todos os ${ae.sustain.targets.length} alvos` : "quem o recebeu"
+              }.` }[ae.sustain.kind] || "Soltar encerra a sustentação."
+          }`
+          : "",
         fx0NoValue: false,
         summary: [
           (ae.effects || [])
@@ -501,6 +536,16 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
   /** @override Configura drag & drop e restaura scroll após renderizar. */
   _onRender(context, options) {
     super._onRender?.(context, options);
+
+    // AÇÕES DA RODADA: o clique gasta (pelo dispatcher), o clique com o
+    // direito devolve. Sem menu de contexto do navegador por cima.
+    for (const btn of this.element?.querySelectorAll?.("[data-action='spendAction']") || []) {
+      btn.addEventListener("contextmenu", async (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        await refundActions(this.document, btn.dataset.actionType);
+      });
+    }
 
     // Preservação de scroll: registra a posição continuamente e restaura
     // após cada re-render (submitOnChange re-renderiza a ficha inteira).
@@ -721,6 +766,19 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       }
     }
 
+    // SUSTENTAÇÃO da emanação: a área só fica de pé enquanto quem a criou
+    // pagar a ação. O vínculo na ficha é o que cobra — e soltá-lo tira a
+    // área do mapa.
+    if (templateId && action.persistArea && action.persistSustain && action.persistSustain !== "none") {
+      await createSustainLink(this.document, {
+        label: `Sustentando: ${action.label || item.name}`,
+        action: action.persistSustain,
+        kind: "template",
+        refs: { sceneId: canvas?.scene?.id || "", templateId },
+        source: item.name,
+      });
+    }
+
     // Ação normal (sem emanação contínua): a área/aura é só o retrato do
     // momento — some do mapa logo após a resolução.
     if (templateId && !action.persistArea) scheduleTransientCleanup(templateId);
@@ -867,6 +925,20 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       finally { this.#fxOpInProgress = false; }
   }
 
+  /* ---- Economia de ações ---- */
+
+  /** Gasta uma ação da rodada pelo painel da ficha. */
+  static async #onSpendAction(event, target) {
+    const tipo = target.dataset.actionType;
+    if (!tipo) return;
+    await spendActions(this.document, tipo, { motivo: "esta ação" });
+  }
+
+  /** Devolve todas as ações (o que o início do turno faz sozinho). */
+  static async #onRestoreActions() {
+    await restoreActions(this.document);
+  }
+
   /** Rola para tentar encerrar um efeito (sucesso ≥ CD remove o efeito). */
   static async #onRollEndEffect(event, target) {
     const idx = Number(target.dataset.index);
@@ -883,7 +955,40 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
     const item = this.document.items.get(id);
     if (!item) return;
     const turningOn = !item.system.active;
+
+    // SUSTENTAÇÃO: desligar à mão um item sustentado solta o vínculo, que
+    // é quem estava pagando por ele. (Soltar o vínculo também desliga o
+    // item; os dois caminhos levam ao mesmo lugar.)
+    if (!turningOn) {
+      const links = (this.document.system?.appliedEffects || []);
+      const restantes = links.filter((ae) => !(ae?.sustain?.enabled && ae.sustain.kind === "item" && ae.sustain.itemId === item.id));
+      if (restantes.length !== links.length) {
+        await this.document.update({ "system.appliedEffects": restantes });
+      }
+    }
+
+    // ECONOMIA DE AÇÕES (quando ligada): LIGAR o item pode custar uma ação
+    // da rodada. Cobrada antes de ligar — sem ação, o item nem acende.
+    // Desligar não custa nada.
+    let actionText = "";
+    if (turningOn && actionEconomyOn() && item.system.actionCost && item.system.actionCost !== "none") {
+      const res = await spendActions(this.document, item.system.actionCost, { motivo: `ativar ${item.name}` });
+      if (!res.ok) return;
+      actionText = res.text;
+    }
+
     await item.update({ "system.active": !item.system.active });
+
+    // Item SUSTENTÁVEL ligado: nasce o vínculo que o segura de pé.
+    if (turningOn && item.system.sustain?.enabled && item.system.sustain.action !== "none") {
+      await createSustainLink(this.document, {
+        label: `Sustentando: ${item.name}`,
+        action: item.system.sustain.action,
+        kind: "item",
+        refs: { itemId: item.id },
+        source: item.name,
+      });
+    }
 
     // Ao LIGAR um item ativo com custos, desconta os custos obrigatórios
     // (PV/PM/PH) automaticamente e anuncia no chat.
@@ -897,9 +1002,18 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
           ? ` <span class="lig-act-level">(${niveis[activationLevelOf(item)] || ""})</span>` : "";
         await ChatMessage.create({
           speaker: ChatMessage.getSpeaker({ actor: this.document }),
-          flavor: `<div class="ligeia-roll-flavor"><strong>${item.name}</strong>${nivel} ativada — custo: ${text}${insufficient ? ' <span class="lig-insufficient">(recurso insuficiente!)</span>' : ""}</div>`,
+          flavor: `<div class="ligeia-roll-flavor"><strong>${item.name}</strong>${nivel} ativada — custo: ${text}${insufficient ? ' <span class="lig-insufficient">(recurso insuficiente!)</span>' : ""}${actionText}</div>`,
         });
+        actionText = "";
       }
+    }
+    // Item sem custo de recurso, mas que gastou ação: o chat conta mesmo
+    // assim — é o registro de que a rodada ficou mais curta.
+    if (actionText) {
+      await ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: this.document }),
+        flavor: `<div class="ligeia-roll-flavor"><strong>${item.name}</strong> ativada${actionText}</div>`,
+      });
     }
   }
 

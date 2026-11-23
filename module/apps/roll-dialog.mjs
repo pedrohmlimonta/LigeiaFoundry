@@ -101,6 +101,57 @@ export async function pedirGastoVariavel(actor, { titulo, recurso, min, max, dis
 }
 
 /**
+ * Pergunta QUAL criatura do cardápio a conjuração vai trazer.
+ *
+ * A ação conjura uma de cada vez: a lista do item é um cardápio, e aqui se
+ * escolhe o prato. A marcada na ficha já vem selecionada, então quem não
+ * quer pensar é só confirmar.
+ *
+ * @param {Array} cardapio  entradas com { index, actorName, count, rounds }
+ * @param {number} marcado  índice que já vem escolhido
+ * @returns {Promise<number|null>} o índice escolhido, ou null se cancelou
+ */
+export async function pedirCriaturaConjurada(cardapio, marcado = 0) {
+  const linhas = cardapio.map((c) => {
+    const quantas = String(c.countEff ?? c.count ?? "1").trim();
+    const nQuantas = quantas && quantas !== "1" ? ` <span class="lig-rd-sub">(${quantas})</span>` : "";
+    const dura = Number(c.rounds) > 0 ? ` <span class="lig-rd-sub">· ${c.rounds} rodadas</span>` : "";
+    return `
+      <label class="lig-rd-pick">
+        <input type="radio" name="criatura" value="${c.index}" ${c.index === marcado ? "checked" : ""}/>
+        <span><strong>${c.actorName || "(ficha removida)"}</strong>${nQuantas}${dura}</span>
+      </label>`;
+  }).join("");
+
+  const DV2 = foundry?.applications?.api?.DialogV2;
+  if (!DV2?.wait) return marcado;
+
+  const out = await DV2.wait({
+    window: { title: "Conjuração — qual criatura?" },
+    classes: ["ligeia", "lig-roll-dialog-window"],
+    content: `<form class="lig-roll-dialog" autocomplete="off">
+      <p class="lig-rd-hint">A ação conjura uma criatura por vez, na quantidade indicada.</p>
+      ${linhas}
+    </form>`,
+    buttons: [
+      {
+        action: "ok", label: "Conjurar", icon: "fas fa-paw", default: true,
+        callback: (event, button) => {
+          const escolhido = button.form?.querySelector?.('input[name="criatura"]:checked');
+          const v = Number(escolhido?.value);
+          return Number.isFinite(v) ? v : marcado;
+        },
+      },
+      { action: "cancel", label: "Cancelar", icon: "fas fa-times", callback: () => null },
+    ],
+    rejectClose: false,
+    close: () => null,
+  }).catch(() => null);
+
+  return typeof out === "number" ? out : null;
+}
+
+/**
  * Arma a mira: o PRÓXIMO CLIQUE num token escolhe o alvo e já dispara.
  *
  * Usado pelas ações em cadeia marcadas como "Variável". Não há janela nem
@@ -227,7 +278,39 @@ function stepperField(label, name, value, hint = "") {
 }
 
 /** Monta o HTML da caixa. */
-function buildContent({ improvement, targets, defenseAttr, difficulty, allowDefense, hint = "", showDifficulty = true }) {
+/**
+ * O bloco da ECONOMIA DE AÇÕES na caixa de rolagem: qual ação esta rolagem
+ * vai gastar, e quantas o personagem ainda tem de cada tipo.
+ *
+ * A escolha vale só para este uso — a ação configurada no item continua
+ * como está. É o espaço para o "essa eu faço como ação simples" que a mesa
+ * combina na hora.
+ */
+function actionCostBlock(pool, atual) {
+  if (!pool) return "";
+  const nomes = {
+    none: "— nenhuma ação —", standard: "Ação padrão", movement: "Ação de movimento",
+    simple: "Ação simples", reaction: "Reação", free: "Ação livre (infinitas)",
+  };
+  const opts = Object.entries(nomes).map(([k, rotulo]) => {
+    const slot = pool[k];
+    // Quantas restam, para a escolha ser informada. Livre e "nenhuma" não
+    // têm contagem: não se esgotam.
+    const resta = slot ? ` (${slot.available} de ${slot.max})` : "";
+    const vazio = slot && slot.available <= 0 ? " ⚠" : "";
+    return `<option value="${k}" ${k === atual ? "selected" : ""}>${rotulo}${resta}${vazio}</option>`;
+  }).join("");
+  return `
+    <div class="lig-rd-row">
+      <label class="lig-rd-field lig-rd-wide">
+        <span class="lig-rd-label">Gasta</span>
+        <select name="actionCost">${opts}</select>
+        <span class="lig-rd-sub">A ação da rodada que este uso consome. Vale só desta vez.</span>
+      </label>
+    </div>`;
+}
+
+function buildContent({ improvement, targets, defenseAttr, difficulty, allowDefense, hint = "", showDifficulty = true, actionPool = null, actionCost = "none" }) {
   const cfg = CONFIG.LIGEIA || {};
   const impLabel =
     improvement > 0 ? `+${improvement}D vantagem` :
@@ -273,6 +356,8 @@ function buildContent({ improvement, targets, defenseAttr, difficulty, allowDefe
         </label>
       </div>` : ""}
       ${hint ? `<div class="lig-rd-hint">${hint}</div>` : ""}
+
+      ${actionCostBlock(actionPool, actionCost)}
 
       ${defenseBlock}
 
@@ -334,9 +419,14 @@ export async function promptRollConfig({
   allowDefense = true,
   hint = "",
   showDifficulty = true,
+  actionPool = null,
+  actionCost = "none",
 } = {}) {
   const targets = allowDefense ? currentTargetActors() : [];
-  const content = buildContent({ improvement, targets, defenseAttr, difficulty, allowDefense, hint, showDifficulty });
+  const content = buildContent({
+    improvement, targets, defenseAttr, difficulty, allowDefense, hint, showDifficulty,
+    actionPool, actionCost,
+  });
 
   const parse = (form) => {
     const bonus = num(form, "bonus", 0);
@@ -350,6 +440,8 @@ export async function promptRollConfig({
       baseDice,
       difficulty: Number.isFinite(dc) ? dc : null,
       defenseAttr: str(form, "defenseAttr", ""),
+      // Só vem preenchido quando a economia de ações está ligada.
+      actionCost: actionPool ? str(form, "actionCost", actionCost) : null,
     };
   };
 

@@ -1216,6 +1216,13 @@ label.lig-bars-players {
 }
 .lig-atk-line { font-size: 0.85rem; }
 .lig-atk-dmg { font-size: 0.85rem; margin-top: 0.15rem; }
+.lig-rd-pick {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.3rem 0.2rem; cursor: pointer;
+}
+.lig-rd-pick:hover { color: var(--lig-gold, #c9a84a); }
+.lig-rd-pick input { margin: 0; flex: 0 0 auto; }
+
 .lig-rd-hint {
   margin-top: 0.35rem;
   font-size: 0.82rem;
@@ -1432,6 +1439,54 @@ label.lig-bars-players {
 .lig-macro-name { flex: 1; cursor: pointer; font-weight: 600; }
 .lig-macro-name:hover { text-decoration: underline; }
 
+/* ECONOMIA DE AÇÕES: o painel da rodada na ficha */
+.lig-actions-panel { margin-top: 0.6rem; }
+.lig-actions-grid {
+  display: flex; flex-wrap: wrap; gap: 0.4rem;
+}
+.lig-action-slot {
+  flex: 1 1 4rem; min-width: 3.9rem;
+  border: 1px solid var(--lig-border, #5a4a2a); border-radius: 4px;
+  background: var(--lig-bg-deep, #15110a);
+  text-align: center; padding: 0.3rem 0.2rem;
+}
+.lig-action-slot.empty { opacity: 0.45; }
+.lig-action-slot.free { opacity: 0.8; display: flex; flex-direction: column; justify-content: center; }
+.lig-action-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 0.1rem;
+  width: 100%; background: none; border: 0; padding: 0; cursor: pointer;
+  color: inherit; font: inherit;
+}
+.lig-action-btn:hover { color: var(--lig-gold, #c9a84a); }
+.lig-action-icon { font-size: 1.1rem; line-height: 1; color: var(--lig-gold, #c9a84a); }
+.lig-action-name { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.02em; }
+.lig-action-pips { display: flex; gap: 0.15rem; min-height: 0.5rem; }
+.lig-pip {
+  width: 0.45rem; height: 0.45rem; border-radius: 50%;
+  border: 1px solid var(--lig-gold, #c9a84a); background: transparent;
+}
+.lig-pip.on { background: var(--lig-gold, #c9a84a); }
+.lig-pip.none { border-style: dashed; opacity: 0.4; }
+
+/* O aviso de que uma condição apertou as ações da rodada */
+.lig-action-capped { color: var(--lig-danger, #b4553f); }
+
+/* A nota do vínculo de sustentação na lista de efeitos */
+.lig-sustain-note {
+  font-size: 0.78rem; font-style: italic;
+  color: var(--lig-gold, #c9a84a); opacity: 0.9; margin: 0.1rem 0 0.2rem;
+}
+
+/* A linha do chat da sustentação (o que ficou de pé, o que caiu) */
+.lig-sustain-line { font-size: 0.85rem; margin-top: 0.2rem; }
+.lig-sustain-line.fell { color: var(--lig-danger, #b4553f); }
+
+/* A linha do chat dizendo que ação foi gasta */
+.lig-action-line { font-size: 0.85rem; margin-top: 0.2rem; }
+
+/* O seletor de custo de ação nas fichas de item */
+.lig-action-economy { align-items: flex-end; }
+
 /* CONJURAÇÃO: as criaturas que a ação invoca */
 .lig-summon-section { margin-top: 0.5rem; }
 .lig-summon-drop {
@@ -1450,9 +1505,16 @@ label.lig-bars-players {
 .lig-summon-head { display: flex; align-items: center; gap: 0.4rem; }
 .lig-summon-name { flex: 1 1 auto; min-width: 0; font-weight: 600; }
 .lig-summon-fields {
-  display: grid; align-items: end; gap: 0.35rem; margin-top: 0.25rem;
-  grid-template-columns: 5rem minmax(7rem, 1fr) 4.5rem auto;
+  display: flex; flex-wrap: wrap; align-items: flex-end;
+  gap: 0.35rem; margin-top: 0.25rem;
 }
+.lig-summon-fields > label { flex: 1 1 5rem; min-width: 4.5rem; }
+.lig-summon-fields > .lig-summon-geral-check { flex: 0 0 auto; min-width: 0; }
+.lig-summon-geral { align-items: flex-end; margin-bottom: 0.3rem; }
+.lig-summon-geral > label { flex: 0 0 8rem; max-width: 8rem; }
+.lig-summon-geral > label input { max-width: 100%; }
+.lig-summon-geral .lig-hint { flex: 1 1 10rem; margin: 0; }
+.lig-summon-fields > label:nth-child(2) { flex: 2 1 8rem; }
 .lig-summon-checks { display: flex; flex-direction: column; gap: 0.1rem; }
 
 /* A linha do chat dizendo o que foi conjurado */

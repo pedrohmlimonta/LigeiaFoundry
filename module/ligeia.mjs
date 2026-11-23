@@ -15,6 +15,9 @@ import { registerMovementHooks, registerMovementSocket, registerForcedMovementAc
 import { registerRollRequestSocket } from "./helpers/roll-request.mjs";
 import { registerGmProxySocket } from "./helpers/gm-proxy.mjs";
 import { registerSummonHooks } from "./helpers/summon.mjs";
+import { registerActionSettings, registerActionHooks } from "./helpers/actions.mjs";
+import { resyncEffectAuras } from "./helpers/emanation.mjs";
+import { snapshotSustainLinks, syncSustainLinks } from "./helpers/sustain.mjs";
 import { registerTokenLinkSettings, registerTokenLinkHooks, migrateTokenLinks, registerTokenSizeHooks, syncTokenSize } from "./helpers/token-link.mjs";
 import { registerTokenBarSettings, registerTokenBarHooks } from "./helpers/token-bars.mjs";
 import { registerTokenArtHooks } from "./helpers/token-art.mjs";
@@ -59,6 +62,8 @@ Hooks.once("init", function () {
   registerTokenLinkHooks();
   // O token acompanha a categoria de tamanho do personagem.
   registerTokenSizeHooks();
+  // Economia de ações por rodada (opcional — desligada por padrão).
+  registerActionSettings();
   // Barras de PV/PM/PH desenhadas abaixo do token.
   registerTokenBarSettings();
   registerTokenBarHooks();
@@ -151,6 +156,33 @@ Hooks.once("init", function () {
     // soma o NÍVEL de quem atacou ao dano, no tipo de dano base do ataque.
     // Vale para qualquer ataque — magia, arma, desarmado. Em false, some.
     critAddsLevelToDamage: true,
+    // CONDIÇÕES QUE LIMITAM AÇÕES (só valem com a economia de ações ligada).
+    //
+    // Cada entrada diz o TETO que a condição impõe — não um desconto, um
+    // limite: o personagem fica com o MENOR entre o que teria e o que a
+    // condição permite.
+    //   all   → teto para todos os tipos contados (inclusive a reação)
+    //   <tipo>→ teto só para aquele tipo (standard/movement/simple/reaction)
+    //   cap   → teto de ações no TURNO somando padrão + movimento + simples
+    //           (a reação fica de fora: ela acontece fora do próprio turno)
+    //
+    // As condições implicadas entram sozinhas: Agarrado já é Imobilizado e
+    // Dominado já é Pasmo (ver helpers/conditions.mjs), então não precisam
+    // repetir o limite aqui. Mesa que queira outra leitura muda esta tabela.
+    conditionActions: {
+      // "não recebe ações no turno" — e sem ciência dos arredores, nem reage
+      atordoado: { all: 0 },
+      // "não recebe ações nem realiza reações"
+      inconsciente: { all: 0 },
+      // "sem ações no começo do turno" (o corpo não responde; só a percepção)
+      paralisado: { all: 0 },
+      // "incapaz de se mover"
+      imobilizado: { movement: 0 },
+      // "não se move por conta própria"
+      telecinese: { movement: 0 },
+      // "faz apenas uma ação por turno"
+      pasmo: { cap: 1 },
+    },
     // 28 palavras arcanas
     arcaneWords: [
       "acida", "augurado", "carmo", "devena", "energio", "exitium",
@@ -449,6 +481,8 @@ Hooks.once("ready", function () {
   registerGmProxySocket();
   // Criaturas conjuradas com duração: saem da cena quando a duração acaba.
   registerSummonHooks();
+  // Economia de ações (quando ligada): recuperação no turno e deslocamento.
+  registerActionHooks();
   // Vincula fichas de token já existentes (uma vez, preservando os valores).
   migrateTokenLinks();
   // Acerta o tamanho dos tokens já colocados conforme a categoria atual.
@@ -462,6 +496,21 @@ Hooks.once("ready", function () {
 /*  se deseja substituir. Não → mantém a atual e não adiciona.         */
 /*  Sim → remove a atual e adiciona a nova.                            */
 /* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------ */
+/*  FICHA NOVA JÁ NASCE SEM A CAIXA DE ROLAGEM                         */
+/*  A caixa de configuração antes de cada rolagem é útil para ajustar  */
+/*  bônus e dados na hora, mas atrapalha quem rola direto. Toda ficha  */
+/*  criada agora começa com "sem caixa" ligado; quem quiser a caixa    */
+/*  desmarca na própria ficha, e as fichas que já existem ficam como   */
+/*  estão.                                                             */
+/* ------------------------------------------------------------------ */
+Hooks.on("preCreateActor", function (actor, data, options, userId) {
+  // Só mexe quando o valor não veio no dado de criação (duplicar uma ficha,
+  // importar de compêndio ou colar JSON traz o que estava gravado lá).
+  if (foundry.utils.hasProperty(data, "system.skipRollDialog")) return;
+  actor.updateSource({ "system.skipRollDialog": true });
+});
+
 const UNIQUE_DEFINITION_TYPES = ["raca", "heranca", "vocacao", "carreira"];
 const UNIQUE_DEFINITION_LABELS = { raca: "raça", heranca: "herança", vocacao: "vocação", carreira: "carreira" };
 
@@ -597,6 +646,8 @@ Hooks.on("updateItem", async function (item, changes, options, userId) {
     // então reacendemos o que ainda vale depois de apagar.
     await resyncEffectFx(actor, visuaisAtivosDe(actor));
   }
+  // Um efeito de EMANAÇÃO neste item acende (ou apaga) a aura dele.
+  await resyncEffectAuras(actor);
 });
 
 Hooks.on("updateItem", async function (item, changes, options, userId) {
@@ -720,6 +771,8 @@ Hooks.on("canvasReady", async function () {
     const ativos = visuaisAtivosDe(actor);
     for (const v of ativos) vivos.add(v.name);
     await resyncEffectFx(actor, ativos);
+    // As auras de efeito voltam com a cena (e as órfãs saem).
+    await resyncEffectAuras(actor);
   }
   // Rede final: visuais nossos que não pertencem a nenhum token em cena.
   const n = limparFxOrfaos(vivos);
@@ -732,11 +785,16 @@ Hooks.on("deleteItem", async function (item) {
   if (actor?.documentName !== "Actor") return;
   endEffectFx(persistentFxName(`item-${item.id}`));
   await resyncEffectFx(actor, visuaisAtivosDe(actor));
+  // E a aura que um efeito dele projetava sai do mapa junto.
+  await resyncEffectAuras(actor);
 });
 
 /* ------------------------------------------------------------------ */
 Hooks.on("preUpdateActor", function (actor, changes, options) {
   if (!foundry.utils.hasProperty(changes, "system.appliedEffects")) return;
+  // VÍNCULOS DE SUSTENTAÇÃO: guarda como estavam, para saber o que foi
+  // largado — e desfazer o que cada um segurava.
+  options.ligeiaSustainAntes = snapshotSustainLinks(actor);
   options.ligeiaFxAntes = (actor.system?.appliedEffects || []).map((ae) => ({
     fxId: ae.fxId,
     fxFile: ae.fxFile,
@@ -751,6 +809,17 @@ Hooks.on("preUpdateActor", function (actor, changes, options) {
 
 Hooks.on("updateActor", async function (actor, changes, options, userId) {
   if (game.user.id !== userId) return;
+  // Efeito aplicado que CRIA EMANAÇÃO: entrou, saiu ou foi desligado, a
+  // aura no mapa acompanha. Vale mesmo sem nenhum visual envolvido.
+  if (foundry.utils.hasProperty(changes, "system.appliedEffects")) {
+    await resyncEffectAuras(actor);
+    // Vínculo largado (desligado, removido, expirado) solta o que segurava:
+    // a área sai do mapa, a criatura some, o item se desliga.
+    const largados = await syncSustainLinks(actor, options.ligeiaSustainAntes);
+    if (largados.length) {
+      ui.notifications?.info(`Sustentação encerrada: ${largados.join(", ")}.`);
+    }
+  }
   if (!Array.isArray(options.ligeiaFxAntes)) return;
   const antes = new Map(options.ligeiaFxAntes.filter((e) => e.fxId).map((e) => [e.fxId, e]));
   const agora = new Map(

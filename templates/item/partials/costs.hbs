@@ -23,6 +23,27 @@
   <div class="lig-empty">Sem custos.</div>
   {{/each}}
 
+  {{#if actionEconomy}}
+  <div class="lig-item-row lig-action-economy">
+    <label title="Qual das ações da rodada LIGAR este item consome. Desligar nunca custa nada.">Ligar o item gasta
+      <select name="system.actionCost">
+        {{selectOptions actionCostChoices selected=system.actionCost}}
+      </select>
+    </label>
+    <label class="lig-inline-check" title="Sustentável: o item ligado cobra uma ação a cada turno para CONTINUAR ligado. Sem a ação na hora, ele se desfaz sozinho.">
+      <input type="checkbox" name="system.sustain.enabled" {{checked system.sustain.enabled}}/>
+      Sustentável
+    </label>
+    {{#if system.sustain.enabled}}
+    <label title="A ação cobrada a cada turno para o item continuar ligado.">Sustentar custa
+      <select name="system.sustain.action">
+        {{selectOptions actionCostChoices selected=system.sustain.action}}
+      </select>
+    </label>
+    {{/if}}
+  </div>
+  {{/if}}
+
   {{#if hasLevels}}
   <p class="lig-hint">Cada custo diz quando é cobrado, conforme o nível que for
     <strong>ativado</strong>. Os modos “+” somam os níveis abaixo: um custo em

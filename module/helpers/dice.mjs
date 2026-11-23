@@ -36,6 +36,7 @@ import { conditionModifiers, attributeConditionDice, actorHasCondition, coverDef
 import { playActionAnimation } from "./integrations.mjs";
 import { executeActionMovement } from "./movement.mjs";
 import { executarConjuracoes, conjuracoesDaAcao } from "./summon.mjs";
+import { spendActions, actionEconomyOn, actionEconomyStrict, hasAction, actionLabel, actionPoolFor } from "./actions.mjs";
 import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvailable, actionIndexOf, activeEffectsOf, arcaneWordsOf, weaponTagsOf, WEAPON_ANY_TARGET, costsForLevel, resolvePreActivation, parsePreActivation, matchEffectsToRemove, removeEffectsAt, DEFENSE_ATTRS, normalizeKey, immuneToDamage, immuneToCondition, immunityReasonFor } from "./effects.mjs";
 import { DEATH_HP, WOUND_LEVELS, woundLevelFor, setWoundLevel } from "./wounds.mjs";
 import { updateActorAsGM, canAffectActor } from "./gm-proxy.mjs";
@@ -840,7 +841,7 @@ export async function applyConditionsToActor(actor, ids = []) {
  * personagem (self/area/aura com includeSelf). `acertou` indica se a defesa
  * falhou (ou se não houve defesa, em self/auto).
  */
-async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls = [], healRoll = null, atkTotal, defTotal, dcTotal = null, acertou, cfg, attackerMods, caster, item = null, outcome = null, isCrit = false }) {
+async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls = [], healRoll = null, atkTotal, defTotal, dcTotal = null, acertou, cfg, attackerMods, caster, item = null, outcome = null, isCrit = false, sustainOut = null }) {
   let dmgText = "";
 
   const hasExtra = Array.isArray(extraDamageRolls) && extraDamageRolls.length > 0;
@@ -1070,6 +1071,9 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       const condsBefore = conds.length;
       const names = [];
       const imunes = [];
+      // Efeitos que o conjurador terá de SUSTENTAR, anotados aqui e virados
+      // em vínculos na ficha dele depois de o alvo ser atualizado.
+      const sustentados = [];
       for (const ae of fxList) {
         // IMUNIDADES: o alvo pode recusar este efeito por condição, pelo
         // nome dele (circunstância) ou pelo item de onde ele veio.
@@ -1173,6 +1177,16 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
           fxAaPersist: ae.fxAaPersist !== false,
           source: caster?.name || "",
         });
+        // SUSTENTAÇÃO: o efeito mora na ficha do alvo, mas quem paga é quem
+        // conjurou. Fica anotado para, depois de gravar no alvo, nascer o
+        // vínculo na ficha do conjurador (ver helpers/sustain.mjs).
+        if (ae.fxSustain && ae.fxSustain !== "none") {
+          sustentados.push({
+            fxId: cur[cur.length - 1].fxId,
+            action: ae.fxSustain,
+            label: ae.label || (isCondition ? condLabel : "Efeito"),
+          });
+        }
         names.push(ae.label || (isCondition ? condLabel : "Efeito"));
       }
       const update = { "system.appliedEffects": cur };
@@ -1188,6 +1202,19 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
         barrierNote = `<div class="lig-heal-applied">${privateResource(tActor, estadoBarreira, "hp")}</div>`;
       }
       await updateActorAsGM(tActor, update);
+
+      // SUSTENTAÇÃO: o efeito está na ficha do alvo, mas quem paga é quem
+      // conjurou. Fica ANOTADO aqui e vira um vínculo só no fim da ação —
+      // um conjuro que pega três inimigos é UMA sustentação, não três.
+      if (sustentados.length && caster && Array.isArray(sustainOut)) {
+        for (const s of sustentados) {
+          sustainOut.push({
+            action: s.action, label: s.label,
+            targetUuid: tActor.uuid, targetName: tActor.name, fxId: s.fxId,
+          });
+        }
+      }
+
       const encText = encantados.length
         ? `<div class="lig-atk-fx">Encantou: <strong>${encantados.join(", ")}</strong></div>`
         : "";
@@ -1612,6 +1639,16 @@ export async function runChainActions({ actor, item, action, hidden, preChain, h
       if (templateId && !alvo.action.persistArea) {
         const { scheduleTransientCleanup } = await import("./template.mjs");
         scheduleTransientCleanup(templateId);
+      } else if (templateId && alvo.action.persistSustain && alvo.action.persistSustain !== "none") {
+        // Emanação sustentada também na cadeia: nasce o vínculo que a segura.
+        const { createSustainLink } = await import("./sustain.mjs");
+        await createSustainLink(actor, {
+          label: `Sustentando: ${alvo.action.label || alvo.item?.name || "Área"}`,
+          action: alvo.action.persistSustain,
+          kind: "template",
+          refs: { sceneId: globalThis.canvas?.scene?.id || "", templateId },
+          source: alvo.item?.name || "",
+        });
       }
       const marca = elo.targets === "pick" ? " <span class=\"lig-chain-when\">(alvo escolhido)</span>" : "";
       disparadas.push(`${alvo.label} <span class="lig-chain-when">(${CHAIN_WHEN_LABELS[elo.when] || elo.when})</span>${marca}`);
@@ -1767,6 +1804,21 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     return;
   }
 
+  // ECONOMIA DE AÇÕES (quando ligada): a ação pode consumir uma das ações da
+  // rodada. Aqui só se CONFERE — sem a ação, nada acontece e nenhum recurso
+  // é gasto. A cobrança vem depois da caixa de rolagem, porque é lá que a
+  // pessoa pode trocar a ação deste uso. Disparo por turno de emanação não
+  // cobra: a ação foi paga quando a área nasceu.
+  const economiaLigada = actionEconomyOn() && frozenAttackTotal == null;
+  let custoDaAcao = economiaLigada ? (action.actionCost || "none") : "none";
+  let actionText = "";
+  if (custoDaAcao !== "none" && !hasAction(actor, custoDaAcao) && actionEconomyStrict()) {
+    ui.notifications?.warn(
+      `${actor?.name || "O personagem"} não tem ${actionLabel(custoDaAcao)} nesta rodada para usar ${action.label || item.name}.`,
+    );
+    return;
+  }
+
   // CUSTO ESCOLHIDO NA ATIVAÇÃO: pergunta quanto canalizar e já trabalha com
   // uma cópia da ação ampliada pelo gasto. Perguntar aqui, antes das
   // ativações prévias e de qualquer desconto, deixa o cancelamento limpo.
@@ -1837,6 +1889,10 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
       difficulty: fixedDC,
       defenseAttr: action.canRoll ? (action.defenseAttr || "") : "",
       allowDefense: !!action.canRoll,
+      // ECONOMIA DE AÇÕES: a caixa mostra qual ação este uso gasta — com o
+      // que resta de cada tipo — e deixa trocar na hora.
+      actionPool: economiaLigada ? actionPoolFor(actor) : null,
+      actionCost: custoDaAcao,
     });
     if (!cfg2) return; // cancelado pelo usuário
     dlgBonus = cfg2.bonus;
@@ -1844,6 +1900,17 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     dlgBaseDice = cfg2.baseDice;
     if (cfg2.difficulty != null) fixedDC = cfg2.difficulty;
     if (cfg2.defenseAttr) defAttrOverride = cfg2.defenseAttr;
+    // A caixa pode trocar a ação que este uso consome (vale só desta vez).
+    if (cfg2.actionCost != null) custoDaAcao = cfg2.actionCost;
+  }
+
+  // Agora sim: cobra a ação da rodada, já com a escolha feita na caixa.
+  if (custoDaAcao !== "none") {
+    const res = await spendActions(actor, custoDaAcao, {
+      motivo: `usar ${action.label || item.name}`,
+    });
+    if (!res.ok) return;
+    actionText = res.text;
   }
 
   let atkRoll = null;
@@ -2089,6 +2156,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
         <strong>${item.name}</strong> <span class="lig-act-name">— ${action.label || "Ação"}</span>
         ${metaText}
         ${preText}
+        ${actionText}
         ${costText}
         ${atkHeader}
         <div class="lig-atk-hint">Resolvendo defesa…</div>
@@ -2099,6 +2167,9 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
 
   // ---- Resolve cada alvo afetado ----
   const hits = []; // { actor, acertou, isSelf } — usado pelo efeito de movimento
+  // Efeitos SUSTENTADOS postos nos alvos: anotados aqui e reunidos num
+  // vínculo só por efeito, depois que todos os alvos forem resolvidos.
+  const sustainOut = [];
   if (affected.length) {
     for (const { actor: tActor, isSelf, outOfRange, dist } of affected) {
       // Alvo fora de alcance: não é atingido; mostra uma linha informativa.
@@ -2237,7 +2308,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
 
       // O desfecho por alvo alimenta as condições das ações em cadeia.
       const outcome = { dealtDamage: false, healed: false, drainBase: 0, drainScaling: 0 };
-      const detail = await resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls, healRoll, atkTotal, defTotal, dcTotal: effectiveDCFor(tActor), acertou, cfg, attackerMods: atkCond, caster: actor, item, outcome, isCrit: !!atkRoll?.isCritSuccess });
+      const detail = await resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls, healRoll, atkTotal, defTotal, dcTotal: effectiveDCFor(tActor), acertou, cfg, attackerMods: atkCond, caster: actor, item, outcome, isCrit: !!atkRoll?.isCritSuccess, sustainOut });
       hits.push({ actor: tActor, acertou, isSelf, ...outcome });
       lines.push(`<div class="lig-atk-target"><div class="lig-atk-line"><strong>${tActor.name}</strong>${defInfo}</div>${detail}</div>`);
     }
@@ -2330,6 +2401,30 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
     }
   }
 
+  // SUSTENTAÇÃO DOS EFEITOS POSTOS NOS ALVOS: um vínculo por EFEITO, com
+  // todos os alvos que o receberam. Assim a magia que marca três inimigos
+  // custa uma ação para sustentar, não três — e soltá-la limpa os três.
+  if (sustainOut.length) {
+    const { createSustainLink } = await import("./sustain.mjs");
+    const porEfeito = new Map();
+    for (const s of sustainOut) {
+      const chave = `${s.label}|${s.action}`;
+      if (!porEfeito.has(chave)) porEfeito.set(chave, { action: s.action, label: s.label, alvos: [] });
+      porEfeito.get(chave).alvos.push({ uuid: s.targetUuid, fxId: s.fxId, name: s.targetName });
+    }
+    for (const g of porEfeito.values()) {
+      const nomes = [...new Set(g.alvos.map((a) => a.name))];
+      const emQuem = nomes.length > 2 ? `${nomes.length} alvos` : nomes.join(" e ");
+      await createSustainLink(actor, {
+        label: `Sustentando: ${g.label} em ${emQuem}`,
+        action: g.action,
+        kind: "effect",
+        refs: { targets: g.alvos.map((a) => ({ uuid: a.uuid, fxId: a.fxId })) },
+        source: item?.name || "",
+      });
+    }
+  }
+
   // CONJURAÇÃO: a ação invoca criaturas. Acontece depois de a ação se
   // resolver — primeiro o golpe (ou a magia) acontece, depois o jogador
   // escolhe no mapa, dentro do alcance, onde cada criatura aparece.
@@ -2367,6 +2462,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
       <strong>${item.name}</strong> <span class="lig-act-name">— ${action.label || "Ação"}</span>
       ${metaText}
       ${preText}
+      ${actionText}
       ${costText}
       ${atkHeader}
       ${lines.join("")}

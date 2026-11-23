@@ -9,7 +9,9 @@ import { WORDS_BY_TIER, WORD_TARGET_PREFIX, tipagensComoAlvos, weaponTagsOf, wea
          buildPreActivationRef, parsePreActivation, resolvePreActivation,
          REMOVE_FX_MODES, chainTargetKeys, defesasComoAlvos, resistenciasComoAlvos,
          ITEM_TARGET_PREFIX, WEAPON_ANY_TARGET,
-         splitTargetArg, mergeTargetArg, tipagensConhecidas } from "../helpers/effects.mjs";
+         splitTargetArg, mergeTargetArg, tipagensConhecidas, acoesComoAlvos,
+         EMANATION_TARGET_PREFIX } from "../helpers/effects.mjs";
+import { actionEconomyOn, ACTION_TYPES } from "../helpers/actions.mjs";
 import { activateTagInputs } from "../apps/tag-input.mjs";
 import { CHAIN_WHEN_LABELS } from "../helpers/dice.mjs";
 import { removeEnchantment } from "../helpers/enchant.mjs";
@@ -296,6 +298,11 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
           if (arr[i].aaConfig === undefined) arr[i].aaConfig = cur.aaConfig ?? null;
           if (arr[i].aaName === undefined) arr[i].aaName = cur.aaName || "";
           if (arr[i].aaEnabled === undefined) arr[i].aaEnabled = cur.aaEnabled ?? true;
+          // Custo de ação: o seletor só existe com a economia de ações
+          // ligada, então sem ela o campo não vem no form e seria zerado.
+          if (arr[i].actionCost === undefined) arr[i].actionCost = cur.actionCost || "none";
+          // Sustentação da emanação: mesmo caso do custo de ação.
+          if (arr[i].persistSustain === undefined) arr[i].persistSustain = cur.persistSustain || "none";
           // Criaturas conjuradas: a lista é montada por drag&drop, então um
           // submit parcial não a traz. Objeto indexado → array; ausente →
           // preserva o que está no documento.
@@ -305,6 +312,21 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
           } else if (su === undefined) {
             arr[i].summons = foundry.utils.deepClone(cur.summons || []);
           }
+          // A sustentação de cada criatura só tem seletor com a economia de
+          // ações ligada: sem ela, preserva o que está gravado.
+          if (Array.isArray(arr[i].summons)) {
+            const antigos = cur.summons || [];
+            arr[i].summons.forEach((s, j) => {
+              if (!s) return;
+              if (s.sustain === undefined) s.sustain = antigos[j]?.sustain || "none";
+              // O número próprio some do formulário enquanto a linha segue o
+              // número geral — sem preservar, destravar "geral" mostraria 1
+              // no lugar do que estava configurado.
+              if (s.count === undefined) s.count = antigos[j]?.count ?? "1";
+            });
+          }
+          // O número geral só é desenhado quando há criaturas na lista.
+          if (arr[i].summonCount === undefined) arr[i].summonCount = cur.summonCount ?? "1";
           // Custo escolhido na ativação: um submit parcial (vindo de um
           // botão, não do formulário inteiro) não traz o sub-objeto, e o
           // DataModel o devolveria aos valores iniciais — desligando a
@@ -335,6 +357,9 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
               if (!novo) continue;
               if (novo.fxAaConfig === undefined) novo.fxAaConfig = velho.fxAaConfig ?? null;
               if (novo.fxAaName === undefined) novo.fxAaName = velho.fxAaName || "";
+              // A sustentação do efeito só tem seletor com a economia de
+              // ações ligada: sem ela, preserva o que está gravado.
+              if (novo.fxSustain === undefined) novo.fxSustain = velho.fxSustain || "none";
             }
           }
           // Idem para o dano extra (objeto indexado → array).
@@ -460,12 +485,21 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       fumble: "Falha crítica piorada",
       autocrit: "Crítico automático (garante o crítico)",
       immune: "Imunidade",
+      action: "Ações por rodada (dá, tira ou libera corrida)",
+      emanation: "Emanação (aura em volta de quem carrega)",
       tempHp: "Sobrevida ao ativar",
       areaFilter: "Filtro de área (força só aliados/inimigos)",
       condition: "Condição (marca enquanto durar)",
       size: "Tamanho (muda a categoria)",
       restore: "Recuperar recurso (ao aplicar)",
       info: "Condição / Texto",
+    };
+    // ECONOMIA DE AÇÕES: os seletores de custo de ação só aparecem com a
+    // mecânica ligada nas opções do mundo.
+    context.actionEconomy = actionEconomyOn();
+    context.actionCostChoices = {
+      none: "— nenhuma ação —",
+      ...Object.fromEntries(Object.entries(ACTION_TYPES).map(([k, d]) => [k, d.label])),
     };
     context.costResources = {
       mp: "Mana (PM)",
@@ -582,6 +616,11 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         "efeito:": "Circunstância (digite o nome do efeito)",
         "item:": "Item (digite o nome)",
       },
+      // AÇÕES POR RODADA: qual ação o efeito dá/tira, ou a licença de correr.
+      action: acoesComoAlvos(),
+      // EMANAÇÃO: o valor é o raio; o texto ao lado diz que ação a aura
+      // dispara a cada turno em quem estiver dentro.
+      emanation: { [EMANATION_TARGET_PREFIX]: "Aura (digite a ação que ela dispara)" },
       condition: condChoices,
       size: sizeTargets,
       restore: { hp: "Vida (PV)", mp: "Mana (PM)", heroic: "Pontos Heroicos" },
@@ -604,6 +643,8 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
         // O crítico automático aceita os mesmos alvos do bônus de rolagem.
         case "autocrit": return TARGETS.roll;
         case "immune": return TARGETS.immune;
+        case "action": return TARGETS.action;
+        case "emanation": return TARGETS.emanation;
         case "stat": return TARGETS.stat;
         case "set": return TARGETS.set;
         // Dano: por TIPO de dano (fogo, corte...) ou por TIPAGEM de arma
@@ -798,6 +839,7 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
             [WEAPON_TAG_PREFIX]: ["vazio = qualquer tipagem", "Deixe vazio para valer em qualquer arma tipada, ou escreva a tipagem (Militar, Haste, Duas Mãos...)."],
             [ITEM_TARGET_PREFIX]: ["nome do item", "Nome do item na ficha. Toda ação dele recebe este efeito."],
             "efeito:": ["nome do efeito", "Casa por trecho do nome, sem acento nem maiúscula."],
+            [EMANATION_TARGET_PREFIX]: ["ação que a aura dispara", "Nome da ação que a aura refaz a cada turno em quem estiver dentro — \"Item — Ação\" ou só a ação. Vazio = a aura é só o círculo no mapa. O VALOR do efeito é o raio, em metros."],
           };
           const [hint, title] = dicas[pref] || ["", ""];
           return {
@@ -1198,8 +1240,12 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       return;
     }
     lista.push({
-      actorUuid: ficha.uuid, actorName: ficha.name, count: "1",
-      disposition: "same", rounds: "0", giveControl: true, hidden: false, enabled: true,
+      actorUuid: ficha.uuid, actorName: ficha.name, count: "1", ownSheet: true,
+      // Criatura nova já segue o número geral da ação — é o caso comum, e
+      // quem precisar de um número próprio desmarca.
+      useGlobalCount: true,
+      disposition: "same", rounds: "0", giveControl: true, hidden: false,
+      sustain: "none", enabled: true,
     });
     actions[ai].summons = lista;
     await this._replaceActions(actions);
