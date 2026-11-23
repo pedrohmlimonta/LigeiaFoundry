@@ -9,10 +9,24 @@
  *   de 1× até 2× o deslocamento .... AMARELO (movimento estendido/corrida)
  *   acima de 2× o deslocamento ..... VERMELHO (além do dobro)
  *
+ * COM A ECONOMIA DE AÇÕES LIGADA as cores deixam de ser só uma régua e
+ * passam a dizer o que o personagem PODE pagar neste turno (ver
+ * helpers/actions.mjs):
+ *
+ *   · gastou a ação padrão → o amarelo some: ele anda a faixa verde e para;
+ *   · gastou a de movimento → o verde some, e a primeira faixa vira amarela,
+ *     porque quem paga agora é a ação padrão;
+ *   · gastou as duas → não há faixa nenhuma, e o movimento é barrado;
+ *   · com um efeito de corrida, a segunda faixa volta sem cobrar a padrão.
+ *
+ * O vermelho deixa de ser "além do dobro" e passa a ser "além do que dá para
+ * pagar" — e esse movimento não acontece: preUpdateToken o recusa.
+ *
  * Implementado estendendo `TokenRuler` (V13+) e sobrescrevendo os estilos do
  * segmento, do marcador de waypoint e do destaque do grid. Se a API não existir
  * (versões antigas), o registro é ignorado sem quebrar nada.
  */
+import { actionEconomyOn, movementBudget, movementBandAt } from "./actions.mjs";
 
 // Cores do rastro.
 const COLOR_OK = 0x2ecc40;    // verde  — dentro do deslocamento
@@ -47,6 +61,22 @@ export function movementColor(traveled, speed) {
   return COLOR_OVER;
 }
 
+/** A cor de cada faixa do orçamento de ações. */
+const CORES = { green: COLOR_OK, yellow: COLOR_WARN, red: COLOR_OVER };
+
+/**
+ * Cor do rastro quando a ECONOMIA DE AÇÕES manda: o que conta não é só a
+ * distância, é o que ainda dá para pagar neste turno.
+ * @returns {number|null} a cor, ou null para deixar a régua simples decidir
+ */
+export function actionMovementColor(actor, traveled) {
+  if (!actionEconomyOn() || !actor) return null;
+  const orcamento = movementBudget(actor);
+  if (!(orcamento.desloc > 0)) return null;
+  // O que vale é o TOTAL do turno: o que já foi andado mais este arrasto.
+  return CORES[movementBandAt(orcamento, orcamento.moved + (Number(traveled) || 0))] ?? null;
+}
+
 /**
  * Registra o medidor de movimento do Ligeia (CONFIG.Token.rulerClass).
  * Chamado no hook `init`.
@@ -66,7 +96,11 @@ export function registerTokenRuler() {
 
     /** Cor para um waypoint, ou null para manter o padrão do core. */
     #colorFor(waypoint) {
-      return movementColor(traveledAt(waypoint), this.ligeiaSpeed);
+      const percorrido = traveledAt(waypoint);
+      // Com a economia de ações ligada, as cores dizem o que dá para pagar.
+      const porAcao = actionMovementColor(this.token?.actor, percorrido);
+      if (porAcao !== null) return porAcao;
+      return movementColor(percorrido, this.ligeiaSpeed);
     }
 
     /** Cor da LINHA do segmento (do waypoint anterior até este). */

@@ -391,6 +391,74 @@ export function movementCostFor(actor, antes, depois) {
 }
 
 /**
+ * O ORÇAMENTO de deslocamento do personagem neste turno.
+ *
+ * Cada ação gasta em movimento compra UM deslocamento:
+ *   · a ação de MOVIMENTO compra a primeira faixa — a verde;
+ *   · a ação PADRÃO compra a seguinte — a amarela, o duplo deslocamento;
+ *   · sem a de movimento, a padrão compra a PRIMEIRA faixa, que então
+ *     aparece amarela: quem não tem como se mover ainda anda usando a ação
+ *     principal, mas anda uma faixa só.
+ *   · um efeito de CORRIDA dá a segunda faixa sem cobrar a padrão.
+ *
+ * O que já foi andado no turno conta: as faixas pagas não são cobradas de
+ * novo, e o alcance que sobra é medido a partir do total do turno.
+ *
+ * @returns {{desloc:number, moved:number, bands:number, max:number,
+ *            firstIsGreen:boolean, canMove:boolean}}
+ *   bands  = quantas faixas o personagem pode ter andado ao fim do turno
+ *   max    = o total em metros que isso dá (0 = não pode mais se mover)
+ *   firstIsGreen = a primeira faixa é paga pela ação de movimento
+ */
+export function movementBudget(actor) {
+  const desloc = Number(actor?.system?.secondary?.deslocamento) || 0;
+  const moved = Math.max(0, Number(actor?.system?.actions?.moved) || 0);
+  if (!actionEconomyOn()) {
+    return { desloc, moved, bands: Infinity, max: Infinity, firstIsGreen: true, canMove: true };
+  }
+
+  const pool = actionPoolFor(actor);
+  const temMov = pool.movement.available > 0;
+  const temPad = pool.standard.available > 0;
+  const corrida = canRunFreely(actor);
+
+  // Faixas já pagas neste turno.
+  let pagas = 0;
+  if (moved > EPS) pagas = 1;
+  if (desloc > 0 && moved > desloc + EPS) pagas = 2;
+
+  let bands = pagas;
+  let firstIsGreen = true;
+  if (pagas === 0) {
+    if (temMov) bands = 1;
+    else if (temPad) { bands = 1; firstIsGreen = false; }
+    // A segunda faixa: a corrida dá de graça; senão, é a padrão que paga —
+    // e ela só pode pagar uma vez.
+    if (bands === 1 && (corrida || (firstIsGreen && temPad))) bands = 2;
+  } else if (pagas === 1) {
+    if (corrida || temPad) bands = 2;
+  }
+
+  const max = desloc > 0 ? bands * desloc : (bands ? Infinity : 0);
+  return { desloc, moved, bands, max, firstIsGreen, canMove: max > moved + EPS };
+}
+
+/**
+ * A cor do rastro para um ponto do caminho, dado o orçamento do turno.
+ *   verde    — dentro da faixa que a ação de movimento paga
+ *   amarelo  — na faixa que a ação padrão paga (ou na primeira, quando é
+ *              ela que está pagando)
+ *   vermelho — além do que dá para pagar: esse passo não acontece
+ * @returns {"green"|"yellow"|"red"}
+ */
+export function movementBandAt(orcamento, totalNoTurno) {
+  const { desloc, max, firstIsGreen } = orcamento;
+  if (totalNoTurno > max + EPS) return "red";
+  if (desloc > 0 && totalNoTurno > desloc + EPS) return "yellow";
+  return firstIsGreen ? "green" : "yellow";
+}
+
+/**
  * Cobra o deslocamento de um token que se moveu `metros`.
  *
  * Dentro do deslocamento: ação de movimento. Passou dele (faixa amarela do
@@ -493,11 +561,42 @@ export function registerActionHooks() {
     }
   });
 
-  // DESLOCAMENTO: guarda de onde o token saiu...
+  // DESLOCAMENTO: guarda de onde o token saiu — e BARRA o que não dá para
+  // pagar. Sem ação de movimento nem padrão, o personagem fica onde está;
+  // com só uma delas, anda uma faixa e para. A trava respeita a opção
+  // "Barrar ação sem a ação disponível": desligada, só avisa.
   Hooks.on("preUpdateToken", (tokenDoc, changed, options) => {
     if (!actionEconomyOn()) return;
     if (!("x" in changed) && !("y" in changed)) return;
-    options.ligeiaMoveFrom = { x: tokenDoc.x, y: tokenDoc.y };
+    const de = { x: tokenDoc.x, y: tokenDoc.y };
+    options.ligeiaMoveFrom = de;
+
+    const actor = tokenDoc.actor;
+    const combate = globalThis.game?.combat;
+    // Fora de combate, ou fora do turno de quem se move, ninguém é barrado:
+    // arrumar a cena não gasta — nem trava — a rodada de ninguém.
+    if (!actor || !combate?.started) return;
+    if (combate.combatant?.actor?.id !== actor.id) return;
+
+    const para = { x: changed.x ?? de.x, y: changed.y ?? de.y };
+    const metros = distanceMoved(tokenDoc.parent, de, para);
+    if (metros <= 0) return;
+
+    const orcamento = movementBudget(actor);
+    if (orcamento.max === Infinity) return;
+    const total = orcamento.moved + metros;
+    if (total <= orcamento.max + EPS) return;
+
+    const sobra = Math.max(0, orcamento.max - orcamento.moved);
+    const motivo = !orcamento.canMove
+      ? "não tem mais ação para se deslocar"
+      : `só pode andar mais ${Math.floor(sobra)}m neste turno`;
+    if (actionEconomyStrict()) {
+      ui.notifications?.warn(`${actor.name} ${motivo}.`);
+      return false; // o token fica onde está
+    }
+    ui.notifications?.warn(`${actor.name} ${motivo} — passou mesmo assim.`);
+    return undefined;
   });
 
   // ...e cobra a ação quando ele chega, se for a vez dele num combate.

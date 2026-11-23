@@ -95,6 +95,12 @@ Desligada por padrão; liga-se em **Configurações → Opções do Sistema →
   turno** — andar 5m e depois mais 6m com 9m de deslocamento cobra a de
   movimento no primeiro trecho e a padrão no segundo, não o preço inteiro
   duas vezes. Só é cobrado em combate, no turno de quem se move.
+- O **medidor do token** deixa de ser régua e passa a mostrar o que dá para
+  pagar: gastou a padrão, o amarelo some; gastou a de movimento, o verde
+  some e a primeira faixa fica amarela (quem paga agora é a padrão); gastou
+  as duas, não há faixa — e o movimento é **recusado**, não só pintado de
+  vermelho. Com "Barrar ação sem a ação disponível" desmarcado, ele apenas
+  avisa e deixa passar.
 - **Condições limitam ações**: Atordoado, Inconsciente e Paralisado tiram as
   ações do turno; Imobilizado (e Agarrado) tira a de movimento; Pasmo (e
   Dominado) deixa só **uma ação por turno**. A tabela vive em
