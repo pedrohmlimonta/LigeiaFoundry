@@ -85,7 +85,14 @@ Desligada por padrão; liga-se em **Configurações → Opções do Sistema →
 - Cada ação de item e cada ativação de item pode **gastar** uma delas.
 - Efeitos do tipo *Ações por rodada* **dão** (+1 simples) ou **tiram**
   (−1 movimento) ações enquanto estiverem ativos, e podem liberar a
-  **corrida**.
+  **corrida**. O alvo **Turno** soma de uma vez em todos os tipos — "+1
+  turno" dá uma padrão, uma de movimento, uma simples e uma reação a mais.
+  Vários efeitos **somam**, sem número máximo, e podem vir de
+  um item ligado, de um efeito posto na ficha ou de uma ação que aplica o
+  efeito **no alvo**. Uma ação concedida no meio do turno vale **na hora**:
+  a ficha guarda quantas ações já saíram, não quantas restam, então o que
+  chega depois entra no disponível imediatamente. O único limite por cima é
+  o das condições (Imobilizado zera o movimento mesmo com bônus).
 - **Deslocamento**, nas mesmas cores do medidor do token: até o
   deslocamento (**verde**) custa a ação de movimento — ou a **padrão**, se a
   de movimento já tiver saído ou não existir, de modo que quem não tem como

@@ -180,6 +180,13 @@ export const ACTION_TARGET_PREFIX = "acao:";
 /** Alvo do efeito que libera a CORRIDA (duplo deslocamento sem a padrão). */
 export const RUN_TARGET = "corrida";
 
+/**
+ * Alvo que concede um TURNO INTEIRO a mais: o valor entra em todos os tipos
+ * de ação de uma vez. "+1 turno" dá uma padrão, uma de movimento, uma
+ * simples e uma reação a mais.
+ */
+export const TURN_TARGET = "turno";
+
 /** Prefixo dos alvos de efeito que valem só para uma palavra arcana. */
 export const WORD_TARGET_PREFIX = "conjuracao:";
 
@@ -578,13 +585,24 @@ function applyEffectToMods(mods, effect, actor) {
   }
 
   // AÇÕES POR RODADA: o alvo diz QUAL ação ("acao:standard") e o valor,
-  // quantas a mais — ou a menos, se for negativo. O alvo "corrida" não conta
-  // número nenhum: é a licença de correr pagando só a ação de movimento.
+  // quantas a mais — ou a menos, se for negativo.
+  //
+  // Dois alvos não são um tipo de ação:
+  //   "acao:turno" — um TURNO inteiro a mais: soma o valor em todos os
+  //                  tipos de uma vez (padrão, movimento, simples, reação).
+  //   "corrida"    — não conta número nenhum: é a licença de correr
+  //                  pagando só a ação de movimento.
   if (effect.type === "action") {
     const bruto = String(effect.target || "").trim();
     if (bruto === RUN_TARGET) { mods.actions.run = true; return; }
     const tipo = bruto.startsWith(ACTION_TARGET_PREFIX)
       ? bruto.slice(ACTION_TARGET_PREFIX.length) : bruto;
+    if (tipo === TURN_TARGET) {
+      for (const k of Object.keys(mods.actions)) {
+        if (k !== "run") mods.actions[k] += v;
+      }
+      return;
+    }
     if (!(tipo in mods.actions) || tipo === "run") return;
     mods.actions[tipo] += v;
     return;
@@ -858,6 +876,7 @@ export function emanationEffectsOf(actor) {
 /** Os alvos de efeito que mexem nas ações, para os seletores das fichas. */
 export function acoesComoAlvos() {
   return {
+    [`${ACTION_TARGET_PREFIX}${TURN_TARGET}`]: "Turno (todas as ações de uma vez)",
     [`${ACTION_TARGET_PREFIX}standard`]: "Ação padrão",
     [`${ACTION_TARGET_PREFIX}movement`]: "Ação de movimento",
     [`${ACTION_TARGET_PREFIX}simple`]: "Ação simples",

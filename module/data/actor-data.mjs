@@ -226,13 +226,19 @@ export class PersonagemData extends foundry.abstract.TypeDataModel {
       }),
 
       // ECONOMIA DE AÇÕES (opcional, ligada nas opções do sistema).
-      // Guarda o que RESTA de cada tipo nesta rodada; o teto sai dos efeitos
-      // ativos (ver helpers/actions.mjs). null = ainda não gastou nada.
+      //
+      // Guarda quantas ações de cada tipo já foram GASTAS nesta rodada — e
+      // não quantas restam. A diferença importa: o teto vem dos efeitos
+      // ativos, e um efeito que conceda uma ação extra NO MEIO DO TURNO
+      // (Saeculorum, por exemplo) precisa valer na hora. Guardando o gasto,
+      // o disponível é sempre teto − gasto, então a ação concedida aparece
+      // imediatamente; guardando o resto, ela só chegaria na rodada
+      // seguinte. Ver helpers/actions.mjs.
       actions: new fields.SchemaField({
-        standard: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
-        movement: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
-        simple: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
-        reaction: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
+        standard: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+        movement: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+        simple: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+        reaction: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
         // Quantos METROS o personagem já andou neste turno. É o que diz se
         // o próximo passo ainda está no verde ou já entrou no amarelo —
         // dois trechos curtos somam, não se cobram como dois começos.
@@ -539,13 +545,19 @@ export class NpcData extends PersonagemData {
       }),
 
       // ECONOMIA DE AÇÕES (opcional, ligada nas opções do sistema).
-      // Guarda o que RESTA de cada tipo nesta rodada; o teto sai dos efeitos
-      // ativos (ver helpers/actions.mjs). null = ainda não gastou nada.
+      //
+      // Guarda quantas ações de cada tipo já foram GASTAS nesta rodada — e
+      // não quantas restam. A diferença importa: o teto vem dos efeitos
+      // ativos, e um efeito que conceda uma ação extra NO MEIO DO TURNO
+      // (Saeculorum, por exemplo) precisa valer na hora. Guardando o gasto,
+      // o disponível é sempre teto − gasto, então a ação concedida aparece
+      // imediatamente; guardando o resto, ela só chegaria na rodada
+      // seguinte. Ver helpers/actions.mjs.
       actions: new fields.SchemaField({
-        standard: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
-        movement: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
-        simple: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
-        reaction: new fields.NumberField({ initial: null, integer: true, min: 0, nullable: true }),
+        standard: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+        movement: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+        simple: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
+        reaction: new fields.NumberField({ initial: 0, integer: true, min: 0 }),
         // Quantos METROS o personagem já andou neste turno. É o que diz se
         // o próximo passo ainda está no verde ou já entrou no amarelo —
         // dois trechos curtos somam, não se cobram como dois começos.

@@ -181,12 +181,12 @@ export function actionMaxFor(actor) {
 }
 
 /**
- * O estoque atual: para cada tipo, quanto resta e quanto cabe.
+ * O estoque atual: para cada tipo, quanto resta, quanto cabe e quanto já saiu.
  *
- * O que está gravado na ficha é o RESTANTE (`system.actions`). Um tipo que
- * ainda não foi gravado conta como cheio — é o estado de quem acabou de
- * entrar em cena —, e o restante nunca passa do máximo (um efeito que caiu
- * pode ter encolhido o teto depois do gasto).
+ * O que está gravado na ficha é o GASTO (`system.actions`), e o que resta é
+ * sempre teto − gasto. É por isso que uma ação concedida no meio do turno
+ * vale na hora: o teto sobe, o gasto não mexe, e o disponível aumenta no
+ * mesmo instante.
  */
 export function actionPoolFor(actor) {
   const max = actionMaxFor(actor);
@@ -194,15 +194,15 @@ export function actionPoolFor(actor) {
   const atual = actor?.system?.actions || {};
   const pool = {};
   for (const tipo of COUNTED_ACTIONS) {
-    const bruto = atual[tipo];
-    const resta = bruto === undefined || bruto === null ? max[tipo] : Number(bruto) || 0;
-    const value = Math.max(0, Math.min(resta, max[tipo]));
+    const spent = Math.max(0, Number(atual[tipo]) || 0);
+    const value = Math.max(0, max[tipo] - spent);
     pool[tipo] = {
       key: tipo,
       label: ACTION_TYPES[tipo].label,
       short: ACTION_TYPES[tipo].short,
       icon: ACTION_TYPES[tipo].icon,
       value,
+      spent,
       max: max[tipo],
       // Quanto dá para usar AGORA — o mesmo que resta, a não ser que um teto
       // de turno (Pasmo e parecidas) já tenha sido alcançado.
@@ -217,7 +217,7 @@ export function actionPoolFor(actor) {
   // quantas já saíram. O que sobra do teto limita todos os tipos que entram
   // nele, sem mexer no que cada um ainda teria.
   if (cap !== null) {
-    const usadas = CAP_ACTIONS.reduce((n, t) => n + Math.max(0, (pool[t]?.max || 0) - (pool[t]?.value || 0)), 0);
+    const usadas = CAP_ACTIONS.reduce((n, t) => n + (pool[t]?.spent || 0), 0);
     const sobra = Math.max(0, cap - usadas);
     for (const t of CAP_ACTIONS) {
       if (!pool[t]) continue;
@@ -286,7 +286,8 @@ export async function spendActions(actor, tipos, { motivo = "", force = false, q
   const update = {};
   const gastou = [];
   for (const [t, n] of pedido) {
-    update[`system.actions.${t}`] = Math.max(0, pool[t].value - n);
+    // O que se grava é o GASTO acumulado do turno.
+    update[`system.actions.${t}`] = pool[t].spent + n;
     for (let i = 0; i < n; i++) gastou.push(t);
   }
   if (actor?.isOwner) await actor.update(update);
@@ -302,14 +303,15 @@ export async function spendActions(actor, tipos, { motivo = "", force = false, q
   };
 }
 
-/** Devolve ações ao estoque (sem passar do máximo). */
+/** Devolve ações ao estoque (desfaz um gasto; nunca fica negativo). */
 export async function refundActions(actor, tipos) {
   const lista = (Array.isArray(tipos) ? tipos : [tipos]).filter((t) => COUNTED_ACTIONS.includes(t));
   if (!lista.length || !actor?.isOwner) return;
   const pool = actionPoolFor(actor);
   const update = {};
   for (const t of lista) {
-    update[`system.actions.${t}`] = Math.min(pool[t].max, (update[`system.actions.${t}`] ?? pool[t].value) + 1);
+    const atual = update[`system.actions.${t}`] ?? pool[t].spent;
+    update[`system.actions.${t}`] = Math.max(0, atual - 1);
   }
   await actor.update(update);
 }
@@ -320,11 +322,11 @@ export async function refundActions(actor, tipos) {
  */
 export async function restoreActions(actor) {
   if (!actor) return false;
-  const max = actionMaxFor(actor);
   const pool = actionPoolFor(actor);
   const update = {};
+  // Turno novo, nada gasto.
   for (const t of COUNTED_ACTIONS) {
-    if (pool[t].value !== max[t]) update[`system.actions.${t}`] = max[t];
+    if (pool[t].spent !== 0) update[`system.actions.${t}`] = 0;
   }
   // O turno novo começa parado: o acumulado de metros zera junto.
   if ((Number(actor.system?.actions?.moved) || 0) !== 0) update["system.actions.moved"] = 0;
