@@ -20,6 +20,10 @@ export function effectField() {
         initial: "bonus",
         choices: ["dice", "rollDice", "bonus", "attr", "stat", "set", "damage", "rd", "vuln", "reroll1", "reroll6", "crit", "fumble", "autocrit", "immune", "action", "emanation", "tempHp", "areaFilter", "condition", "size", "restore", "info"],
       }),
+      // CLASSIFICAÇÃO (dois eixos de polos opostos, ver helpers/effects.mjs):
+      // é o que a dissipação lê para saber o que pode anular.
+      polarity: new fields.StringField({ initial: "none", choices: ["none", "positive", "negative"] }),
+      nature: new fields.StringField({ initial: "none", choices: ["none", "magical", "natural"] }),
       target: new fields.StringField({ required: true, initial: "all" }),
       // Número OU fórmula determinística com @variáveis do dono — ex.:
       // "floor(@nivel/2)". Dados (1d6) NÃO valem; ver resolveEffectValue.
@@ -374,6 +378,15 @@ export function actionEntryField() {
           initial: "label",
           choices: ["label", "condition", "mine", "all"],
         }),
+        // FILTROS DE CLASSE: além do modo, a dissipação pode alcançar só
+        // uma parte dos efeitos — "só negativos", "só mágicos", ou os dois
+        // juntos ("negativos E mágicos"). "any" não filtra.
+        polarity: new fields.StringField({ initial: "any", choices: ["any", "none", "positive", "negative"] }),
+        nature: new fields.StringField({ initial: "any", choices: ["any", "none", "magical", "natural"] }),
+        // PERGUNTAR: em vez de levar os primeiros que casarem, mostra os
+        // efeitos encontrados nos alvos e deixa escolher quais tirar, até o
+        // limite. É o jeito de usar uma dissipação com critério.
+        ask: new fields.BooleanField({ initial: false }),
         // Nome a procurar (modo "label") ou id da condição (modo "condition").
         // No nome, a comparação ignora acentos e maiúsculas, e casa por
         // trecho: "veneno" alcança "Veneno da Aranha".
@@ -446,6 +459,10 @@ export function actionEntryField() {
         // Duração: "rounds" (em rodadas) ou "scene" (até o fim da cena)
         durationMode: new fields.StringField({ initial: "scene", choices: ["rounds", "scene"] }),
         durationRounds: new fields.StringField({ blank: true, initial: "1" }),
+        // CLASSIFICAÇÃO do efeito que vai para o alvo — é com ela que uma
+        // dissipação sabe se pode anulá-lo.
+        fxPolarity: new fields.StringField({ initial: "none", choices: ["none", "positive", "negative"] }),
+        fxNature: new fields.StringField({ initial: "none", choices: ["none", "magical", "natural"] }),
         // SUSTENTAÇÃO: quem conjurou paga esta ação a cada turno para o
         // efeito continuar de pé no alvo. "none" = não precisa sustentar.
         fxSustain: new fields.StringField({

@@ -1023,6 +1023,85 @@ export const REMOVE_FX_MODES = {
   all: "Todos",
 };
 
+/* ======================================================================== */
+/*  Classificação dos efeitos: polaridade e natureza                        */
+/* ======================================================================== */
+
+/**
+ * Todo efeito pode ser classificado em dois eixos INDEPENDENTES, e cada eixo
+ * tem polos opostos — por isso cada um é uma escolha só, não duas caixas:
+ *
+ *   POLARIDADE  positivo × negativo   (uma bênção não é também uma maldição)
+ *   NATUREZA    mágico  × natural     (o que veio de magia não veio do veneno)
+ *
+ * Os dois eixos se combinam à vontade: existe o buff mágico, o debuff
+ * mágico, o veneno natural e o efeito que não é nenhum dos dois.
+ *
+ * É isto que a dissipação lê: "anula só efeitos negativos", "anula só
+ * efeitos mágicos", "anula os dois ao mesmo tempo" — ou qualquer um.
+ */
+export const FX_POLARITIES = {
+  none: "— sem polaridade —",
+  positive: "Positivo (benéfico)",
+  negative: "Negativo (prejudicial)",
+};
+
+export const FX_NATURES = {
+  none: "— sem natureza —",
+  magical: "Mágico",
+  natural: "Natural",
+};
+
+/** As mesmas listas do lado de quem ANULA, com o "qualquer" na frente. */
+export const FX_POLARITY_FILTERS = {
+  any: "Qualquer polaridade",
+  positive: "Só positivos",
+  negative: "Só negativos",
+  none: "Só sem polaridade",
+};
+
+export const FX_NATURE_FILTERS = {
+  any: "Qualquer natureza",
+  magical: "Só mágicos",
+  natural: "Só naturais",
+  none: "Só sem natureza",
+};
+
+/** A polaridade de um efeito aplicado ("none" quando não tem). */
+export function fxPolarityOf(ae) {
+  const v = String(ae?.polarity || "none");
+  return v in FX_POLARITIES ? v : "none";
+}
+
+/** A natureza de um efeito aplicado ("none" quando não tem). */
+export function fxNatureOf(ae) {
+  const v = String(ae?.nature || "none");
+  return v in FX_NATURES ? v : "none";
+}
+
+/**
+ * O efeito passa pelos filtros de polaridade e natureza de uma dissipação?
+ * "any" (ou vazio) não filtra nada; os dois eixos são exigidos JUNTOS, então
+ * "negativos" + "mágicos" só alcança a maldição mágica.
+ */
+export function fxMatchesClass(ae, { polarity = "any", nature = "any" } = {}) {
+  const pol = polarity || "any";
+  const nat = nature || "any";
+  if (pol !== "any" && fxPolarityOf(ae) !== pol) return false;
+  if (nat !== "any" && fxNatureOf(ae) !== nat) return false;
+  return true;
+}
+
+/** Como a classificação de um efeito se lê na tela ("" quando não tem). */
+export function fxClassLabel(ae) {
+  const partes = [];
+  const pol = fxPolarityOf(ae);
+  const nat = fxNatureOf(ae);
+  if (pol !== "none") partes.push(pol === "positive" ? "positivo" : "negativo");
+  if (nat !== "none") partes.push(nat === "magical" ? "mágico" : "natural");
+  return partes.join(" · ");
+}
+
 /**
  * Normaliza um texto digitado para servir de chave: sem acento, minúsculo,
  * sem espaços nas pontas. É o que faz "Espada Longa" casar com
@@ -1059,6 +1138,9 @@ export function matchEffectsToRemove(lista, regra, { casterName = "", limite = 0
 
   const casa = (ae) => {
     if (!ae) return false;
+    // Antes do modo, os dois eixos: quem anula só maldições não encosta
+    // numa bênção, por mais que o nome bata.
+    if (!fxMatchesClass(ae, { polarity: regra?.polarity, nature: regra?.nature })) return false;
     switch (modo) {
       case "all": return true;
       // Casa por TRECHO: "veneno" alcança "Veneno da Aranha".

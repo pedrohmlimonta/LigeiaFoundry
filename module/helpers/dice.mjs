@@ -37,7 +37,7 @@ import { playActionAnimation } from "./integrations.mjs";
 import { executeActionMovement } from "./movement.mjs";
 import { executarConjuracoes, conjuracoesDaAcao } from "./summon.mjs";
 import { spendActions, actionEconomyOn, actionEconomyStrict, hasAction, actionLabel, actionPoolFor } from "./actions.mjs";
-import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvailable, actionIndexOf, activeEffectsOf, arcaneWordsOf, weaponTagsOf, WEAPON_ANY_TARGET, costsForLevel, resolvePreActivation, parsePreActivation, matchEffectsToRemove, removeEffectsAt, DEFENSE_ATTRS, normalizeKey, immuneToDamage, immuneToCondition, immunityReasonFor } from "./effects.mjs";
+import { areaFilterOverrideFor, actorRollData, resolveEffectValue, actionIsAvailable, actionIndexOf, activeEffectsOf, arcaneWordsOf, weaponTagsOf, WEAPON_ANY_TARGET, costsForLevel, resolvePreActivation, parsePreActivation, matchEffectsToRemove, removeEffectsAt, DEFENSE_ATTRS, normalizeKey, immuneToDamage, immuneToCondition, immunityReasonFor, fxClassLabel } from "./effects.mjs";
 import { DEATH_HP, WOUND_LEVELS, woundLevelFor, setWoundLevel } from "./wounds.mjs";
 import { updateActorAsGM, canAffectActor } from "./gm-proxy.mjs";
 import { enchantmentMods, applyEnchantment, pedirItemParaEncantar, removeEnchantment } from "./enchant.mjs";
@@ -841,7 +841,7 @@ export async function applyConditionsToActor(actor, ids = []) {
  * personagem (self/area/aura com includeSelf). `acertou` indica se a defesa
  * falhou (ou se não houve defesa, em self/auto).
  */
-async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls = [], healRoll = null, atkTotal, defTotal, dcTotal = null, acertou, cfg, attackerMods, caster, item = null, outcome = null, isCrit = false, sustainOut = null }) {
+async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls = [], healRoll = null, atkTotal, defTotal, dcTotal = null, acertou, cfg, attackerMods, caster, item = null, outcome = null, isCrit = false, sustainOut = null, removeOut = null }) {
   let dmgText = "";
 
   const hasExtra = Array.isArray(extraDamageRolls) && extraDamageRolls.length > 0;
@@ -1030,6 +1030,27 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
       let mexeuCondicoes = false;
       for (const regra of remList) {
         const limite = resolveEffectValue(regra.count, caster);
+        // REGRA QUE PERGUNTA: aqui ela só LEVANTA os candidatos deste alvo.
+        // A escolha vem depois, numa caixa só para todos os alvos — senão
+        // uma dissipação em área abriria uma caixa por criatura.
+        if (regra.ask && Array.isArray(removeOut)) {
+          const achados = matchEffectsToRemove(lista, regra, { casterName: caster?.name || "" });
+          for (const i of achados) {
+            const ae = lista[i];
+            if (!ae?.fxId) continue;
+            removeOut.push({
+              id: `${tActor.uuid}|${ae.fxId}`,
+              alvoUuid: tActor.uuid,
+              alvo: tActor.name,
+              fxId: ae.fxId,
+              label: ae.label || "Efeito",
+              classe: fxClassLabel(ae),
+              fonte: ae.source || "",
+              limite,
+            });
+          }
+          continue;
+        }
         const indices = matchEffectsToRemove(lista, regra, {
           casterName: caster?.name || "", limite,
         });
@@ -1052,7 +1073,7 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
         if (mexeuCondicoes) upd["system.conditions"] = condicoes;
         await updateActorAsGM(tActor, upd);
         remText = `<div class="lig-atk-fx lig-atk-dispel">Efeitos removidos: <strong>${tirados.join(", ")}</strong></div>`;
-      } else {
+      } else if (!remList.some((r) => r.ask)) {
         remText = `<div class="lig-atk-fx muted">Nada a remover.</div>`;
       }
     } else {
@@ -1146,6 +1167,10 @@ async function resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls 
           icon: isCondition ? (CONFIG.LIGEIA?.conditions?.[condId]?.icon || "icons/svg/aura.svg") : "icons/svg/aura.svg",
           effects,
           conditionId: condId,
+          // CLASSIFICAÇÃO: viaja da ação para a ficha do alvo, e é o que uma
+          // dissipação vai ler para saber se pode anular este efeito.
+          polarity: ae.fxPolarity || "none",
+          nature: ae.fxNature || "none",
           disabled: false,
           duration: { rounds: String(rounds), remaining: rounds }, // rounds 0 = até o fim da cena
           endRoll: {
@@ -1324,6 +1349,59 @@ export function applyVariableCost(item, action, gasto, actor) {
   copia.range = somarNumero(action.range, vc.rangeBonus);
   copia.rollBonus = somarNumero(action.rollBonus, vc.rollBonus);
   return copia;
+}
+
+/**
+ * Tira dos alvos os efeitos escolhidos na caixa de dissipação.
+ *
+ * Os escolhidos vêm de alvos diferentes, então a remoção é agrupada por
+ * ficha: cada uma recebe uma atualização só, com os efeitos fora e as
+ * condições que eles marcavam acertadas junto.
+ *
+ * @param {Array} candidatos  o que a caixa mostrou
+ * @param {string[]|null} escolhidos  os ids marcados (null = cancelou)
+ * @returns {Promise<string[]>} os nomes do que saiu
+ */
+export async function aplicarRemocaoEscolhida(candidatos, escolhidos, caster = null) {
+  if (!Array.isArray(escolhidos) || !escolhidos.length) return [];
+  const marcados = new Set(escolhidos);
+
+  // Agrupa por ficha: id → { uuid, fxIds }
+  const porAlvo = new Map();
+  for (const c of candidatos) {
+    if (!marcados.has(c.id)) continue;
+    if (!porAlvo.has(c.alvoUuid)) porAlvo.set(c.alvoUuid, []);
+    porAlvo.get(c.alvoUuid).push(c);
+  }
+
+  const tirados = [];
+  for (const [uuid, lista] of porAlvo) {
+    let alvo = null;
+    try { alvo = await fromUuid(uuid); } catch (e) { alvo = null; }
+    if (alvo?.documentName !== "Actor" || !canAffectActor(alvo)) continue;
+
+    const atuais = foundry.utils.deepClone(alvo.system?.appliedEffects || []);
+    let condicoes = foundry.utils.deepClone(alvo.system?.conditions || []);
+    const fora = new Set(lista.map((c) => c.fxId));
+    const indices = [];
+    atuais.forEach((ae, i) => { if (ae?.fxId && fora.has(ae.fxId)) indices.push(i); });
+    if (!indices.length) continue;
+
+    const r = removeEffectsAt(atuais, indices, condicoes);
+    const upd = { "system.appliedEffects": r.restantes };
+    if (r.mudouCondicoes) upd["system.conditions"] = r.condicoes;
+    await updateActorAsGM(alvo, upd);
+
+    for (const ae of r.removidos) {
+      tirados.push(`${ae?.label || "Efeito"}${porAlvo.size > 1 ? ` (${alvo.name})` : ""}`);
+      // Um efeito que encantava um item leva o encantamento junto.
+      if (ae?.enchantItemId && ae?.fxId) {
+        const encantado = alvo.items?.get?.(ae.enchantItemId);
+        if (encantado) { try { await removeEnchantment(encantado, ae.fxId); } catch (e) { /* segue */ } }
+      }
+    }
+  }
+  return tirados;
 }
 
 /**
@@ -2167,6 +2245,9 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
 
   // ---- Resolve cada alvo afetado ----
   const hits = []; // { actor, acertou, isSelf } — usado pelo efeito de movimento
+  // Efeitos que uma dissipação com escolha alcançou, de TODOS os alvos.
+  // Viram uma caixa só depois que todos forem resolvidos.
+  const removeOut = [];
   // Efeitos SUSTENTADOS postos nos alvos: anotados aqui e reunidos num
   // vínculo só por efeito, depois que todos os alvos forem resolvidos.
   const sustainOut = [];
@@ -2308,7 +2389,7 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
 
       // O desfecho por alvo alimenta as condições das ações em cadeia.
       const outcome = { dealtDamage: false, healed: false, drainBase: 0, drainScaling: 0 };
-      const detail = await resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls, healRoll, atkTotal, defTotal, dcTotal: effectiveDCFor(tActor), acertou, cfg, attackerMods: atkCond, caster: actor, item, outcome, isCrit: !!atkRoll?.isCritSuccess, sustainOut });
+      const detail = await resolveHitOnActor(action, tActor, { damageRoll, extraDamageRolls, healRoll, atkTotal, defTotal, dcTotal: effectiveDCFor(tActor), acertou, cfg, attackerMods: atkCond, caster: actor, item, outcome, isCrit: !!atkRoll?.isCritSuccess, sustainOut, removeOut });
       hits.push({ actor: tActor, acertou, isSelf, ...outcome });
       lines.push(`<div class="lig-atk-target"><div class="lig-atk-line"><strong>${tActor.name}</strong>${defInfo}</div>${detail}</div>`);
     }
@@ -2398,6 +2479,23 @@ export async function rollItemAction({ actor, item, action, hidden = false, over
       if (!moveLines) playActionAnimation({ actor, item, action, targetActors: animTargets });
     } catch (e) {
       console.warn("Ligeia | falha no efeito de movimento:", e);
+    }
+  }
+
+  // DISSIPAÇÃO COM ESCOLHA: uma caixa só, com os efeitos de todos os alvos
+  // agrupados por quem os carrega, e o limite da ação segurando a mão.
+  if (removeOut.length) {
+    const { pedirEfeitosParaRemover } = await import("../apps/roll-dialog.mjs");
+    // O limite é o da regra; havendo mais de uma regra que pergunta, vale a
+    // mais generosa (0 = sem limite).
+    const limites = removeOut.map((c) => c.limite || 0);
+    const limite = limites.includes(0) ? 0 : Math.max(...limites);
+    const escolhidos = await pedirEfeitosParaRemover(removeOut, limite);
+    const tirados = await aplicarRemocaoEscolhida(removeOut, escolhidos, actor);
+    if (tirados.length) {
+      lines.push(`<div class="lig-atk-fx lig-atk-dispel">Efeitos anulados: <strong>${tirados.join(", ")}</strong></div>`);
+    } else if (escolhidos && escolhidos.length === 0) {
+      lines.push(`<div class="lig-atk-fx muted">Nenhum efeito foi anulado.</div>`);
     }
   }
 

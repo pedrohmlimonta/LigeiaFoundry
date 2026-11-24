@@ -58,6 +58,12 @@
       <option value="E" {{#if (eq eff.level "E")}}selected{{/if}}>Épico</option>
     </select>
     {{/if}}
+    <select name="system.effects.{{i}}.polarity" class="lig-fx-class" title="Polaridade: benéfico ou prejudicial. É o que uma dissipação lê para saber se pode anular este efeito.">
+      {{selectOptions ../fxPolarities selected=eff.polarity}}
+    </select>
+    <select name="system.effects.{{i}}.nature" class="lig-fx-class" title="Natureza: mágico ou natural. Combina com a polaridade — existe a maldição mágica e o veneno natural.">
+      {{selectOptions ../fxNatures selected=eff.nature}}
+    </select>
     <input type="text" name="system.effects.{{i}}.label" value="{{eff.label}}" placeholder="nota"/>
     <label class="lig-inline-check" title="Em vez de valer para o personagem, este efeito ENCANTA um item escolhido na hora e passa a valer nas ações daquele item.">
       <input type="checkbox" name="system.effects.{{i}}.enchant" {{checked eff.enchant}}/> encantar

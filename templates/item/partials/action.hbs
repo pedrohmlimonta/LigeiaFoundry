@@ -489,6 +489,15 @@
         <span class="lig-hint lig-removefx-na">—</span>
         {{/if}}
         <input type="text" name="system.actions.{{i}}.removesEffects.{{ri}}.count" value="{{rm.count}}" class="lig-narrow" placeholder="todos" title="Quantos remover entre os que casarem. Vazio ou 0 = todos. Aceita fórmula com @variáveis."/>
+        <select name="system.actions.{{i}}.removesEffects.{{ri}}.polarity" title="Alcança só efeitos desta polaridade. Combina com a natureza ao lado: 'só negativos' + 'só mágicos' alcança apenas a maldição mágica.">
+          {{selectOptions ../../fxPolarityFilters selected=rm.polarity}}
+        </select>
+        <select name="system.actions.{{i}}.removesEffects.{{ri}}.nature" title="Alcança só efeitos desta natureza.">
+          {{selectOptions ../../fxNatureFilters selected=rm.nature}}
+        </select>
+        <label class="lig-inline-check" title="Em vez de levar os primeiros que casarem, mostra os efeitos encontrados nos alvos e deixa escolher quais anular, até o limite.">
+          <input type="checkbox" name="system.actions.{{i}}.removesEffects.{{ri}}.ask" {{checked rm.ask}}/> escolher
+        </label>
         <label class="lig-inline-check" title="Ativa">
           <input type="checkbox" name="system.actions.{{i}}.removesEffects.{{ri}}.enabled" {{checked rm.enabled}}/>
         </label>
@@ -497,7 +506,8 @@
       {{/each}}
       {{#if act.removesEffects.length}}
       <p class="lig-hint">Aplicado a cada alvo atingido, antes dos efeitos que esta ação concede.
-        A condição marcada pelo efeito sai junto, a menos que outro efeito ativo ainda a sustente.</p>
+        A condição marcada pelo efeito sai junto, a menos que outro efeito ativo ainda a sustente.
+        Com <strong>escolher</strong> marcado, os efeitos de todos os alvos aparecem numa caixa só e você decide quais anular, até o limite.</p>
       {{else}}
       <div class="lig-empty">Esta ação não remove efeitos.</div>
       {{/if}}
@@ -610,6 +620,16 @@
             <input type="text" value="{{fx.durationRounds}}" title="Aceita número ou fórmula com @variáveis: @nivel, ceil(@nivel/2), @forca+1 (sem dados como 1d6)." name="system.actions.{{i}}.appliesEffects.{{fi}}.durationRounds"/>
           </label>
           {{/if}}
+          <label title="Polaridade do efeito: benéfico ou prejudicial. É o que uma dissipação lê para saber se pode anulá-lo.">Polaridade
+            <select name="system.actions.{{i}}.appliesEffects.{{fi}}.fxPolarity">
+              {{selectOptions ../../fxPolarities selected=fx.fxPolarity}}
+            </select>
+          </label>
+          <label title="Natureza do efeito: mágico ou natural.">Natureza
+            <select name="system.actions.{{i}}.appliesEffects.{{fi}}.fxNature">
+              {{selectOptions ../../fxNatures selected=fx.fxNature}}
+            </select>
+          </label>
           {{#if ../../actionEconomy}}
           <label title="Sustentação: quem conjurou paga esta ação a cada turno para o efeito continuar de pé no alvo. Sem a ação, o efeito cai sozinho.">Sustentar custa
             <select name="system.actions.{{i}}.appliesEffects.{{fi}}.fxSustain">

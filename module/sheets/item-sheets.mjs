@@ -10,7 +10,8 @@ import { WORDS_BY_TIER, WORD_TARGET_PREFIX, tipagensComoAlvos, weaponTagsOf, wea
          REMOVE_FX_MODES, chainTargetKeys, defesasComoAlvos, resistenciasComoAlvos,
          ITEM_TARGET_PREFIX, WEAPON_ANY_TARGET,
          splitTargetArg, mergeTargetArg, tipagensConhecidas, acoesComoAlvos,
-         EMANATION_TARGET_PREFIX } from "../helpers/effects.mjs";
+         EMANATION_TARGET_PREFIX, FX_POLARITIES, FX_NATURES,
+         FX_POLARITY_FILTERS, FX_NATURE_FILTERS } from "../helpers/effects.mjs";
 import { actionEconomyOn, ACTION_TYPES } from "../helpers/actions.mjs";
 import { activateTagInputs } from "../apps/tag-input.mjs";
 import { CHAIN_WHEN_LABELS } from "../helpers/dice.mjs";
@@ -501,6 +502,12 @@ class LigeiaItemSheetBase extends HandlebarsApplicationMixin(ItemSheetV2) {
       none: "— nenhuma ação —",
       ...Object.fromEntries(Object.entries(ACTION_TYPES).map(([k, d]) => [k, d.label])),
     };
+    // CLASSIFICAÇÃO dos efeitos (polaridade e natureza) e os filtros que a
+    // dissipação usa para alcançar só uma parte deles.
+    context.fxPolarities = FX_POLARITIES;
+    context.fxNatures = FX_NATURES;
+    context.fxPolarityFilters = FX_POLARITY_FILTERS;
+    context.fxNatureFilters = FX_NATURE_FILTERS;
     context.costResources = {
       mp: "Mana (PM)",
       hp: "Vida (PV)",

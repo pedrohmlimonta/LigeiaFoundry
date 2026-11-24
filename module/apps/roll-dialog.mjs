@@ -152,6 +152,76 @@ export async function pedirCriaturaConjurada(cardapio, marcado = 0) {
 }
 
 /**
+ * Mostra os efeitos que a dissipação alcançou e deixa escolher quais tirar.
+ *
+ * A lista vem de todos os alvos atingidos de uma vez, agrupada por quem
+ * carrega cada efeito, e o limite é o da ação: marcar mais do que ele
+ * desmarca o mais antigo, de modo que nunca dá para passar do que se pode
+ * anular. Com limite 0 não há teto — marca-se o que quiser.
+ *
+ * @param {Array} candidatos  [{ id, label, alvo, classe, fonte }]
+ * @param {number} limite     quantos podem sair (0 = sem limite)
+ * @returns {Promise<string[]|null>} os ids escolhidos, ou null se cancelou
+ */
+export async function pedirEfeitosParaRemover(candidatos, limite = 0) {
+  if (!candidatos?.length) return [];
+  const DV2 = foundry?.applications?.api?.DialogV2;
+  // Sem caixa disponível, leva os primeiros — o mesmo que a regra automática.
+  if (!DV2?.wait) return candidatos.slice(0, limite > 0 ? limite : candidatos.length).map((c) => c.id);
+
+  // Agrupa por alvo: numa dissipação em área, saber de quem é cada efeito é
+  // metade da decisão.
+  const porAlvo = new Map();
+  for (const c of candidatos) {
+    if (!porAlvo.has(c.alvo)) porAlvo.set(c.alvo, []);
+    porAlvo.get(c.alvo).push(c);
+  }
+  const vários = porAlvo.size > 1;
+  const corpo = [...porAlvo.entries()].map(([alvo, lista]) => {
+    const linhas = lista.map((c) => `
+      <label class="lig-rd-pick">
+        <input type="checkbox" name="fx" value="${c.id}"/>
+        <span><strong>${c.label}</strong>${c.classe ? ` <span class="lig-rd-sub">(${c.classe})</span>` : ""}${c.fonte ? ` <span class="lig-rd-sub">· de ${c.fonte}</span>` : ""}</span>
+      </label>`).join("");
+    return vários ? `<div class="lig-rd-group"><div class="lig-rd-group-title">${alvo}</div>${linhas}</div>` : linhas;
+  }).join("");
+
+  const teto = limite > 0
+    ? `<p class="lig-rd-hint">Você pode anular até <strong>${limite}</strong>. Marcar além disso solta o mais antigo.</p>`
+    : `<p class="lig-rd-hint">Sem limite: marque o que quiser anular.</p>`;
+
+  // O limite é segurado enquanto a caixa está aberta: o excedente se
+  // desmarca sozinho, em vez de avisar depois que já foi.
+  const segurarLimite = (ev) => {
+    const form = ev.target?.closest?.("form.lig-roll-dialog");
+    if (!form || ev.target?.name !== "fx" || limite <= 0) return;
+    const marcados = [...form.querySelectorAll('input[name="fx"]:checked')];
+    while (marcados.length > limite) marcados.shift().checked = false;
+  };
+  document.addEventListener("change", segurarLimite, true);
+
+  try {
+    const out = await DV2.wait({
+      window: { title: "Anular efeitos — escolha quais" },
+      classes: ["ligeia", "lig-roll-dialog-window"],
+      content: `<form class="lig-roll-dialog" autocomplete="off">${teto}${corpo}</form>`,
+      buttons: [
+        {
+          action: "ok", label: "Anular", icon: "fas fa-ban", default: true,
+          callback: (event, button) => [...button.form.querySelectorAll('input[name="fx"]:checked')].map((i) => i.value),
+        },
+        { action: "cancel", label: "Cancelar", icon: "fas fa-times", callback: () => null },
+      ],
+      rejectClose: false,
+      close: () => null,
+    }).catch(() => null);
+    return Array.isArray(out) ? out : null;
+  } finally {
+    document.removeEventListener("change", segurarLimite, true);
+  }
+}
+
+/**
  * Arma a mira: o PRÓXIMO CLIQUE num token escolhe o alvo e já dispara.
  *
  * Usado pelas ações em cadeia marcadas como "Variável". Não há janela nem

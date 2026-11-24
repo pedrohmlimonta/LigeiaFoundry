@@ -13,7 +13,7 @@ import { effectIsActive, availableActionsOf, resolveEffectValue, WORD_TARGET_PRE
          chainTargetKeys, actionShowsInSheet, defesasComoAlvos, resistenciasComoAlvos,
          ITEM_TARGET_PREFIX, WEAPON_ANY_TARGET, WEAPON_TAG_PREFIX,
          splitTargetArg, mergeTargetArg, tipagensConhecidas, acoesComoAlvos,
-         EMANATION_TARGET_PREFIX } from "../helpers/effects.mjs";
+         EMANATION_TARGET_PREFIX, FX_POLARITIES, FX_NATURES } from "../helpers/effects.mjs";
 
 import { createSustainLink, isSustainLink } from "../helpers/sustain.mjs";
 import { actionEconomyOn, spendActions, refundActions, restoreActions, actionPoolFor, poolEntries,
@@ -339,6 +339,10 @@ export class LigeiaCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV
       bloqueio: "Bloqueio", esquiva: "Esquiva", conjuracao: "Conjuração", iniciativa: "Iniciativa", deslocamento: "Deslocamento",
     };
     context.weaponTagSuggestions = tipagensConhecidas();
+    // CLASSIFICAÇÃO dos efeitos (polaridade × natureza), lida pelas
+    // dissipações para saber o que podem anular.
+    context.fxPolarities = FX_POLARITIES;
+    context.fxNatures = FX_NATURES;
     // ECONOMIA DE AÇÕES: o painel da rodada só existe com a mecânica ligada.
     context.actionEconomy = actionEconomyOn();
     if (context.actionEconomy) {

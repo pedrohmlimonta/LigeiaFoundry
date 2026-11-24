@@ -50,6 +50,10 @@ function appliedEffectsField() {
       // Se este efeito ativa uma condição, guarda o id dela (para removê-la
       // quando o efeito terminar/for resistido).
       conditionId: new fields.StringField({ blank: true, initial: "" }),
+      // CLASSIFICAÇÃO (ver helpers/effects.mjs): dois eixos de polos
+      // opostos. É o que a dissipação lê para saber o que pode anular.
+      polarity: new fields.StringField({ initial: "none", choices: ["none", "positive", "negative"] }),
+      nature: new fields.StringField({ initial: "none", choices: ["none", "magical", "natural"] }),
       disabled: new fields.BooleanField({ initial: false }),
       duration: new fields.SchemaField({
         // Número OU fórmula com @variáveis do portador (ex.: "@nivel").

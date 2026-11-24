@@ -139,6 +139,23 @@ foi solto, a ação faltou) ou quando ela **morre**; morrendo uma de três, as
 outras duas continuam e o vínculo encolhe. Desmarcando "ficha própria", o
 token é avulso e nenhuma ficha é criada.
 
+### Classificação dos efeitos e dissipação
+Todo efeito se classifica em **dois eixos de polos opostos**, independentes
+entre si: **positivo × negativo** e **mágico × natural** (ou nenhum dos
+dois). Um efeito nunca é positivo e negativo ao mesmo tempo, nem mágico e
+natural — mas pode ser *negativo e mágico*, como uma maldição, ou *negativo
+e natural*, como um veneno. A classificação existe nos três lugares: efeito
+de item, efeito que a ação aplica no alvo e efeito ativo na ficha.
+
+É o que a **dissipação** lê. A regra de *anular efeitos* de uma ação ganhou
+filtros de polaridade e natureza, que se combinam: "só negativos", "só
+mágicos", ou "negativos **e** mágicos" — e segue valendo o modo (pelo nome,
+por condição, os que eu apliquei, todos) e o limite de quantos saem. Com
+**escolher** marcado, em vez de levar os primeiros que casarem, a ação
+mostra numa caixa só os efeitos encontrados em **todos os alvos atingidos**,
+agrupados por quem os carrega e com a classe de cada um, e você decide quais
+anular — marcar além do limite solta o mais antigo.
+
 ### Emanações
 Uma ação de área ou aura pode deixar a área no mapa e reaplicar-se a quem
 iniciar o turno dentro dela. Além disso, um **efeito do tipo Emanação** cria

@@ -220,6 +220,18 @@
       </div>
       {{#if ae.summary}}<div class="lig-applied-summary">{{ae.summary}}</div>{{/if}}
       {{#if ae.isSustain}}<div class="lig-sustain-note">⛓ {{ae.sustainNote}}</div>{{/if}}
+      <div class="lig-applied-config lig-fx-class-row">
+        <label title="Polaridade do efeito: benéfico ou prejudicial. É o que uma dissipação lê para saber se pode anulá-lo.">Polaridade
+          <select name="system.appliedEffects.{{ae.index}}.polarity">
+            {{selectOptions ../fxPolarities selected=ae.polarity}}
+          </select>
+        </label>
+        <label title="Natureza do efeito: mágico ou natural.">Natureza
+          <select name="system.appliedEffects.{{ae.index}}.nature">
+            {{selectOptions ../fxNatures selected=ae.nature}}
+          </select>
+        </label>
+      </div>
       <div class="lig-applied-config">
         <label>Tipo
           <select name="system.appliedEffects.{{ae.index}}.effects.0.type">

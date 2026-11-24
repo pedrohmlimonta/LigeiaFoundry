@@ -1223,6 +1223,12 @@ label.lig-bars-players {
 .lig-rd-pick:hover { color: var(--lig-gold, #c9a84a); }
 .lig-rd-pick input { margin: 0; flex: 0 0 auto; }
 
+.lig-rd-group { margin: 0.3rem 0 0.5rem; }
+.lig-rd-group-title {
+  font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--lig-gold, #c9a84a); margin-bottom: 0.15rem;
+}
+
 .lig-rd-hint {
   margin-top: 0.35rem;
   font-size: 0.82rem;
@@ -1467,6 +1473,10 @@ label.lig-bars-players {
 }
 .lig-pip.on { background: var(--lig-gold, #c9a84a); }
 .lig-pip.none { border-style: dashed; opacity: 0.4; }
+
+/* Polaridade e natureza no editor de efeitos */
+.lig-fx-class { max-width: 9rem; }
+.lig-fx-class-row > label { flex: 1 1 8rem; }
 
 /* O aviso de que uma condição apertou as ações da rodada */
 .lig-action-capped { color: var(--lig-danger, #b4553f); }
